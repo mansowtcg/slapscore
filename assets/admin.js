@@ -85,6 +85,7 @@ export async function mount(root, ctx) {
     <div class="col">
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>se revisan primero</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Partidos ocultos</h3></div><div id="hidden"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
     </div>
   </div>`;
@@ -93,7 +94,7 @@ export async function mount(root, ctx) {
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
-  loadWorkflow(); loadRuns();
+  loadWorkflow(); loadRuns(); drawRanks();
   try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
@@ -235,7 +236,14 @@ async function track() {
         if (save && save.status === 'completed') { stage = 3; pct = 84; }
         if (pub && pub.status === 'completed') { stage = 3; pct = 94; }
       }
-      if (run.status === 'completed') break;
+      if (run.status === 'completed') {
+        if (run.conclusion === 'cancelled') {
+          const j = await gh(`/actions/workflows/${WF}/runs?per_page=10&event=${st.kind}`);
+          const newer = (j.workflow_runs || []).find((r) => r.id !== run.id && Date.parse(r.created_at) >= st.since - 20000 && Date.parse(r.created_at) >= Date.parse(run.created_at));
+          if (newer) { run = newer; continue; }
+        }
+        break;
+      }
       drawProgress({ pct, stage, title, time });
       await sleep(4000);
     }
@@ -318,4 +326,88 @@ function drawWeights(set) {
     catch (ex) { X.toast(ex.message); }
     b.disabled = false;
   });
+}
+
+// ---------- logos de rango ----------
+// Un solo commit con varios archivos (API de datos de Git)
+async function commitFiles(changes, message) {
+  const ref = await gh('/git/ref/heads/main');
+  const base = ref.object.sha;
+  const commit = await gh(`/git/commits/${base}`);
+  const tree = [];
+  for (const c of changes) {
+    if (c.remove) { tree.push({ path: c.path, mode: '100644', type: 'blob', sha: null }); continue; }
+    const blob = await gh('/git/blobs', { method: 'POST', body: JSON.stringify({ content: c.b64, encoding: 'base64' }) });
+    tree.push({ path: c.path, mode: '100644', type: 'blob', sha: blob.sha });
+  }
+  const t = await gh('/git/trees', { method: 'POST', body: JSON.stringify({ base_tree: commit.tree.sha, tree }) });
+  const nc = await gh('/git/commits', { method: 'POST', body: JSON.stringify({ message, tree: t.sha, parents: [base] }) });
+  await gh('/git/refs/heads/main', { method: 'PATCH', body: JSON.stringify({ sha: nc.sha }) });
+}
+const readFileB64 = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res({ b64: String(r.result).split(',')[1], url: String(r.result) }); r.onerror = () => rej(new Error('No se pudo leer ' + f.name)); r.readAsDataURL(f); });
+const EXT = { 'image/png': 'png', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/jpeg': 'jpg' };
+function keyFromFile(name) {
+  let s = name.replace(/\.[a-z0-9]+$/i, '').trim().replace(/[\s-]+/g, '_').toUpperCase();
+  s = s.replace(/^PLATINUM/, 'PLAT').replace(/_?([123])$/, (m, d) => '_' + ['I', 'II', 'III'][d - 1]);
+  if (X.RANK_KEYS.includes(s)) return s;
+  const k = X.C.rankKeyFromName(name.replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' '));
+  return X.RANK_KEYS.includes(k) ? k : null;
+}
+async function drawRanks() {
+  const el = $('#ranks'); if (!el) return;
+  const { esc, C } = X;
+  let manifest = {};
+  try { const j = await gh('/contents/assets/ranks/index.json?ref=main'); manifest = JSON.parse(decodeB64(j.content)) || {}; }
+  catch (e) { if (e.status !== 404) { el.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; } }
+  const pending = {};
+  const draw = () => {
+    el.innerHTML = `<p class="muted" style="margin-top:0">Sube los logos oficiales de cada rango: PNG, WebP o SVG, cuadrados y de 128 px o más. Mientras no haya logo se usa el emblema de SlapScore.</p>
+      <div class="rk-up">${X.RANK_KEYS.map((k) => {
+        const name = C.parseRank(k).name, has = !!manifest[k], pv = pending[k] ? `<img src="${pending[k].url}" alt="">` : X.rank(k, 36);
+        return `<div class="rk-item"><span class="pv">${pv}</span><span class="nm">${esc(name)}<small>${pending[k] ? 'Nuevo, sin guardar' : has ? 'Logo oficial' : 'Emblema SlapScore'}</small></span><span class="acts"><label>${has || pending[k] ? 'Cambiar' : 'Subir'}<input type="file" accept="image/png,image/webp,image/svg+xml" data-up="${k}" hidden></label>${has && !pending[k] ? `<button type="button" class="rm" data-rm="${k}">Quitar</button>` : ''}</span></div>`;
+      }).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;align-items:center">
+        <label class="btn">Subir varios a la vez<input type="file" accept="image/png,image/webp,image/svg+xml" multiple id="rk-multi" hidden></label>
+        <button class="btn primary" type="button" id="rk-save" ${Object.keys(pending).length ? '' : 'disabled'}>Guardar ${Object.keys(pending).length || ''} logos</button>
+        <span class="muted" style="font-size:12.5px">Para subir varios, nombra cada archivo como el rango: <span class="code">PLAT_III.png</span>, <span class="code">Gold 2.png</span>, <span class="code">Legend.png</span>…</span>
+      </div>`;
+    $$('[data-up]', el).forEach((inp) => inp.addEventListener('change', async () => { const f = inp.files[0]; if (f) await addFile(inp.getAttribute('data-up'), f); }));
+    $('#rk-multi').addEventListener('change', async (e) => {
+      const miss = [];
+      for (const f of e.target.files) { const k = keyFromFile(f.name); if (k) await addFile(k, f, true); else miss.push(f.name); }
+      if (miss.length) X.toast(`No sé a qué rango corresponden: ${miss.slice(0, 3).join(', ')}${miss.length > 3 ? '…' : ''}`);
+      draw();
+    });
+    $$('[data-rm]', el).forEach((b) => b.addEventListener('click', async () => {
+      const k = b.getAttribute('data-rm'); b.disabled = true;
+      const next = { ...manifest }; const file = next[k]; delete next[k];
+      try {
+        await commitFiles([{ path: `assets/ranks/${file}`, remove: true }, { path: 'assets/ranks/index.json', b64: btoa(JSON.stringify(next, null, 2) + '\n') }], `Quitar logo de rango ${k}`);
+        manifest = next; X.toast('Logo quitado. La web se actualiza en unos 2 minutos.'); startTracking({ since: Date.now() - 5000, minutes: 1, kind: 'push', label: 'Aplicando los cambios' }); draw();
+      } catch (ex) { X.toast(ex.message); b.disabled = false; }
+    }));
+    const save = $('#rk-save');
+    if (save) save.addEventListener('click', async () => {
+      save.disabled = true; save.textContent = 'Guardando…';
+      const next = { ...manifest }, changes = [];
+      for (const [k, f] of Object.entries(pending)) {
+        const file = `${k}.${f.ext}`;
+        if (next[k] && next[k] !== file) changes.push({ path: `assets/ranks/${next[k]}`, remove: true });
+        changes.push({ path: `assets/ranks/${file}`, b64: f.b64 }); next[k] = file;
+      }
+      changes.push({ path: 'assets/ranks/index.json', b64: btoa(JSON.stringify(next, null, 2) + '\n') });
+      try {
+        await commitFiles(changes, `Logos de rango: ${Object.keys(pending).join(', ')}`);
+        manifest = next; for (const k of Object.keys(pending)) delete pending[k];
+        X.toast('Logos guardados. Se verán en la web en unos 2 minutos.');
+        startTracking({ since: Date.now() - 5000, minutes: 1, kind: 'push', label: 'Publicando los logos' }); draw();
+      } catch (ex) { X.toast(ex.message); save.disabled = false; save.textContent = 'Guardar logos'; }
+    });
+  };
+  async function addFile(k, f, quiet) {
+    const ext = EXT[f.type]; if (!ext) { X.toast(`${f.name}: usa PNG, WebP o SVG.`); return; }
+    if (f.size > 600 * 1024) { X.toast(`${f.name} pesa más de 600 KB. Usa una versión más ligera.`); return; }
+    try { const r = await readFileB64(f); pending[k] = { ...r, ext }; if (!quiet) draw(); } catch (e) { X.toast(e.message); }
+  }
+  draw();
 }

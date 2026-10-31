@@ -232,7 +232,9 @@ for (const m of norms) {
   days.get(day).push({
     i: m.id, k: m.key, t: m.t, y: m.type, r: m.region, a: m.arena, e: m.endReason, o: m.ot ? 1 : 0,
     s: [m.score.home, m.score.away], w: m.winner === 'home' ? 0 : m.winner === 'away' ? 1 : -1, v: m.mvp, f: m.format,
-    p: m.players.map((p) => [p.pid, p.name, p.team === 'home' ? 0 : 1, p.rating, p.st.goals || 0, p.st.assists || 0, p.rk, p.rkApprox ? 1 : 0]),
+    // [id, nombre, equipo, nota, G, A, rango, aprox, tiros, paradas, pases, puntos de juego, robos, bloqueos]
+    p: m.players.map((p) => [p.pid, p.name, p.team === 'home' ? 0 : 1, p.rating, p.st.goals || 0, p.st.assists || 0, p.rk, p.rkApprox ? 1 : 0,
+      p.st.shots || 0, p.st.saves || 0, p.st.passes || 0, p.st.score || 0, p.st.takeaways || 0, p.st.blocks || 0]),
   });
   m.players.forEach((p, idx) => {
     if (!p.pid) return;
@@ -248,12 +250,12 @@ for (const m of norms) {
 }
 
 function agg(list) {
-  const a = { gp: 0, w: 0, l: 0, d: 0, mvp: 0, rs: 0, g: 0, as: 0, sh: 0, sv: 0, ps: 0, tk: 0, bl: 0, to: 0, po: 0, fw: 0, fl: 0, ph: 0 };
+  const a = { gp: 0, w: 0, l: 0, d: 0, mvp: 0, rs: 0, g: 0, as: 0, sh: 0, sv: 0, ps: 0, tk: 0, bl: 0, to: 0, po: 0, fw: 0, fl: 0, ph: 0, pt: 0 };
   for (const g of list) {
     const s = g.st; a.gp++; a[g.r === 'W' ? 'w' : g.r === 'L' ? 'l' : 'd']++; a.mvp += g.mv; a.rs += g.rt;
     a.g += s.goals || 0; a.as += s.assists || 0; a.sh += s.shots || 0; a.sv += s.saves || 0; a.ps += s.passes || 0;
     a.tk += s.takeaways || 0; a.bl += s.blocks || 0; a.to += s.turnovers || 0; a.po += s.possession_time_sec || 0;
-    a.fw += s.faceoffs_won || 0; a.fl += s.faceoffs_lost || 0; a.ph += s.post_hits || 0;
+    a.fw += s.faceoffs_won || 0; a.fl += s.faceoffs_lost || 0; a.ph += s.post_hits || 0; a.pt += s.score || 0;
   }
   a.rs = Math.round(a.rs * 10) / 10;
   return a;

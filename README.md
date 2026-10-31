@@ -28,6 +28,14 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada, así el rep
 
 Se pueden cambiar desde el panel de administrador, que usa un token de GitHub de grano fino con permisos de **Actions** y **Contents** en lectura y escritura sobre este repositorio. El token solo se guarda en el navegador de quien lo usa.
 
+## App en el móvil
+
+SlapScore se puede instalar en la pantalla de inicio (Android: botón «Instalar»; iPhone: Compartir › Añadir a pantalla de inicio). Un service worker guarda la web y los datos ya vistos para que cargue al instante y funcione sin conexión. Cada publicación marca los archivos con su versión (`?b=…`) para que nunca se mezclen versiones.
+
+## Logos de rango
+
+La web usa los logos que haya en `assets/ranks/` según `assets/ranks/index.json` (por ejemplo `{"PLAT_III": "PLAT_III.png"}`). Se suben desde el panel de administrador. Si falta alguno, se usa el emblema de SlapScore.
+
 ## Código
 
 - `assets/core.js`: nota de los jugadores, normalización de partidos y rangos (lo comparten la web y el robot).

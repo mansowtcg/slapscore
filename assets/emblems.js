@@ -49,10 +49,23 @@ export function emblemSVG(rk, size = 20) {
   return `<svg class="emb" width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
+// Logos oficiales subidos desde el panel (assets/ranks/index.json: { "PLAT_III": "PLAT_III.png", "GOLD": "GOLD.png", ... })
+let OFFICIAL = {};
+export function setOfficial(map) { OFFICIAL = map && typeof map === 'object' ? map : {}; }
+export const hasOfficial = () => Object.keys(OFFICIAL).length > 0;
+export function officialSrc(rk) {
+  const r = parseRank(rk); if (!r) return null;
+  const f = OFFICIAL[r.key] || OFFICIAL[r.tier];
+  return f ? 'assets/ranks/' + encodeURI(f) : null;
+}
+
 // Emblema con título accesible (nombre del rango)
 export function emblem(rk, size = 20, opts = {}) {
   const r = parseRank(rk);
   if (!r) return '';
   const label = r.name + (opts.mmr != null ? ` · ${opts.mmr} MMR` : '') + (opts.approx ? ' (aproximado)' : '');
-  return `<span class="emb-wrap${opts.approx ? ' approx' : ''}" role="img" aria-label="${label}" title="${label}">${emblemSVG(rk, size)}</span>`;
+  const src = officialSrc(rk);
+  const inner = src ? `<img class="emb-img" src="${src}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async">` : emblemSVG(rk, size);
+  return `<span class="emb-wrap${opts.approx ? ' approx' : ''}" role="img" aria-label="${label}" title="${label}">${inner}</span>`;
 }
+export const RANK_KEYS = ['BRONZE_I', 'BRONZE_II', 'BRONZE_III', 'SILVER_I', 'SILVER_II', 'SILVER_III', 'GOLD_I', 'GOLD_II', 'GOLD_III', 'PLAT_I', 'PLAT_II', 'PLAT_III', 'DIAMOND', 'LEGEND'];

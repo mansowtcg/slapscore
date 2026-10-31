@@ -1,6 +1,6 @@
 // SlapScore — aplicación web
 import * as C from './core.js';
-import { emblem, emblemDefs } from './emblems.js';
+import { emblem, emblemDefs, setOfficial, hasOfficial, RANK_KEYS } from './emblems.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -63,7 +63,7 @@ const DF_DM = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short',
 const today = () => C.madrid(Date.now()).day;
 const yesterday = () => C.madrid(Date.now() - 864e5).day;
 const dayDate = (d) => new Date(d + 'T12:00:00Z');
-function dayShort(d) { if (d === today()) return 'Hoy'; if (d === yesterday()) return 'Ayer'; return DF_WD.format(dayDate(d)).replace('.', ''); }
+function dayShort(d) { if (d === today()) return 'Hoy'; if (d === yesterday()) return 'Ayer'; const w = DF_WD.format(dayDate(d)).replace('.', ''); return w[0].toUpperCase() + w.slice(1); }
 const dayLong = (d) => d === today() ? 'Hoy' : d === yesterday() ? 'Ayer' : new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(dayDate(d));
 function ago(t) {
   const s = (Date.now() - t) / 1000;
@@ -82,6 +82,12 @@ function parseMatch(h) {
   return m ? { key: `${m[1]}-${m[2]}-${m[3]}/${m[4]}`, id: m[5] } : null;
 }
 const ICON = {
+  install: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>',
+  games: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M12 4v16"/><circle cx="12" cy="12" r="2.6"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.4 3.4-5.5 6.5-5.5s5.7 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.2 14.8c1.7.8 2.9 2.6 3.3 5.2"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0Z"/><path d="M8 6H4.5v1.5A3.5 3.5 0 0 0 8 11M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11M12 13v4M8.5 20.5h7M9.5 17h5v3.5h-5Z"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
   theme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>',
@@ -101,6 +107,7 @@ APP.innerHTML = `
     <a class="brand" href="#partidos" aria-label="SlapScore, inicio"><span class="brand-mark"><i></i></span><span class="t">SlapScore</span></a>
     <div class="search" role="search">${ICON.search}<input id="q" type="search" placeholder="Buscar jugador" autocomplete="off" aria-label="Buscar jugador" aria-controls="sres"><div class="sres" id="sres" role="listbox" hidden></div></div>
     <div class="hdr-actions">
+      <button class="ibtn" id="btn-install" type="button" aria-label="Instalar SlapScore" title="Instalar la app" hidden>${ICON.install}</button>
       <button class="ibtn" id="btn-refresh" type="button" aria-label="Actualizar datos" title="Actualizar datos">${ICON.refresh}</button>
       <button class="ibtn" id="btn-theme" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro">${ICON.theme}</button>
       <a class="ibtn" id="btn-admin" href="#admin" aria-label="Panel de administrador" title="Administrador" hidden>${ICON.admin}</a>
@@ -113,6 +120,8 @@ APP.innerHTML = `
 <div class="wrap newbar" id="newbar" hidden><button type="button" id="btn-new">Hay partidos nuevos · Actualizar</button></div>
 <main class="wrap" id="main" tabindex="-1"></main>
 <footer class="wrap foot" id="foot"></footer>
+<nav class="bnav" aria-label="Secciones"><a href="#partidos" data-nav="partidos">${ICON.games}Partidos</a><a href="#jugadores" data-nav="jugadores">${ICON.users}Jugadores</a><a href="#rankings" data-nav="rankings">${ICON.trophy}Rankings</a><a href="#notas" data-nav="notas">${ICON.info}Info</a></nav>
+<div id="itip"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
 const MAIN = $('#main');
@@ -131,10 +140,12 @@ function renderChrome() {
 // tema
 function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
 try { applyTheme(localStorage.getItem('slapscore-theme')); } catch {}
+const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+function themeIcon() { const b = $('#btn-theme'); const d = isDark(); b.innerHTML = d ? ICON.sun : ICON.theme; b.setAttribute('aria-label', d ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'); }
+themeIcon(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeIcon);
 $('#btn-theme').addEventListener('click', () => {
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
-  const next = dark ? 'light' : 'dark';
-  const doIt = () => { applyTheme(next); try { localStorage.setItem('slapscore-theme', next); } catch {} };
+  const next = isDark() ? 'light' : 'dark';
+  const doIt = () => { applyTheme(next); themeIcon(); try { localStorage.setItem('slapscore-theme', next); } catch {} };
   if (document.startViewTransition && !REDUCED.matches) document.startViewTransition(doIt); else doIt();
 });
 
@@ -202,17 +213,31 @@ function setNav(view) {
   const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', notas: 'notas' };
   $$('[data-nav]').forEach((a) => a.getAttribute('data-nav') === map[view] ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
 }
-let lastPath = null;
+let lastPath = null, lastHash = location.hash || '#';
+const SCROLL = new Map(), STACK = [lastHash];
 function go(opts = {}) {
   const tok = ++TOK; closeSheet(true); MAIN.onclick = null; S.onResize = null;
   const r = route(); setNav(r.view);
-  const path = r.view + (r.view === 'matches' ? '' : (r.id || r.pid || ''));
+  const path = r.view + (r.day || r.id || r.pid || '');
   const scroll = !opts.keepScroll && path !== lastPath; lastPath = path;
-  const run = () => { render(r, tok); if (scroll) window.scrollTo(0, 0); };
+  const y = opts.restore ? SCROLL.get(location.hash || '#') : null;
+  const run = () => { render(r, tok); if (y != null) restoreScroll(y, tok); else if (scroll) window.scrollTo(0, 0); };
   if (S.booted && !opts.instant && document.startViewTransition && !REDUCED.matches) document.startViewTransition(run);
   else run();
 }
-window.addEventListener('hashchange', () => go());
+function restoreScroll(y, tok) {
+  let n = 0;
+  const tryIt = () => { if (!live(tok)) return; window.scrollTo(0, y); if (Math.abs(window.scrollY - y) > 4 && n++ < 15) setTimeout(tryIt, 70); };
+  requestAnimationFrame(tryIt);
+}
+window.addEventListener('hashchange', () => {
+  SCROLL.set(lastHash, window.scrollY);
+  const h = location.hash || '#';
+  const back = STACK.length > 1 && STACK[STACK.length - 2] === h;
+  if (back) STACK.pop(); else { STACK.push(h); if (STACK.length > 60) STACK.shift(); }
+  lastHash = h;
+  go({ restore: back });
+});
 function render(r, tok) {
   if (!S.index) { MAIN.innerHTML = skeletonList(6); return; }
   if (r.view === 'match') return r.id ? viewMatch(r, tok) : notFound('Este enlace de partido no es válido.');
@@ -253,6 +278,7 @@ async function viewMatches(dayArg, tok) {
         </div>
         <div class="filters" id="m-filters"></div>
       </div>
+      <div id="m-lead" class="only-mobile"></div>
       <div id="m-list" class="col">${skeletonList(8)}</div>
     </section>
     <aside class="col" id="m-right">${skeletonList(5)}</aside>
@@ -264,8 +290,8 @@ async function viewMatches(dayArg, tok) {
   catch (e) { if (live(tok)) errorBox(e); return; }
   if (!live(tok)) return;
   list = list.filter((m) => !S.hidden.has(m.i));
-  const draw = () => { drawFilters(list); drawLeft(list, draw); drawList(list, day); };
-  draw();
+  drawFilters(list); drawLeft(list); drawList(list, day);
+  const ml = $('#m-lead'); if (ml) ml.innerHTML = leadersCard(list, day);
   drawRight(list, top, day);
 }
 function counts(list, f) { const c = new Map(); for (const m of list) c.set(m[f], (c.get(m[f]) || 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1]); }
@@ -273,9 +299,13 @@ function drawFilters(list) {
   const el = $('#m-filters'); if (!el) return;
   const types = counts(list, 'y');
   el.innerHTML = `<div class="chips" role="group" aria-label="Tipo de partida"><button type="button" class="chip" data-t="" aria-pressed="${!MF.type}">Todos <span class="n">${list.length}</span></button>${types.map(([y, n]) => `<button type="button" class="chip" data-t="${esc(y)}" aria-pressed="${MF.type === y}">${esc(typeLabel(y))} <span class="n">${n}</span></button>`).join('')}</div>
-    <input class="input" id="m-q" type="search" placeholder="Filtrar por jugador" value="${esc(MF.q)}" autocomplete="off" aria-label="Filtrar partidos por jugador">`;
+    <input class="input" id="m-q" type="search" placeholder="Filtrar por jugador" value="${esc(MF.q)}" autocomplete="off" aria-label="Filtrar partidos por jugador">
+    <select class="select only-narrow" id="m-region" aria-label="Región"><option value="">Región</option>${counts(list, 'r').map(([v, n]) => `<option value="${esc(v)}" ${MF.region === v ? 'selected' : ''}>${esc(regionLabel(v))} (${n})</option>`).join('')}</select>
+    <select class="select only-narrow" id="m-arena" aria-label="Arena"><option value="">Arena</option>${counts(list, 'a').map(([v, n]) => `<option value="${esc(v)}" ${MF.arena === v ? 'selected' : ''}>${esc(v)} (${n})</option>`).join('')}</select>`;
   $$('[data-t]', el).forEach((b) => b.addEventListener('click', () => { MF.type = b.getAttribute('data-t'); MF.limit = 120; $$('[data-t]', el).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawList(list, S._day); drawLeft(list); }));
-  $('#m-q').addEventListener('input', (e) => { MF.q = e.target.value; MF.limit = 120; drawList(list, S._day); });
+  let tq; $('#m-q').addEventListener('input', (e) => { clearTimeout(tq); tq = setTimeout(() => { MF.q = e.target.value; MF.limit = 120; drawList(list, S._day); }, 140); });
+  $('#m-region').addEventListener('change', (e) => { MF.region = e.target.value; MF.limit = 120; drawLeft(list); drawList(list, S._day); });
+  $('#m-arena').addEventListener('change', (e) => { MF.arena = e.target.value; MF.limit = 120; drawLeft(list); drawList(list, S._day); });
 }
 function filtered(list) {
   const q = fold(MF.q.trim());
@@ -311,6 +341,14 @@ function drawList(list, day) {
   }
   if (rows.length > MF.limit) html += `<div class="card more"><button class="btn" type="button" id="m-more">Ver más partidos (${rows.length - MF.limit})</button></div>`;
   el.innerHTML = html;
+  const byId = new Map(rows.map((m) => [m.i, m]));
+  el.onclick = (e) => {
+    const b = e.target.closest('.ev-x'); if (!b) return;
+    const w = b.closest('.evw'), box = $('.ev-box', w), m = byId.get(w.getAttribute('data-i'));
+    const open = b.getAttribute('aria-expanded') !== 'true';
+    if (open && !box.dataset.ready && m) { $('.ev-box-in', box).innerHTML = evBox(m); box.dataset.ready = '1'; }
+    b.setAttribute('aria-expanded', String(open)); box.classList.toggle('open', open);
+  };
   $$('.grp-h', el).forEach((b) => b.addEventListener('click', () => {
     const g = b.closest('.grp'); const k = g.getAttribute('data-k'); const open = g.getAttribute('data-open') !== 'true';
     g.setAttribute('data-open', String(open)); b.setAttribute('aria-expanded', String(open)); open ? MF.closed.delete(k) : MF.closed.add(k);
@@ -325,14 +363,42 @@ function evRow(m, q) {
   };
   const mvp = m.p[m.v];
   const status = m.o ? '<span class="ot">Prór.</span>' : (m.e === 'Tie' ? 'Empate' : m.e === 'Forfeit' ? 'Rend.' : /Left$/.test(m.e) ? 'Aband.' : 'Final');
-  return `<a class="ev" href="${matchHref(m.k, m.i)}"><div class="ev-time"><b>${DF_TIME.format(new Date(m.t))}</b><span>${status}</span></div>
+  return `<div class="evw" data-i="${esc(m.i)}"><a class="ev" href="${matchHref(m.k, m.i)}"><div class="ev-time"><b>${DF_TIME.format(new Date(m.t))}</b><span>${status}</span></div>
     <div class="ev-teams">${side(0)}${side(1)}</div>
     <div class="ev-score"><span class="${m.w === 0 ? 'won' : ''}">${m.s[0]}</span><span class="${m.w === 1 ? 'won' : ''}">${m.s[1]}</span></div>
-    <div class="ev-mvp" title="${mvp ? 'MVP: ' + esc(mvp[1]) : ''}">${mvp ? badge(mvp[3]) : ''}</div></a>`;
+    <div class="ev-mvp" title="${mvp ? 'MVP: ' + esc(mvp[1]) : ''}">${mvp ? badge(mvp[3]) : ''}</div></a>
+    <button class="ev-x" type="button" aria-expanded="false" aria-label="Ver las estadísticas de los jugadores">${ICON.down}</button>
+    <div class="ev-box"><div><div class="ev-box-in"></div></div></div></div>`;
+}
+// Estadísticas de todos los jugadores de un partido, desde el resumen del día
+const MINI = [['Nota', 3], ['G', 4, 'Goles'], ['A', 5, 'Asistencias'], ['TIR', 8, 'Tiros'], ['PAR', 9, 'Paradas'], ['PAS', 10, 'Pases'], ['ROB', 12, 'Robos'], ['BLQ', 13, 'Bloqueos'], ['PTS', 11, 'Puntos de juego']];
+function evBox(m) {
+  const best = MINI.map(([, i]) => i === 3 ? null : Math.max(0, ...m.p.map((p) => typeof p[i] === 'number' ? p[i] : 0)));
+  const row = (p) => `<tr><td><a class="pc" href="#j-${esc(p[0])}">${rank(p[6], 16, { approx: p[7] })}<span class="nm">${esc(p[1])}</span></a></td>${MINI.map(([, i], k) => i === 3 ? `<td>${badge(p[3])}</td>`
+    : `<td class="${typeof p[i] === 'number' && p[i] > 0 && p[i] === best[k] ? 'best' : ''}">${typeof p[i] === 'number' ? int(p[i]) : '–'}</td>`).join('')}</tr>`;
+  return `<div class="tscroll"><table class="tbl evt"><thead><tr><th>Jugador</th>${MINI.map(([l, , t]) => `<th${t ? ` title="${t}"` : ''}>${l}</th>`).join('')}</tr></thead><tbody>
+    ${[0, 1].map((tm) => `<tr class="tg"><td colspan="${MINI.length + 1}"><span class="pc">${crest(tm, 16)}${tm === 0 ? 'Local' : 'Visitante'} · ${m.s[tm]}</span></td></tr>` + m.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map(row).join('')).join('')}
+  </tbody></table></div><div class="ev-box-f"><a href="${matchHref(m.k, m.i)}">Ver el partido completo</a></div>`;
+}
+function leaders(list) {
+  const map = new Map();
+  for (const m of list) for (const p of m.p) {
+    let a = map.get(p[0]);
+    if (!a) { a = { id: p[0], n: p[1], rk: p[6], gp: 0, g: 0, a: 0, rs: 0, t: 0 }; map.set(p[0], a); }
+    a.gp++; a.g += p[4]; a.a += p[5]; a.rs += p[3];
+    if (m.t > a.t) { a.t = m.t; a.n = p[1]; if (p[6]) a.rk = p[6]; }
+  }
+  return [...map.values()].sort((x, y) => (y.g + y.a) - (x.g + x.a) || y.g - x.g || y.rs / y.gp - x.rs / x.gp).slice(0, 8);
+}
+function leadersCard(list, day, cls = '') {
+  const L = leaders(list); if (!L.length) return '';
+  return `<div class="card in ${cls}"><div class="card-h"><h3>Líderes del día</h3><small>${esc(dayLong(day))}</small></div><div class="tscroll"><table class="tbl lead"><thead><tr><th>Jugador</th><th title="Partidos jugados">PJ</th><th title="Goles">G</th><th title="Asistencias">A</th><th title="Goles más asistencias">G+A</th><th>Nota</th></tr></thead><tbody>
+    ${L.map((x, i) => `<tr class="${i >= 5 ? 'xtra' : ''}"><td><a class="pc" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${rank(x.rk, 16)}<span class="nm">${esc(x.n)}</span></a></td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${badge(x.rs / x.gp)}</td></tr>`).join('')}
+  </tbody></table></div></div>`;
 }
 function drawRight(list, top, day) {
   const el = $('#m-right'); if (!el) return;
-  let html = '';
+  let html = leadersCard(list, day, 'hide-mobile');
   const best = list.slice().sort((a, b) => (b.p[b.v] ? b.p[b.v][3] : 0) - (a.p[a.v] ? a.p[a.v][3] : 0))[0];
   if (best && best.p[best.v]) {
     const mv = best.p[best.v];
@@ -399,7 +465,7 @@ async function viewMatch(r, tok) {
     const run = () => drawPanel(m);
     if (document.startViewTransition && !REDUCED.matches) document.startViewTransition(run); else run();
   }));
-  S.onResize = moveInd; requestAnimationFrame(moveInd);
+  S.onResize = moveInd; requestAnimationFrame(moveInd); if (document.fonts) document.fonts.ready.then(() => { if (S.onResize === moveInd) moveInd(); });
   drawPanel(m);
   MAIN.onclick = (e) => { const b = e.target.closest('[data-perf]'); if (b && S.curMatch) { const p = S.curMatch.players[Number(b.getAttribute('data-perf'))]; if (p) openPerf(S.curMatch, p); } };
   const hb = $('#m-hide');
@@ -459,9 +525,26 @@ function drawPanel(m) {
       <div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 16px;margin:12px -16px -16px">${['home', 'away'].map((tm) => lineupList(m, tm)).join('')}</div>`;
     return;
   }
-  el.innerHTML = `<div class="sgrp-h">Estadísticas principales</div>${['shots', 'saves', 'passes', 'possession_time_sec', 'takeaways', 'turnovers', 'faceoffs_won'].map((k) => cmpRow(m, k)).join('')}
-    <div class="sgrp-h" style="margin-top:22px">Notas de los jugadores</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 16px;margin:0 -16px -16px">${['home', 'away'].map((tm) => lineupList(m, tm)).join('')}</div>`;
+  el.innerHTML = `<div class="sgrp-h">Estadísticas de los jugadores</div>${boxScore(m)}
+    <div class="sgrp-h">Comparativa de equipos</div>${['shots', 'saves', 'passes', 'possession_time_sec', 'takeaways', 'turnovers', 'faceoffs_won'].map((k) => cmpRow(m, k)).join('')}`;
+}
+const BOX = [['rating', 'Nota', 'Nota'], ['goals', 'G', 'Goles'], ['primary_assists', 'A1', 'Asistencias primarias'], ['secondary_assists', 'A2', 'Asistencias secundarias'],
+  ['score', 'PTS', 'Puntos de juego'], ['shots', 'TIR', 'Tiros'], ['saves', 'PAR', 'Paradas'], ['blocks', 'BLQ', 'Bloqueos'], ['passes', 'PAS', 'Pases'],
+  ['post_hits', 'PST', 'Postes'], ['takeaways', 'ROB', 'Robos'], ['turnovers', 'PÉR', 'Pérdidas'], ['possession_time_sec', 'POS', 'Posesión'],
+  ['faceoffs_won', 'FO+', 'Faceoffs ganados'], ['faceoffs_lost', 'FO−', 'Faceoffs perdidos']];
+function boxScore(m) {
+  const best = {};
+  for (const [k] of BOX) if (!['rating', 'turnovers', 'faceoffs_lost'].includes(k)) best[k] = Math.max(0, ...m.players.map((p) => p.st[k] || 0));
+  const cell = (k, v) => k === 'possession_time_sec' ? C.fmtPoss(v || 0) : int(v || 0);
+  const team = (tm) => {
+    const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
+    return `<div class="bx-team"><div class="bx-h">${crest(tm, 22)}<b>${tm === 'home' ? 'Local' : 'Visitante'}</b><span class="sc">${m.score[tm]}</span>${m.winner === tm ? '<span class="pill live">Ganador</span>' : ''}<span class="avg">Nota media ${badge(avg(m, tm))}</span></div>
+      <div class="tscroll"><table class="tbl bx"><thead><tr><th>Jugador</th>${BOX.map(([, s, l]) => `<th title="${l}">${s}</th>`).join('')}</tr></thead><tbody>
+      ${ps.map(([p, i]) => `<tr><td><button type="button" class="linkish" data-perf="${i}">${avatar(p.name, p.pid, 'sm')}<span class="nm">${esc(p.name)}</span>${rank(p.rk, 16, { approx: p.rkApprox })}${i === m.mvp ? '<span class="mvp-tag">MVP</span>' : ''}</button></td>${BOX.map(([k]) => k === 'rating' ? `<td>${badge(p.rating)}</td>`
+        : `<td class="${best[k] && (p.st[k] || 0) === best[k] ? 'best' : ''}">${cell(k, p.st[k])}</td>`).join('')}</tr>`).join('')}
+      <tr class="tot"><td>Total</td>${BOX.map(([k]) => k === 'rating' ? '<td></td>' : `<td>${cell(k, m.tot[tm][k])}</td>`).join('')}</tr></tbody></table></div></div>`;
+  };
+  return team('home') + team('away') + `<p class="legend">${BOX.slice(1).map(([, s, l]) => `<b>${s}</b> ${l}`).join(' · ')}. En azul, el mejor del partido en cada columna.</p>`;
 }
 const avg = (m, tm) => { const ps = m.players.filter((p) => p.team === tm); return ps.length ? ps.reduce((a, p) => a + p.rating, 0) / ps.length : 0; };
 function lineupList(m, tm) {
@@ -499,7 +582,7 @@ function statsTable(m) {
   let body = '';
   for (const tm of ['home', 'away']) {
     const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
-    body += `<tr class="grp"><td colspan="${keys.length + 2}">${tm === 'home' ? 'Local' : 'Visitante'} · ${m.score[tm]}</td></tr>`;
+    body += `<tr class="tg"><td colspan="${keys.length + 2}">${tm === 'home' ? 'Local' : 'Visitante'} · ${m.score[tm]}</td></tr>`;
     body += ps.map(([p]) => `<tr><td><a class="pc" href="#j-${esc(p.pid)}">${rank(p.rk, 16, { approx: p.rkApprox })}${esc(p.name)}</a></td><td>${badge(p.rating)}</td>${keys.map((k) => `<td>${val(k, p.st[k])}</td>`).join('')}</tr>`).join('');
     body += `<tr class="tot"><td>Total</td><td></td>${keys.map((k) => `<td>${val(k, m.tot[tm][k])}</td>`).join('')}</tr>`;
   }
@@ -636,7 +719,7 @@ function radar(attr) {
 // JUGADORES (tabla)
 // =====================================================================
 const PF = { q: '', win: 'a', min: 3, sort: 'avg', dir: -1, limit: 50 };
-const PCOLS = [['mmr', 'Rango'], ['gp', 'PJ'], ['w', 'V'], ['wp', '% V'], ['avg', 'Nota'], ['mvp', 'MVP'], ['g', 'G'], ['as', 'A'], ['ga', 'G+A'], ['sh', 'Tiros'], ['sv', 'Paradas'], ['ps', 'Pases'], ['tk', 'Robos'], ['to', 'Pérd.'], ['po', 'Posesión/PJ']];
+const PCOLS = [['mmr', 'Rango'], ['gp', 'PJ'], ['w', 'V'], ['wp', '% V'], ['avg', 'Nota'], ['mvp', 'MVP'], ['g', 'G'], ['as', 'A'], ['ga', 'G+A'], ['ppg', 'PTS/PJ'], ['sh', 'Tiros'], ['shp', '% tiro'], ['sv', 'Paradas'], ['ps', 'Pases'], ['tk', 'Robos'], ['to', 'Pérd.'], ['po', 'Posesión/PJ']];
 async function viewPlayers(tok) {
   MAIN.innerHTML = `<h1 class="h1 in">Jugadores</h1><p class="lead">Todos los jugadores con partidos guardados. Pulsa una columna para ordenar.</p>
     <div class="card in"><div class="card-h" style="flex-wrap:wrap"><div class="toolbar" style="width:100%">
@@ -659,13 +742,13 @@ function drawPlayers(P) {
   for (const [id, p] of Object.entries(P)) {
     const a = p[PF.win]; if (!a || a.gp < PF.min) continue;
     if (q && !fold(p.n).includes(q)) continue;
-    rows.push({ id, p, v: { mmr: p.mmr ?? -1, gp: a.gp, w: a.w, wp: a.w / a.gp, avg: a.rs / a.gp, mvp: a.mvp, g: a.g, as: a.as, ga: a.g + a.as, sh: a.sh, sv: a.sv, ps: a.ps, tk: a.tk, to: a.to, po: a.po / a.gp } });
+    rows.push({ id, p, v: { mmr: p.mmr ?? -1, gp: a.gp, w: a.w, wp: a.w / a.gp, avg: a.rs / a.gp, mvp: a.mvp, g: a.g, as: a.as, ga: a.g + a.as, ppg: (a.pt || 0) / a.gp, shp: a.sh ? a.g / a.sh : 0, sh: a.sh, sv: a.sv, ps: a.ps, tk: a.tk, to: a.to, po: a.po / a.gp } });
   }
   rows.sort((x, y) => (PF.dir === -1 ? y.v[PF.sort] - x.v[PF.sort] : x.v[PF.sort] - y.v[PF.sort]) || y.v.avg - x.v.avg);
   const el = $('#ptable'); if (!el) return;
   if (!rows.length) { el.innerHTML = '<div class="empty"><strong>Ningún jugador con estos filtros.</strong>Baja el mínimo de partidos o cambia el periodo.</div>'; return; }
   const shown = rows.slice(0, PF.limit);
-  const fmt = (k, v) => k === 'avg' ? badge(v) : k === 'wp' ? pct(v) : k === 'po' ? C.fmtPoss(v) : k === 'mmr' ? '' : int(v);
+  const fmt = (k, v) => k === 'avg' ? badge(v) : k === 'wp' || k === 'shp' ? pct(v) : k === 'po' ? C.fmtPoss(v) : k === 'ppg' ? int(Math.round(v)) : k === 'mmr' ? '' : int(v);
   el.innerHTML = `<table class="tbl"><thead><tr><th>Jugador</th>${PCOLS.map(([k, l]) => `<th><button type="button" data-sort="${k}" class="${PF.sort === k ? 'on' : ''}" aria-label="Ordenar por ${l}">${l}${PF.sort === k ? (PF.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead><tbody>
     ${shown.map((r) => `<tr><td><a class="pc" href="#j-${esc(r.id)}">${avatar(r.p.n, r.id, 'sm')}${esc(r.p.n)}</a></td><td><span class="pc" style="justify-content:flex-end">${r.p.rk ? `${int(r.p.mmr)} ${rank(r.p.rk, 20)}` : '<span class="muted">–</span>'}</span></td>${PCOLS.slice(1).map(([k]) => `<td>${fmt(k, r.v[k])}</td>`).join('')}</tr>`).join('')}
   </tbody></table>${rows.length > PF.limit ? `<div class="more"><button class="btn" type="button" id="p-more">Ver más (${rows.length - PF.limit})</button></div>` : ''}`;
@@ -728,7 +811,7 @@ function viewMethod() {
         <p>En 2v2 y 1v1 cada jugador acumula más acciones, así que ahí pesan menos para que las notas se puedan comparar entre formatos. Por encima de 8,5 y por debajo de 4,5 la escala se comprime, así que un 10 o un 3 solo salen en partidos excepcionales. El jugador con la nota más alta es el MVP.</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px">${[[9.2, '9 o más'], [8.4, '8 – 8,9'], [7.4, '7 – 7,9'], [6.7, '6,5 – 6,9'], [6.2, '6 – 6,4'], [5.5, 'menos de 6']].map(([r, l]) => `<span style="display:flex;gap:8px;align-items:center">${badge(r)}<span class="muted">${l}</span></span>`).join('')}</div>
       </div></div>
-      <div class="card in"><div class="card-h"><h3>Rangos</h3><small>emblemas propios de SlapScore</small></div><div class="card-b"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">
+      <div class="card in"><div class="card-h"><h3>Rangos</h3><small>${hasOfficial() ? 'logos oficiales' : 'emblemas de SlapScore'}</small></div><div class="card-b"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px">
         ${['BRONZE_I', 'SILVER_II', 'GOLD_III', 'PLAT_I', 'PLAT_II', 'PLAT_III', 'DIAMOND', 'LEGEND'].map((k) => `<div style="display:flex;align-items:center;gap:10px">${rank(k, 34)}<b>${esc(C.parseRank(k).name)}</b></div>`).join('')}
         </div><p class="muted" style="margin:14px 0 0;font-size:13px">El rango de cada jugador en un partido es el que tenía según el último registro de SlapScore anterior a ese partido. Si el partido es de antes de empezar a seguirle, se muestra atenuado como aproximado.</p></div></div>
       <div class="card in"><div class="card-h"><h3>De dónde salen los datos</h3></div><div class="card-b">
@@ -746,7 +829,7 @@ function viewMethod() {
 // ADMIN
 // =====================================================================
 function ctx() {
-  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank };
+  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial };
 }
 async function viewAdmin(tok) {
   MAIN.innerHTML = skeletonList(4);
@@ -758,7 +841,8 @@ async function viewAdmin(tok) {
 // ACTUALIZACIÓN DE DATOS
 // =====================================================================
 async function fetchIndex() {
-  const [idx, set] = await Promise.all([getJSON('data/index.json', true), getJSON('config/settings.json', true).catch(() => null)]);
+  const [idx, set, ranks] = await Promise.all([getJSON('data/index.json', true), getJSON('config/settings.json', true).catch(() => null), getJSON('assets/ranks/index.json', true).catch(() => ({}))]);
+  setOfficial(ranks);
   return { idx, set };
 }
 async function refreshData(manual) {
@@ -794,3 +878,27 @@ setInterval(async () => {
   }
   renderChrome(); go({ instant: true }); S.booted = true;
 })();
+
+// ---------- app instalable ----------
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+function hideTip(remember) { $('#itip').innerHTML = ''; if (remember) { try { localStorage.setItem('slapscore-tip', String(Date.now())); } catch {} } }
+function showTip() {
+  if (standalone() || !matchMedia('(max-width: 900px)').matches) return;
+  let last = 0; try { last = Number(localStorage.getItem('slapscore-tip')) || 0; } catch {}
+  if (Date.now() - last < 7 * 864e5) return;
+  const ios = isIOS() && !installEvt;
+  $('#itip').innerHTML = `<div class="itip" role="dialog" aria-label="Instalar SlapScore"><span class="brand-mark sm"><i></i></span><div class="t"><b>Instala SlapScore</b><span>${ios ? 'Pulsa Compartir y después «Añadir a pantalla de inicio».' : 'Tenla en tu pantalla de inicio y ábrela como una app.'}</span></div>${ios ? '' : '<button class="btn primary sm" type="button" id="tip-ok">Instalar</button>'}<button class="ibtn" type="button" id="tip-x" aria-label="Cerrar">×</button></div>`;
+  $('#tip-x').addEventListener('click', () => hideTip(true));
+  const ok = $('#tip-ok'); if (ok) ok.addEventListener('click', install);
+}
+async function install() {
+  if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; $('#btn-install').hidden = true; hideTip(true); return; }
+  if (isIOS()) { hideTip(false); try { localStorage.removeItem('slapscore-tip'); } catch {} showTip(); }
+}
+$('#btn-install').addEventListener('click', install);
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('#btn-install').hidden = false; setTimeout(showTip, 2500); });
+addEventListener('appinstalled', () => { installEvt = null; $('#btn-install').hidden = true; hideTip(true); toast('SlapScore instalada en tu dispositivo'); });
+if (isIOS() && !standalone()) { $('#btn-install').hidden = false; setTimeout(showTip, 3500); }
+if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
