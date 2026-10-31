@@ -134,34 +134,37 @@ function login(root) {
 }
 
 // ---------- robot ----------
-function nextRun() {
-  const d = new Date(); d.setUTCSeconds(0, 0);
-  for (let i = 1; i <= 61; i++) { const t = new Date(d.getTime() + i * 60000); if (t.getUTCMinutes() === 7 || t.getUTCMinutes() === 37) return t; }
-  return null;
-}
 async function loadWorkflow() {
   const el = $('#wf'), pill = $('#wf-pill'); if (!el) return;
   const { esc, int, ago, S } = X;
   try {
-    const wf = await gh(`/actions/workflows/${WF}`);
+    const [wf, rj] = await Promise.all([gh(`/actions/workflows/${WF}`), gh(`/actions/workflows/${WF}/runs?per_page=5`).catch(() => ({}))]);
     wfState = wf.state;
     const on = wf.state === 'active';
     const t = (S.index && S.index.totals) || {}, lr = (S.index && S.index.lastRun) || {};
-    const nr = nextRun();
+    const runs = rj.workflow_runs || [];
+    const live = runs.find((r) => r.status === 'in_progress'), queued = runs.find((r) => r.status !== 'completed' && r.status !== 'in_progress');
+    const now = live ? `en marcha desde hace ${Math.max(1, Math.round((Date.now() - Date.parse(live.run_started_at || live.created_at)) / 60000))} min` : queued ? 'en cola, empieza enseguida' : on ? 'parada: pulsa «Traer partidos ahora» para relanzarla' : '–';
     pill.innerHTML = `<span class="pill ${on ? 'live' : 'warn'}"><span class="dot ${on ? 'pulse' : ''}"></span>${on ? 'Activo' : 'En pausa'}</span>`;
-    el.innerHTML = `<dl class="kv"><dt>Pasadas automáticas</dt><dd>${on ? 'cada 30 minutos' : 'paradas'}</dd>
-      ${on && nr ? `<dt>Próxima pasada</dt><dd>hacia las ${nr.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</dd>` : ''}
+    el.innerHTML = `<dl class="kv"><dt>Pasadas automáticas</dt><dd>${on ? 'seguidas, una cada 25 min aprox.' : 'paradas'}</dd>
+      <dt>Ahora</dt><dd>${esc(now)}</dd>
       <dt>Última pasada</dt><dd>${lr.at ? esc(ago(Date.parse(lr.at))) + ` · ${int(lr.newMatches)} nuevos` : '–'}</dd>
       <dt>Partidos guardados</dt><dd>${int(t.matches)}</dd><dt>Jugadores conocidos</dt><dd>${int(t.known)} (${int(t.tracked)} revisados)</dd><dt>Con rango</dt><dd>${int(t.ranked)}</dd></dl>
       <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ${on ? 'danger' : 'primary'}" type="button" id="wf-toggle">${on ? 'Pausar robot' : 'Reanudar robot'}</button></div>`;
     $('#wf-toggle').addEventListener('click', async (e) => {
       const b = e.currentTarget; b.disabled = true;
-      try { await gh(`/actions/workflows/${WF}/${on ? 'disable' : 'enable'}`, { method: 'PUT' }); X.toast(on ? 'Robot en pausa: no habrá pasadas automáticas' : 'Robot reanudado'); loadWorkflow(); }
+      try {
+        await gh(`/actions/workflows/${WF}/${on ? 'disable' : 'enable'}`, { method: 'PUT' });
+        // al reanudar, se relanza la cadena de pasadas automáticas
+        if (!on) await gh(`/actions/workflows/${WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { minutes: '20', chain: '1' } }) }).catch(() => {});
+        X.toast(on ? 'Robot en pausa: la pasada en marcha termina y no habrá más' : 'Robot reanudado: la primera pasada empieza ya'); loadWorkflow(); loadRuns();
+      }
       catch (ex) { X.toast(ex.message); b.disabled = false; }
     });
   } catch (e) { el.innerHTML = `<p class="err">${esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
 }
 const EVENT = { schedule: 'Automática', workflow_dispatch: 'Manual', push: 'Cambio de ajustes' };
+const eventLabel = (r) => (r.display_title === AUTO ? 'Automática' : EVENT[r.event] || r.event);
 async function loadRuns() {
   const el = $('#runs'); if (!el) return;
   const { esc } = X;
@@ -174,19 +177,24 @@ async function loadRuns() {
       const status = r.status !== 'completed' ? '<span class="pill live"><span class="dot pulse"></span>En marcha</span>'
         : r.conclusion === 'success' ? '<span class="pill">Hecha</span>' : `<span class="pill ot">${r.conclusion === 'cancelled' ? 'Cancelada' : 'Falló'}</span>`;
       const dur = r.status === 'completed' ? Math.max(1, Math.round((en - st) / 60000)) + ' min' : '';
-      return `<div class="row">${status}<span><b>${EVENT[r.event] || esc(r.event)}</b> · ${new Date(st).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${dur ? ' · ' + dur : ''}</span><span class="muted">${info ? `+${info.newMatches} partidos` : ''}</span><a href="${esc(r.html_url)}" target="_blank" rel="noopener">Ver</a></div>`;
+      return `<div class="row">${status}<span><b>${esc(eventLabel(r))}</b> · ${new Date(st).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${dur ? ' · ' + dur : ''}</span><span class="muted">${info ? `+${info.newMatches} partidos` : ''}</span><a href="${esc(r.html_url)}" target="_blank" rel="noopener">Ver</a></div>`;
     });
     el.innerHTML = rows.length ? rows.join('') : '<div class="empty">Todavía no hay pasadas.</div>';
   } catch (e) { el.innerHTML = `<div class="card-b err">${esc(e.message)}</div>`; }
 }
 
 // ---------- traer ahora + seguimiento ----------
+const AUTO = 'Pasada automática';
+const runMinutes = (r) => (r.display_title === AUTO ? 20 : r.event === 'push' ? 1 : 8);
 async function bringNow(minutes) {
   if (tracking) { X.toast('Ya hay una pasada en marcha'); return; }
   if (wfState && wfState !== 'active') { X.toast('El robot está en pausa: reanúdalo para traer partidos.'); return; }
   const btn = $('#go-now'); if (btn) btn.disabled = true;
   try {
-    await gh(`/actions/workflows/${WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { minutes: String(minutes) } }) });
+    // si ya hay una pasada en marcha, se sigue esa en vez de poner otra en cola detrás
+    const cur = ((await gh(`/actions/workflows/${WF}/runs?per_page=5`)).workflow_runs || []).find((r) => r.status === 'in_progress');
+    if (cur) { X.toast('Ya hay una pasada en marcha: te enseño cómo va'); startTracking({ runId: cur.id, since: Date.parse(cur.created_at), minutes: runMinutes(cur), kind: cur.event, label: 'Pasada en marcha' }); return; }
+    await gh(`/actions/workflows/${WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { minutes: String(minutes), chain: '0' } }) });
     startTracking({ since: Date.now() - 5000, minutes, kind: 'workflow_dispatch', label: 'Trayendo partidos' });
   } catch (e) { X.toast(e.message); if (btn) btn.disabled = false; }
 }
@@ -213,10 +221,10 @@ async function track() {
   const finish = () => { tracking = false; try { sessionStorage.removeItem(RUN_KEY); } catch {} };
   try {
     drawProgress({ pct: 3, stage: 0, title, time: '' });
-    let run = null;
+    let run = st.runId ? await gh(`/actions/runs/${st.runId}`) : null;
     for (let i = 0; i < 40 && !run; i++) {
       const j = await gh(`/actions/workflows/${WF}/runs?per_page=10&event=${st.kind}`);
-      run = (j.workflow_runs || []).find((r) => Date.parse(r.created_at) >= st.since - 20000);
+      run = (j.workflow_runs || []).find((r) => Date.parse(r.created_at) >= st.since - 20000 && r.display_title !== AUTO);
       if (!run) await sleep(3000);
     }
     if (!run) { drawProgress({ pct: 3, stage: 0, title, error: 'GitHub aún no ha arrancado la pasada. Mírala en la pestaña Actions.', url: `https://github.com/${REPO}/actions` }); return finish(); }
@@ -242,7 +250,7 @@ async function track() {
       if (run.status === 'completed') {
         if (run.conclusion === 'cancelled') {
           const j = await gh(`/actions/workflows/${WF}/runs?per_page=10&event=${st.kind}`);
-          const newer = (j.workflow_runs || []).find((r) => r.id !== run.id && Date.parse(r.created_at) >= st.since - 20000 && Date.parse(r.created_at) >= Date.parse(run.created_at));
+          const newer = (j.workflow_runs || []).find((r) => r.id !== run.id && r.display_title !== AUTO && Date.parse(r.created_at) >= st.since - 20000 && Date.parse(r.created_at) >= Date.parse(run.created_at));
           if (newer) { run = newer; continue; }
         }
         break;

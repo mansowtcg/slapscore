@@ -8,7 +8,7 @@ Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://m
 
 - `crawler/crawl.js` revisa los perfiles públicos de slapshot.gg (`/api/game/players/ID` y `/ranked`): los últimos 10 partidos de cada jugador y su rango/MMR. Cada jugador que aparece en un partido entra en la lista; los más activos se revisan más a menudo. Como mucho 9 peticiones por minuto (el límite de slapshot.gg es 10).
 - El robot es **incremental**: en cada pasada solo añade lo nuevo (partidos, resúmenes de esa hora, perfiles de los jugadores que han jugado). Una pasada normal tarda unos segundos en procesar aunque haya decenas de miles de jugadores.
-- `.github/workflows/crawl.yml` lo ejecuta cada 30 minutos (y cuando se lanza desde el panel), guarda los datos y publica la web.
+- `.github/workflows/crawl.yml` lo ejecuta, guarda los datos y publica la web. Las pasadas automáticas van **encadenadas**: cada una rastrea 20 minutos a ritmo suave (5 peticiones/min) y, al terminar, deja en cola la siguiente, así que la web se actualiza cada 25 minutos aprox. sin depender del reloj de GitHub, que no es fiable. El reloj de GitHub (`schedule`) y el Worker de Cloudflare solo relanzan la cadena si se corta. «Pausar robot» en el panel la detiene.
 
 ## Datos (rama `data`)
 
@@ -45,7 +45,7 @@ El flujo publica siempre en GitHub Pages. Si el repositorio tiene estos secretos
 
 - `CLOUDFLARE_API_TOKEN`: token de Cloudflare con la plantilla «Edit Cloudflare Workers».
 - `CLOUDFLARE_ACCOUNT_ID`: el ID de la cuenta de Cloudflare.
-- `DISPATCH_TOKEN` (opcional): token de GitHub de grano fino con **Actions: lectura y escritura** sobre este repositorio. Con él, el Worker (`cloudflare/worker.js`) lanza el robot cada 30 minutos, que es más puntual que el reloj de GitHub.
+- `DISPATCH_TOKEN` (opcional): token de GitHub de grano fino con **Actions: lectura y escritura** sobre este repositorio. Con él, el Worker (`cloudflare/worker.js`) comprueba cada 30 minutos que la cadena de pasadas sigue viva y, si se ha cortado, la relanza.
 
 En Cloudflare la web queda en `https://slapscore.<tu-subdominio>.workers.dev`, sin límite de tráfico, y solo se suben los archivos que cambian.
 

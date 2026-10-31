@@ -1,21 +1,27 @@
 name: Rastrear partidos
+# Las pasadas automáticas van encadenadas: al terminar, cada pasada pone en cola la siguiente.
+# El reloj de GitHub (schedule) y el Worker de Cloudflare solo sirven para relanzar la cadena si se corta.
+run-name: ${{ inputs.chain == '1' && 'Pasada automática' || '' }}
 
 on:
   push:
     branches: [main]
   schedule:
-    - cron: '7,37 * * * *'   # cada 30 minutos (si GitHub se retrasa, el Worker de Cloudflare también lo lanza)
+    - cron: '7,37 * * * *'
   workflow_dispatch:
     inputs:
       minutes:
         description: 'Minutos de rastreo en esta pasada'
         default: '8'
+      chain:
+        description: 'Pasada automática encadenada (1) o manual (0)'
+        default: '0'
 
 permissions:
   contents: write
   pages: write
   id-token: write
-  actions: read
+  actions: write
 
 concurrency:
   group: crawl
@@ -24,7 +30,7 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -36,11 +42,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           go=true
-          # Si el reloj de GitHub coincide con una pasada reciente (lanzada desde Cloudflare o a mano), no repetir
+          # El reloj de GitHub solo hace falta si la cadena se ha cortado: si hay otra pasada en marcha o reciente, no repetir
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            recent=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 10 --json databaseId,createdAt \
-              --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select((now - (.createdAt | fromdateiso8601)) < 1380)] | length" || echo 0)
-            if [ "${recent:-0}" -gt 0 ]; then go=false; echo "Ya hubo una pasada hace menos de 23 minutos: esta se salta."; fi
+            busy=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 10 --json databaseId,createdAt,status \
+              --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\" or (now - (.createdAt | fromdateiso8601)) < 1380)] | length" || echo 0)
+            if [ "${busy:-0}" -gt 0 ]; then go=false; echo "Hay otra pasada en marcha o reciente: esta se salta."; fi
           fi
           echo "go=$go" >> "$GITHUB_OUTPUT"
           echo "cf=${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}" >> "$GITHUB_OUTPUT"
@@ -57,7 +63,9 @@ jobs:
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:
-          MINUTES: ${{ github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
+          # encadenadas: 20 min a ritmo suave (5 peticiones/min); a mano: lo que se pida a 9/min; cambios de ajustes: 1 min
+          MINUTES: ${{ inputs.chain == '1' && '20' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
+          GAP_MS: ${{ inputs.chain == '1' && '12000' || '6700' }}
           MAX_REQUESTS: '200'
         run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node --max-old-space-size=6144 crawler/crawl.js
       - name: Subir el archivo
@@ -132,3 +140,14 @@ jobs:
           if [ -n "$DISPATCH_TOKEN" ]; then SEC="$RUNNER_TEMP/cf.env"; printf 'GH_DISPATCH_TOKEN=%s\n' "$DISPATCH_TOKEN" > "$SEC"; fi
           npx -y wrangler@4.146.0 deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
           rm -f "$RUNNER_TEMP/cf.env"
+      - name: Programar la siguiente pasada
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Si esta pasada ha fallado, se espera un poco para no repetir el fallo en bucle
+          if [ "${{ job.status }}" != "success" ]; then echo "Esta pasada no ha ido bien: la siguiente, en 10 minutos."; sleep 600; fi
+          others=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 20 --json databaseId,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\")] | length" || echo 0)
+          if [ "${others:-0}" -gt 0 ]; then echo "Ya hay otra pasada en cola: ella programará la siguiente."; exit 0; fi
+          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=20 && echo "Siguiente pasada en cola."
