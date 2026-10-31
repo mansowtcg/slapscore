@@ -256,7 +256,7 @@ pre.json{margin:0;padding:14px 16px;font:12.5px/1.5 ui-monospace,SFMono-Regular,
 .ph h1{margin:0;font-family:var(--font-display);font-weight:800;font-size:34px;line-height:1;overflow-wrap:anywhere}
 .ph .idl{color:var(--muted);font-size:12.5px;margin-top:4px;overflow-wrap:anywhere}
 .ph .avg{display:flex;flex-direction:column;align-items:center;gap:4px}
-.ph .avg span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ph .avg .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .qs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-top:1px solid var(--line)}
 .qs div{padding:10px 12px;border-left:1px solid var(--line)}
 .qs div:first-child{border-left:0}
@@ -829,7 +829,7 @@ function viewPlayer(key){
   var mateList = Array.from(mates.values()).sort(function(x,y){ return y.n-x.n || y.w-x.w; }).slice(0,5);
   MAIN.innerHTML = '<a class="back" href="#jugadores">← Jugadores</a>'
     + '<section class="card" style="margin-bottom:16px"><div class="ph">'+avatar(P.name,P.key,'lg')+'<div style="min-width:0"><h1>'+esc(P.name)+'</h1><div class="idl">'+rankLine(P.pid)+'ID '+esc(P.pid)+' · último partido '+(P.lastT?ago(P.lastT):'–')+' · <a href="https://slapshot.gg/players/'+encodeURIComponent(P.pid)+'" target="_blank" rel="noopener">slapshot.gg ↗</a></div></div>'
-    + '<div class="avg"><span>Nota media</span>'+badge(a.avg,'big')+'</div></div>'
+    + '<div class="avg"><span class="lbl">Nota media</span>'+badge(a.avg,'big')+'</div></div>'
     + '<div class="qs"><div><b>'+gp+'</b><span>Partidos</span></div><div><b>'+a.w+'–'+a.l+(a.d?'–'+a.d:'')+'</b><span>V–D</span></div><div><b>'+pct(a.wp)+'</b><span>Victorias</span></div><div><b>'+a.mvp+'</b><span>MVP</span></div><div><b>'+((t.goals||0)+(t.assists||0))+'</b><span>G + A</span></div></div></section>'
     + '<div class="grid2"><div class="stack">'
     + '<div class="card"><div class="card-h"><h3>Forma</h3><small>últimos '+last10.length+' partidos</small></div><div class="form">'+last10.map(function(x){ return '<a href="#m-'+x.m.sid+'" title="'+esc(DF_SHORT.format(new Date(x.m.t))+' · '+x.m.score.home+'–'+x.m.score.away)+'">'+badge(x.p.rating)+'<span class="res '+x.p.res+'">'+(x.p.res==='W'?'V':x.p.res==='L'?'D':'E')+'</span></a>'; }).join('')+'</div></div>'
