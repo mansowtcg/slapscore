@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '7,37 * * * *'   # cada 30 minutos
+    - cron: '7,37 * * * *'   # cada 30 minutos (si GitHub se retrasa, el Worker de Cloudflare también lo lanza)
   workflow_dispatch:
     inputs:
       minutes:
@@ -15,6 +15,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: crawl
@@ -29,20 +30,52 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Comprobar
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          go=true
+          # Si el reloj de GitHub coincide con una pasada reciente (lanzada desde Cloudflare o a mano), no repetir
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            recent=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 10 --json databaseId,createdAt \
+              --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select((now - (.createdAt | fromdateiso8601)) < 1380)] | length" || echo 0)
+            if [ "${recent:-0}" -gt 0 ]; then go=false; echo "Ya hubo una pasada hace menos de 23 minutos: esta se salta."; fi
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "cf=${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}" >> "$GITHUB_OUTPUT"
       - name: Bajar datos
+        if: steps.gate.outputs.go == 'true'
         uses: actions/checkout@v4
         with:
           ref: data
           path: data
       - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
         with:
           node-version: 20
       - name: Rastrear slapshot.gg
+        if: steps.gate.outputs.go == 'true'
         env:
           MINUTES: ${{ github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
           MAX_REQUESTS: '200'
-        run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node crawler/crawl.js
+        run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node --max-old-space-size=6144 crawler/crawl.js
+      - name: Subir el archivo
+        if: steps.gate.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Partidos completos que salen de la web: un archivo por día en la publicación "archivo-AAAA-MM"
+          shopt -s nullglob
+          for f in data/_int/outbox/*.json.gz; do
+            day=$(basename "$f" .json.gz); tag="archivo-${day:0:7}"
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "Archivo de partidos · ${day:0:7}" \
+              --notes "Partidos completos de slapshot.gg guardados por SlapScore (un archivo JSON comprimido por día, hora de Madrid)." --latest=false || continue
+            cp "$f" "$RUNNER_TEMP/partidos-$day.json.gz"
+            if gh release upload "$tag" "$RUNNER_TEMP/partidos-$day.json.gz" --clobber; then rm "$f"; echo "Archivado $day"; fi
+          done
       - name: Guardar datos
+        if: steps.gate.outputs.go == 'true'
         working-directory: data
         run: |
           git config user.name "slapscore-bot"
@@ -52,20 +85,50 @@ jobs:
           git commit -q -m "Datos $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q -f origin nuevo:data
       - name: Preparar la web
+        if: steps.gate.outputs.go == 'true'
         run: |
           mkdir _site
           cp -r index.html manifest.webmanifest sw.js assets config _site/
           cp -r data _site/data
-          rm -rf _site/data/.git _site/data/state.json
+          rm -rf _site/data/.git _site/data/_int
           touch _site/.nojekyll
           B="${GITHUB_SHA::8}"
           sed -i "s/__BUILD__/$B/g" _site/sw.js
           sed -i -E "s#assets/(app\.js|core\.js|emblems\.js|style\.css)\"#assets/\1?b=$B\"#g" _site/index.html
-          sed -i -E "s#from '\./(core|emblems)\.js'#from './\1.js?b=$B'#g; s#import\('\./admin\.js'\)#import('./admin.js?b=$B')#g" _site/assets/*.js
+          sed -i -E "s#from '\./(core|emblems)\.js'#from './\1.js?b=$B'#g; s#import\('\./(admin|vendor/gunzip)\.js'\)#import('./\1.js?b=$B')#g" _site/assets/*.js
+          echo "Archivos: $(find _site -type f | wc -l) · tamaño: $(du -sh _site | cut -f1)"
       - uses: actions/configure-pages@v5
+        if: steps.gate.outputs.go == 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.gate.outputs.go == 'true'
         with:
           path: _site
       - name: Publicar la web
         id: deploy
+        if: steps.gate.outputs.go == 'true'
         uses: actions/deploy-pages@v4
+      - name: Publicar en Cloudflare
+        if: steps.gate.outputs.go == 'true' && steps.gate.outputs.cf == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DISPATCH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+        run: |
+          # Caché larga para lo que va versionado (?v= / ?b=); el índice y la portada, siempre frescos
+          cat > _site/_headers <<'EOF'
+          /data/*
+            Cache-Control: public, max-age=31536000, immutable
+          /assets/*
+            Cache-Control: public, max-age=86400
+          /sw.js
+            Cache-Control: no-cache
+          /index.html
+            Cache-Control: no-cache
+          /
+            Cache-Control: no-cache
+          EOF
+          rm -f _site/.nojekyll
+          SEC=""
+          if [ -n "$DISPATCH_TOKEN" ]; then SEC="$RUNNER_TEMP/cf.env"; printf 'GH_DISPATCH_TOKEN=%s\n' "$DISPATCH_TOKEN" > "$SEC"; fi
+          npx -y wrangler@4.146.0 deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
+          rm -f "$RUNNER_TEMP/cf.env"

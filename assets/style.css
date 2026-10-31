@@ -247,7 +247,7 @@ main{padding-block:20px 40px;min-height:60vh}
 .tabs button{border:0;background:transparent;padding:14px 12px;font-weight:800;font-size:14px;color:var(--muted);white-space:nowrap;transition:color .2s}
 .tabs button[aria-selected="true"]{color:var(--primary)}
 .tabs .ind{position:absolute;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--primary);transition:transform .35s var(--ease),width .35s var(--ease);left:0}
-.panel{padding:16px;view-transition-name:panel}
+.panel{padding:16px}
 .cmp-row{padding:10px 0}
 .cmp-top{display:grid;grid-template-columns:64px 1fr 64px;align-items:center;font-weight:700}
 .cmp-top em{font-style:normal;text-align:center;color:var(--fg-2);font-size:13.5px;font-weight:600}
@@ -440,15 +440,26 @@ table.tbl{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowra
 @keyframes flow{to{background-position:-200% 0}}
 @keyframes toast-in{from{opacity:0;transform:translateY(16px) scale(.96);filter:blur(6px)}}
 @keyframes toast-out{to{opacity:0;transform:translateY(10px);filter:blur(6px)}}
-@keyframes vt-out{to{opacity:0;filter:blur(10px);transform:translateY(-6px) scale(.992)}}
-@keyframes vt-in{from{opacity:0;filter:blur(12px);transform:translateY(10px) scale(1.004)}}
-main{view-transition-name:main}
-::view-transition-old(main){animation:vt-out .2s cubic-bezier(.4,0,1,1) both}
-::view-transition-new(main){animation:vt-in .38s var(--ease) both}
-::view-transition-old(panel){animation:vt-out .16s ease-in both}
-::view-transition-new(panel){animation:vt-in .3s var(--ease) both}
-::view-transition-old(root),::view-transition-new(root){animation-duration:.25s}
-.in{animation:vt-in .45s var(--ease) both}
+@keyframes vt-out{to{opacity:0;filter:blur(6px);transform:translateY(-4px)}}
+@keyframes vt-in{from{opacity:0;filter:blur(6px);transform:translateY(8px)}}
+@keyframes rise-in{from{opacity:0;transform:translateY(8px)}}
+/* Cambio de página: solo se anima lo que se ve en pantalla (desenfoque corto); la cabecera y la barra inferior no se mueven */
+.hdr{view-transition-name:hdr}
+.bnav{view-transition-name:bnav}
+::view-transition-group(hdr),::view-transition-group(bnav),::view-transition-new(hdr),::view-transition-new(bnav){animation:none}
+::view-transition-old(hdr),::view-transition-old(bnav){display:none}
+::view-transition-old(root){animation:vt-out .14s cubic-bezier(.4,0,1,1) both}
+::view-transition-new(root){animation:vt-in .26s var(--ease) both}
+.in{animation:rise-in .28s var(--ease) both}
+main[data-static="1"] .in{animation:none}
+.panel.swap{animation:rise-in .22s var(--ease) both}
+/* barra de carga bajo la muesca */
+.pbar{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;height:3px;z-index:70;pointer-events:none;opacity:0;transition:opacity .25s;overflow:hidden}
+.pbar::after{content:"";position:absolute;top:0;bottom:0;left:0;width:38%;border-radius:0 3px 3px 0;background:var(--hdr-ink);opacity:.85;transform:translateX(-100%)}
+.pbar.on{opacity:1}
+.pbar.on::after{animation:barmove 1s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes barmove{to{transform:translateX(270%)}}
+.busy{opacity:.55;transition:opacity .2s;pointer-events:none}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
   ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
@@ -476,7 +487,7 @@ main{view-transition-name:main}
 .ev-box.open{grid-template-rows:1fr}
 .ev-box>div{overflow:hidden;min-height:0}
 .ev-box-in{background:var(--surface-2);padding:2px 0 12px}
-.ev-box.open .ev-box-in{animation:vt-in .35s var(--ease) both}
+.ev-box.open .ev-box-in{animation:rise-in .28s var(--ease) both}
 .ev-box-f{padding:8px 16px 0;text-align:right;font-weight:700;font-size:13px}
 .grp{content-visibility:auto;contain-intrinsic-size:auto 640px}
 /* tablas de estadísticas */
@@ -570,3 +581,16 @@ main{view-transition-name:main}
 .rk-item .acts{display:flex;flex-direction:column;gap:4px}
 .rk-item .acts button,.rk-item .acts label{font-size:11.5px;font-weight:800;color:var(--primary);background:none;border:0;padding:0;cursor:pointer;text-align:right}
 .rk-item .acts button.rm{color:var(--loss)}
+
+/* ===================== v3 ===================== */
+.support .card-b{display:flex;flex-direction:column;gap:4px}
+.support p{margin:0;color:var(--muted);font-size:13px}
+.btn.kofi{align-self:flex-start;margin-top:8px;background:#FF5E5B;border-color:#FF5E5B;color:#fff}
+.btn.kofi:hover{background:#F04B48;border-color:#F04B48}
+.btn.kofi svg{width:18px;height:18px}
+.note .card-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding-top:16px}
+.note .card-b p{margin:4px 0 10px;color:var(--muted);font-size:13px}
+.note .card-b .btn svg{width:13px;height:13px}
+.hnote{font-size:12.5px;padding:10px 16px 14px;margin:0}
+.foot-r{display:flex;gap:16px}
+.seedrow small.code{display:block;font-size:11px}

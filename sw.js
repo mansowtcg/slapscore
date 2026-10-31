@@ -1,7 +1,7 @@
 // Service worker de SlapScore: carga instantánea y uso sin conexión.
 const BUILD = '__BUILD__';
 const SHELL = `slapscore-shell-${BUILD}`;
-const DATA = 'slapscore-data';
+const DATA = 'slapscore-data-v3';
 const FONTS = 'slapscore-fonts';
 const SHELL_FILES = ['./', 'index.html', 'manifest.webmanifest', 'assets/icons/icon-192.png', 'assets/icons/apple-touch-icon.png'];
 
@@ -10,14 +10,16 @@ self.addEventListener('install', (e) => {
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (k.startsWith('slapscore-shell-') && k !== SHELL) await caches.delete(k);
+    for (const k of await caches.keys()) if ((k.startsWith('slapscore-shell-') && k !== SHELL) || k === 'slapscore-data') await caches.delete(k);
     await self.clients.claim();
   })());
 });
 
+let trimming = false;
 async function trimData() {
-  const c = await caches.open(DATA); const keys = await c.keys();
-  if (keys.length > 400) for (const k of keys.slice(0, keys.length - 400)) await c.delete(k);
+  if (trimming) return; trimming = true;
+  try { const c = await caches.open(DATA); const keys = await c.keys(); if (keys.length > 700) for (const k of keys.slice(0, keys.length - 600)) await c.delete(k); }
+  finally { trimming = false; }
 }
 async function networkFirst(req, cacheName) {
   const c = await caches.open(cacheName);
@@ -42,7 +44,7 @@ self.addEventListener('fetch', (e) => {
   if (/\/data\/index\.json$|\/config\/settings\.json$|\/assets\/ranks\/index\.json$/.test(path) || url.searchParams.has('v') && /^\d+$/.test(url.searchParams.get('v'))) {
     e.respondWith(networkFirst(req, DATA)); return;
   }
-  // Datos versionados (?v=fecha de actualización): no cambian nunca
+  // Datos versionados (?v=huella del contenido): una misma dirección nunca cambia
   if (path.includes('/data/')) { e.respondWith(cacheFirst(req, DATA)); return; }
   // Código y estilos marcados con la versión publicada (?b=...): tampoco cambian
   if (url.searchParams.has('b')) { e.respondWith(cacheFirst(req, SHELL)); return; }

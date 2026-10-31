@@ -12,29 +12,76 @@ const ADMIN_KEY = 'slapscore-admin';
 // ---------- estado ----------
 const S = {
   index: null, ver: '', settings: { seeds: [], hidden: [], weights: {} }, W: C.DEFAULT_WEIGHTS, hidden: new Set(),
-  days: new Map(), shards: new Map(), pfiles: new Map(), players: null, top: null, booted: false,
+  dayMap: new Map(), mem: new Map(), booted: false,
 };
 function applySettings(s) {
   S.settings = { seeds: [], hidden: [], weights: {}, ...(s || {}) };
   S.W = C.weightsFrom(S.settings.weights);
-  S.hidden = new Set((S.settings.hidden || []).map(String));
+  // los ocultos se guardan como "día/hora|id" (o solo el id en ajustes antiguos)
+  S.hidden = new Set((S.settings.hidden || []).map((h) => String(h).split('|').pop()));
 }
-async function getJSON(url, fresh) {
-  const u = url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(fresh ? Date.now() : S.ver);
+function setIndex(idx) {
+  S.index = idx; S.ver = idx.updated;
+  S.dayMap = new Map((idx.days || []).map((d) => [d.d, d]));
+}
+
+// ---------- datos ----------
+// Cada archivo se pide con su versión (?v=hash): si no ha cambiado, sale de la caché del navegador al instante.
+async function gunzip(buf) {
+  if (typeof DecompressionStream === 'function') return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  const z = await import('./vendor/gunzip.js'); return z.strFromU8(z.gunzipSync(buf));
+}
+async function getJSON(url, ver) {
+  const fresh = ver === true;
+  const u = url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(fresh ? Date.now() : (ver || S.ver));
   const r = await fetch(u, fresh ? { cache: 'no-store' } : {});
   if (!r.ok) { const e = new Error(r.status === 404 ? 'No encontrado' : 'Error ' + r.status); e.status = r.status; throw e; }
-  return r.json();
+  if (!url.endsWith('.gz')) return r.json();
+  const buf = new Uint8Array(await r.arrayBuffer());
+  // por si el servidor ya lo ha descomprimido (Content-Encoding: gzip)
+  return JSON.parse(buf[0] === 0x1f && buf[1] === 0x8b ? await gunzip(buf) : new TextDecoder().decode(buf));
 }
-function cached(map, key, fn) {
-  if (!map.has(key)) map.set(key, fn().catch((e) => { map.delete(key); throw e; }));
-  return map.get(key);
+// Memoria de la sesión: lo ya cargado se reutiliza sin volver a pedirlo (las claves llevan la versión)
+function remember(key, fn) {
+  let p = S.mem.get(key);
+  if (p) { S.mem.delete(key); S.mem.set(key, p); return p; }
+  p = fn().catch((e) => { S.mem.delete(key); throw e; });
+  S.mem.set(key, p);
+  if (S.mem.size > 500) S.mem.delete(S.mem.keys().next().value);
+  return p;
 }
-const loadDay = (d) => cached(S.days, d, () => getJSON(`data/days/${d}.json`));
-const loadShard = (k) => cached(S.shards, k, () => getJSON(`data/full/${k}.json`));
-const loadP = (pid) => cached(S.pfiles, pid, () => getJSON(`data/p/${C.fileId(pid)}.json`));
-function loadPlayers() { if (!S.players) S.players = getJSON('data/players.json').then((j) => j.players || {}).catch((e) => { S.players = null; throw e; }); return S.players; }
-function loadTop() { if (!S.top) S.top = getJSON('data/top.json').catch((e) => { S.top = null; throw e; }); return S.top; }
-function resetCaches() { S.days.clear(); S.pfiles.clear(); S.players = null; S.top = null; }
+const notFoundErr = () => Object.assign(new Error('No encontrado'), { status: 404 });
+const fileVer = (k) => (S.index && S.index.files && S.index.files[k]) || S.ver;
+const inChunk = (c, hh) => c === 'all' || c === hh || (c.includes('-') && hh <= c.slice(0, 2) && hh >= c.slice(3, 5));
+function loadMeta(d) { const di = S.dayMap.get(d); return di ? remember('m:' + d + di.u, () => getJSON(`data/days/${d}.json`, di.u)) : Promise.reject(notFoundErr()); }
+const loadChunk = (d, c) => remember(`c:${d}/${c.c}:${c.v}`, () => getJSON(`data/days/${d}/${c.c}.json.gz`, c.v));
+const loadRaw = (d, hh, v) => remember(`r:${d}/${hh}:${v}`, () => getJSON(`data/full/${d}/${hh}.json.gz`, v));
+const loadBucket = (pid) => { const b = C.bucketOf(pid); return remember('p:' + b + ':' + S.ver, () => getJSON(`data/p/${b}.json.gz`, S.ver)); };
+async function loadP(pid) {
+  const P = (await loadBucket(pid))[pid];
+  if (!P) throw notFoundErr();
+  if (!P._g) { P._g = P.games.map(C.gameObj); P._a = C.aggObj(P.a); }
+  return P;
+}
+const loadSearch = () => remember('s:' + fileVer('search'), () => getJSON('data/search.json.gz', fileVer('search')));
+const loadTable = (w) => remember('t:' + w + fileVer('p' + w), () => getJSON(`data/players-${w}.json.gz`, fileVer('p' + w))
+  .then((j) => j.rows.map((r) => ({ id: r[0], n: r[1], rk: r[2], mmr: r[3], a: C.aggObj(r.slice(4)) }))));
+const loadRankings = () => remember('rk:' + fileVer('rankings'), () => getJSON('data/rankings.json', fileVer('rankings')));
+const loadTop = () => remember('top:' + fileVer('top'), () => getJSON('data/top.json', fileVer('top')));
+const loadAttr = () => remember('at:' + fileVer('attr'), () => getJSON('data/attr.json', fileVer('attr')));
+// Compatibilidad con el panel de administrador: { id: { n, rk, mmr, a: { gp } } }
+async function loadPlayers() { const rows = await loadSearch(); const o = {}; for (const r of rows) o[r[0]] = { n: r[1], rk: r[2], mmr: r[3], a: { gp: r[4] } }; return o; }
+// Un partido: su resumen (rangos, nota) y, si no está archivado, el JSON original de slapshot.gg
+async function loadMatch(key, id) {
+  const d = key.slice(0, 10), hh = key.slice(11);
+  const meta = await loadMeta(d);
+  const c = (meta.chunks || []).find((x) => inChunk(x.c, hh));
+  if (!c) throw notFoundErr();
+  const [list, raws] = await Promise.all([loadChunk(d, c), meta.x ? null : loadRaw(d, hh, c.v).catch(() => null)]);
+  const e = list.find((x) => x.i === id) || null, raw = raws ? raws.find((x) => x.id === id) || null : null;
+  if (!e && !raw) throw notFoundErr();
+  return { meta, e, raw };
+}
 
 // ---------- formato ----------
 const nf = (d) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -95,6 +142,7 @@ const ICON = {
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c0 1 .8 1.2.8 2.2M12 3.5c0 1 .8 1.2.8 2.2"/><path d="M5 21h10"/></svg>',
   ext: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
 };
 
@@ -117,6 +165,7 @@ APP.innerHTML = `
     <a href="#partidos" data-nav="partidos">Partidos</a><a href="#jugadores" data-nav="jugadores">Jugadores</a><a href="#rankings" data-nav="rankings">Rankings</a><a href="#notas" data-nav="notas">Cómo puntuamos</a>
   </nav>
 </header>
+<div class="pbar" id="pbar" aria-hidden="true"></div>
 <div class="wrap newbar" id="newbar" hidden><button type="button" id="btn-new">Hay partidos nuevos · Actualizar</button></div>
 <main class="wrap" id="main" tabindex="-1"></main>
 <footer class="wrap foot" id="foot"></footer>
@@ -131,11 +180,15 @@ function toast(msg, ms = 3800) {
   $('#toasts').appendChild(el);
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, ms);
 }
+// Enlace de apoyo (Ko-fi u otro) configurable desde el panel; si no hay, no se muestra nada
+function supportUrl() { const u = String((S.settings && S.settings.support) || '').trim(); return /^https:\/\/[^\s"'<>]+$/.test(u) ? u : ''; }
+const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 300));
 function isAdmin() { try { return !!JSON.parse(localStorage.getItem(ADMIN_KEY) || 'null')?.token; } catch { return false; } }
 function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
-  $('#foot').innerHTML = `<span>Datos públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>${i ? ` · actualizado ${esc(ago(Date.parse(i.updated)))}` : ''} · SlapScore no está afiliado a Oddshot Games.</span><a href="#admin">Administrador</a>`;
+  const sup = supportUrl();
+  $('#foot').innerHTML = `<span>Datos públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>${i ? ` · actualizado ${esc(ago(Date.parse(i.updated)))}` : ''} · SlapScore no está afiliado a Oddshot Games.</span><span class="foot-r">${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">Apoya el proyecto</a>` : ''}<a href="#admin">Administrador</a></span>`;
 }
 // tema
 function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
@@ -156,7 +209,7 @@ function openSheet(html) {
   $('#sheet-root').innerHTML = `<div class="ovl" id="ovl"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">${html}</div></div>`;
   const ovl = $('#ovl');
   ovl.addEventListener('click', (e) => { if (e.target === ovl || e.target.closest('[data-close]')) closeSheet(); });
-  const f = $('[data-close]', ovl); if (f) f.focus();
+  const f = $('[data-close]', ovl); if (f) f.focus({ preventScroll: true });
 }
 function closeSheet(instant) {
   const ovl = $('#ovl'); if (!ovl) return;
@@ -177,23 +230,32 @@ function copyText(txt, el) {
 // ---------- buscador ----------
 (() => {
   const inp = $('#q'), box = $('#sres'); let sel = -1, list = [];
+  let idx = null, idxVer = '';
+  async function getIdx() {
+    const v = fileVer('search');
+    if (!idx || idxVer !== v) { const rows = await loadSearch(); idx = rows.map((r) => [fold(r[1]), r]); idxVer = v; }
+    return idx;
+  }
   async function draw() {
     const q = fold(inp.value.trim());
     if (!q) { box.hidden = true; return; }
-    let P; try { P = await loadPlayers(); } catch { box.innerHTML = '<div class="none">No se pudo cargar la lista de jugadores.</div>'; box.hidden = false; return; }
-    list = Object.entries(P).filter(([, p]) => fold(p.n).includes(q))
-      .sort((a, b) => (fold(b[1].n).startsWith(q) - fold(a[1].n).startsWith(q)) || (b[1].a.gp - a[1].a.gp)).slice(0, 8);
-    box.innerHTML = list.length ? list.map(([id, p], i) => `<a role="option" href="#j-${esc(id)}" class="${i === sel ? 'on' : ''}">${avatar(p.n, id)}<span class="nm">${esc(p.n)}<small>${p.rank ? esc(p.rank) + ' · ' + p.mmr + ' MMR · ' : ''}${p.a.gp} partidos</small></span>${rank(p.rk, 22)}</a>`).join('')
+    let I; try { I = await getIdx(); } catch { box.innerHTML = '<div class="none">No se pudo cargar la lista de jugadores.</div>'; box.hidden = false; return; }
+    if (fold(inp.value.trim()) !== q) return;
+    // primero los que empiezan por el texto; la lista ya viene ordenada por partidos jugados
+    const starts = [], has = [];
+    for (const [f, r] of I) { if (f.startsWith(q)) { starts.push(r); if (starts.length >= 8) break; } else if (has.length < 8 && f.includes(q)) has.push(r); }
+    list = starts.concat(has).slice(0, 8);
+    box.innerHTML = list.length ? list.map((r, i) => { const rk = r[2] ? C.parseRank(r[2]) : null; return `<a role="option" href="#j-${esc(r[0])}" class="${i === sel ? 'on' : ''}">${avatar(r[1], r[0])}<span class="nm">${esc(r[1])}<small>${rk ? esc(rk.name) + (r[3] != null ? ' · ' + int(r[3]) + ' MMR' : '') + ' · ' : ''}${int(r[4])} ${r[4] === 1 ? 'partido' : 'partidos'}</small></span>${rank(r[2], 22)}</a>`; }).join('')
       : '<div class="none">Ningún jugador con ese nombre todavía.</div>';
     box.hidden = false;
   }
   const close = () => { box.hidden = true; inp.value = ''; sel = -1; inp.blur(); };
-  inp.addEventListener('focus', () => { loadPlayers().catch(() => {}); });
-  inp.addEventListener('input', () => { sel = -1; draw(); });
+  inp.addEventListener('focus', () => { getIdx().catch(() => {}); });
+  let ti; inp.addEventListener('input', () => { sel = -1; clearTimeout(ti); ti = setTimeout(draw, 60); });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { sel = Math.min(list.length - 1, sel + 1); draw(); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
-    else if (e.key === 'Enter') { const it = list[sel < 0 ? 0 : sel]; if (it) { location.hash = 'j-' + it[0]; close(); } }
+    else if (e.key === 'Enter') { clearTimeout(ti); const s0 = sel; draw().then(() => { const it = list[s0 < 0 ? 0 : s0]; if (it) { location.hash = 'j-' + it[0]; close(); } }); }
     else if (e.key === 'Escape') close();
   });
   box.addEventListener('click', () => setTimeout(close, 0));
@@ -215,15 +277,54 @@ function setNav(view) {
 }
 let lastPath = null, lastHash = location.hash || '#';
 const SCROLL = new Map(), STACK = [lastHash];
-function go(opts = {}) {
-  const tok = ++TOK; closeSheet(true); MAIN.onclick = null; S.onResize = null;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Barra de carga fina bajo la cabecera (solo si la espera se nota)
+let barT = 0;
+function progress(on) {
+  const b = $('#pbar'); if (!b) return;
+  clearTimeout(barT);
+  if (on) barT = setTimeout(() => b.classList.add('on'), 90);
+  else { b.classList.remove('on'); }
+}
+function pickDay(dayArg) {
+  const days = (S.index && S.index.days) || [];
+  if (!days.length) return null;
+  if (dayArg && S.dayMap.has(dayArg)) return dayArg;
+  return S.dayMap.has(today()) ? today() : days[0].d;
+}
+// Lo que necesita cada vista: se pide antes de cambiar de página
+function prefetch(r) {
+  if (!S.index) return null;
+  if (r.view === 'match' && r.id) return loadMatch(r.key, r.id);
+  if (r.view === 'player') return Promise.all([loadP(r.pid), loadAttr()]);
+  if (r.view === 'jugadores') return loadTable(PF.win);
+  if (r.view === 'rankings') return loadRankings();
+  if (r.view === 'matches') { const d = pickDay(r.day); return d ? Promise.all([loadMeta(d).then((m) => firstChunks(d, m)), loadTop()]) : null; }
+  return null;
+}
+async function go(opts = {}) {
+  const tok = ++TOK;
   const r = route(); setNav(r.view);
   const path = r.view + (r.day || r.id || r.pid || '');
   const scroll = !opts.keepScroll && path !== lastPath; lastPath = path;
   const y = opts.restore ? SCROLL.get(location.hash || '#') : null;
-  const run = () => { render(r, tok); if (y != null) restoreScroll(y, tok); else if (scroll) window.scrollTo(0, 0); };
-  if (S.booted && !opts.instant && document.startViewTransition && !REDUCED.matches) document.startViewTransition(run);
-  else run();
+  // Con la página anterior aún visible esperamos un momento a los datos: la nueva aparece ya completa, sin esqueletos
+  const pre = S.booted ? prefetch(r) : null;
+  if (pre) {
+    let done = false; const pp = pre.then(() => { done = true; }, () => { done = true; });
+    await Promise.race([pp, sleep(16)]);
+    if (!done && !opts.instant) { progress(true); await Promise.race([pp, sleep(650)]); progress(false); }
+    if (!live(tok)) return;
+  }
+  closeSheet(true); MAIN.onclick = null; S.onResize = null;
+  const run = () => { const p = render(r, tok); if (y != null) restoreScroll(y, tok); else if (scroll) window.scrollTo(0, 0); return p; };
+  const vt = S.booted && !opts.instant && document.startViewTransition && !REDUCED.matches;
+  // Si la página entra con la transición, sus tarjetas no se animan otra vez; si llega más tarde (red lenta), sí
+  MAIN.dataset.static = vt && pre ? '1' : '0';
+  if (vt) {
+    try { document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)])); }
+    catch { run(); }
+  } else run();
 }
 function restoreScroll(y, tok) {
   let n = 0;
@@ -240,6 +341,7 @@ window.addEventListener('hashchange', () => {
 });
 function render(r, tok) {
   if (!S.index) { MAIN.innerHTML = skeletonList(6); return; }
+  if (S.index.v !== 3) { MAIN.innerHTML = '<div class="card empty in"><strong>Actualizando los datos…</strong>Vuelve a cargar la página en un par de minutos.</div>'; return; }
   if (r.view === 'match') return r.id ? viewMatch(r, tok) : notFound('Este enlace de partido no es válido.');
   if (r.view === 'player') return viewPlayer(r.pid, tok);
   if (r.view === 'jugadores') return viewPlayers(tok);
@@ -261,11 +363,16 @@ const skeletonList = (n) => `<div class="card">${'<div class="card-h"><div class
 // PARTIDOS
 // =====================================================================
 const MF = { type: '', region: '', arena: '', q: '', limit: 120, closed: new Set() };
+// Primeros trozos (horas) del día hasta tener unos 120 partidos
+function firstChunks(d, meta, need = 120) {
+  const out = []; let n = 0;
+  for (const c of meta.chunks || []) { if (n >= need) break; out.push(loadChunk(d, c)); n += c.n; }
+  return Promise.all(out);
+}
 async function viewMatches(dayArg, tok) {
   const days = (S.index.days || []);
   if (!days.length) { MAIN.innerHTML = `<div class="card empty"><strong>Todavía no hay partidos.</strong>El robot rastrea slapshot.gg cada 30 minutos.</div>`; return; }
-  const t = today();
-  const day = dayArg && days.some((d) => d.d === dayArg) ? dayArg : (days.find((d) => d.d === t) || days[0]).d;
+  const day = pickDay(dayArg);
   const idx = days.findIndex((d) => d.d === day);
   MAIN.innerHTML = `<div class="layout">
     <aside class="col col-left" id="m-left">${skeletonList(4)}</aside>
@@ -273,7 +380,7 @@ async function viewMatches(dayArg, tok) {
       <div class="card">
         <div class="days">
           <button class="ibtn" type="button" data-day="${days[idx + 1] ? days[idx + 1].d : ''}" ${days[idx + 1] ? '' : 'disabled'} aria-label="Día anterior">${ICON.left}</button>
-          <div class="days-list" id="days">${days.slice(0, 30).map((d) => `<button type="button" class="day" data-day="${d.d}" aria-pressed="${d.d === day}"><b>${esc(dayShort(d.d))}</b><small>${esc(DF_DM.format(dayDate(d.d)))} · ${d.n}</small></button>`).join('')}</div>
+          <div class="days-list" id="days">${days.slice(0, Math.max(30, idx + 4)).map((d) => `<button type="button" class="day" data-day="${d.d}" aria-pressed="${d.d === day}"><b>${esc(dayShort(d.d))}</b><small>${esc(DF_DM.format(dayDate(d.d)))} · ${int(d.n)}</small></button>`).join('')}</div>
           <button class="ibtn" type="button" data-day="${days[idx - 1] ? days[idx - 1].d : ''}" ${days[idx - 1] ? '' : 'disabled'} aria-label="Día siguiente">${ICON.right}</button>
         </div>
         <div class="filters" id="m-filters"></div>
@@ -284,62 +391,102 @@ async function viewMatches(dayArg, tok) {
     <aside class="col" id="m-right">${skeletonList(5)}</aside>
   </div>`;
   $$('[data-day]', MAIN).forEach((b) => b.addEventListener('click', () => { const d = b.getAttribute('data-day'); if (d) { MF.limit = 120; location.hash = 'd-' + d; } }));
-  const cur = $(`#days .day[aria-pressed="true"]`); if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'center' });
-  let list, top;
-  try { [list, top] = await Promise.all([loadDay(day), loadTop().catch(() => null)]); }
+  const cur = $(`#days .day[aria-pressed="true"]`);
+  if (cur) { const L = $('#days'); L.scrollLeft = cur.offsetLeft - (L.clientWidth - cur.offsetWidth) / 2; }
+  let meta, top;
+  try { [meta, top] = await Promise.all([loadMeta(day), loadTop().catch(() => null)]); }
   catch (e) { if (live(tok)) errorBox(e); return; }
   if (!live(tok)) return;
-  list = list.filter((m) => !S.hidden.has(m.i));
-  drawFilters(list); drawLeft(list); drawList(list, day);
-  const ml = $('#m-lead'); if (ml) ml.innerHTML = leadersCard(list, day);
-  drawRight(list, top, day);
+  const st = { day, meta, lists: [], next: 0, tok };
+  drawFilters(st); drawLeft(st);
+  const ml = $('#m-lead'); if (ml) ml.innerHTML = leadersCard(meta, day);
+  drawRight(st, top);
+  await refreshList(st);
+  // días de al lado, ya preparados para cuando cambies
+  idle(() => { for (const d of [days[idx + 1], days[idx - 1]]) if (d) loadMeta(d.d).then((m) => firstChunks(d.d, m)).catch(() => {}); });
 }
-function counts(list, f) { const c = new Map(); for (const m of list) c.set(m[f], (c.get(m[f]) || 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1]); }
-function drawFilters(list) {
+// recuentos del día: exactos aunque todavía no se hayan cargado todos los partidos
+function countBy(st, f, filt) {
+  const c = new Map();
+  for (const t of st.meta.counts || []) { if (filt && !filt(t)) continue; c.set(t[f], (c.get(t[f]) || 0) + t[3]); }
+  return [...c.entries()].sort((a, b) => b[1] - a[1]);
+}
+const byType = (t) => !MF.type || t[0] === MF.type;
+const loadedRows = (st) => { const out = []; for (const l of st.lists) for (const m of l) if (!S.hidden.has(m.i)) out.push(m); return out; };
+async function moreChunks(st, need) {
+  const chunks = st.meta.chunks || [];
+  const all = !!MF.q.trim();
+  while (st.next < chunks.length && (all || filtered(loadedRows(st)).length < need)) {
+    const batch = chunks.slice(st.next, all ? chunks.length : st.next + 2); st.next += batch.length;
+    st.lists.push(...await Promise.all(batch.map((c) => loadChunk(st.day, c))));
+  }
+}
+let listSeq = 0;
+async function refreshList(st) {
+  if (!live(st.tok)) return;   // un temporizador de una vista anterior no debe tocar la actual
+  const seq = ++listSeq, el = $('#m-list');
+  if (el && el.dataset.ready && st.next < (st.meta.chunks || []).length) el.classList.add('busy');
+  try { await moreChunks(st, MF.limit); } catch { if (live(st.tok) && seq === listSeq) toast('No se pudieron cargar más partidos. Comprueba tu conexión.'); }
+  if (el) el.classList.remove('busy');
+  if (!live(st.tok) || seq !== listSeq) return;
+  drawList(st);
+}
+function drawFilters(st) {
   const el = $('#m-filters'); if (!el) return;
-  const types = counts(list, 'y');
-  el.innerHTML = `<div class="chips" role="group" aria-label="Tipo de partida"><button type="button" class="chip" data-t="" aria-pressed="${!MF.type}">Todos <span class="n">${list.length}</span></button>${types.map(([y, n]) => `<button type="button" class="chip" data-t="${esc(y)}" aria-pressed="${MF.type === y}">${esc(typeLabel(y))} <span class="n">${n}</span></button>`).join('')}</div>
+  const types = countBy(st, 0);
+  el.innerHTML = `<div class="chips" role="group" aria-label="Tipo de partida"><button type="button" class="chip" data-t="" aria-pressed="${!MF.type}">Todos <span class="n">${int(st.meta.n)}</span></button>${types.map(([y, n]) => `<button type="button" class="chip" data-t="${esc(y)}" aria-pressed="${MF.type === y}">${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}</div>
     <input class="input" id="m-q" type="search" placeholder="Filtrar por jugador" value="${esc(MF.q)}" autocomplete="off" aria-label="Filtrar partidos por jugador">
-    <select class="select only-narrow" id="m-region" aria-label="Región"><option value="">Región</option>${counts(list, 'r').map(([v, n]) => `<option value="${esc(v)}" ${MF.region === v ? 'selected' : ''}>${esc(regionLabel(v))} (${n})</option>`).join('')}</select>
-    <select class="select only-narrow" id="m-arena" aria-label="Arena"><option value="">Arena</option>${counts(list, 'a').map(([v, n]) => `<option value="${esc(v)}" ${MF.arena === v ? 'selected' : ''}>${esc(v)} (${n})</option>`).join('')}</select>`;
-  $$('[data-t]', el).forEach((b) => b.addEventListener('click', () => { MF.type = b.getAttribute('data-t'); MF.limit = 120; $$('[data-t]', el).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawList(list, S._day); drawLeft(list); }));
-  let tq; $('#m-q').addEventListener('input', (e) => { clearTimeout(tq); tq = setTimeout(() => { MF.q = e.target.value; MF.limit = 120; drawList(list, S._day); }, 140); });
-  $('#m-region').addEventListener('change', (e) => { MF.region = e.target.value; MF.limit = 120; drawLeft(list); drawList(list, S._day); });
-  $('#m-arena').addEventListener('change', (e) => { MF.arena = e.target.value; MF.limit = 120; drawLeft(list); drawList(list, S._day); });
+    <select class="select only-narrow" id="m-region" aria-label="Región"></select>
+    <select class="select only-narrow" id="m-arena" aria-label="Arena"></select>`;
+  drawSelects(st);
+  $$('[data-t]', el).forEach((b) => b.addEventListener('click', () => { MF.type = b.getAttribute('data-t'); MF.limit = 120; $$('[data-t]', el).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawLeft(st); drawSelects(st); refreshList(st); }));
+  let tq; $('#m-q').addEventListener('input', (e) => { clearTimeout(tq); tq = setTimeout(() => { MF.q = e.target.value; MF.limit = 120; refreshList(st); }, 160); });
+  $('#m-region').addEventListener('change', (e) => { MF.region = e.target.value; MF.limit = 120; drawLeft(st); refreshList(st); });
+  $('#m-arena').addEventListener('change', (e) => { MF.arena = e.target.value; MF.limit = 120; drawLeft(st); refreshList(st); });
+}
+function drawSelects(st) {
+  const r = $('#m-region'), a = $('#m-arena'); if (!r || !a) return;
+  r.innerHTML = `<option value="">Región</option>${countBy(st, 1, byType).map(([v, n]) => `<option value="${esc(v)}" ${MF.region === v ? 'selected' : ''}>${esc(regionLabel(v))} (${int(n)})</option>`).join('')}`;
+  a.innerHTML = `<option value="">Arena</option>${countBy(st, 2, byType).map(([v, n]) => `<option value="${esc(v)}" ${MF.arena === v ? 'selected' : ''}>${esc(v || 'Sin arena')} (${int(n)})</option>`).join('')}`;
 }
 function filtered(list) {
   const q = fold(MF.q.trim());
   return list.filter((m) => (!MF.type || m.y === MF.type) && (!MF.region || m.r === MF.region) && (!MF.arena || m.a === MF.arena) && (!q || m.p.some((p) => fold(p[1]).includes(q))));
 }
-function drawLeft(list) {
+function drawLeft(st) {
   const el = $('#m-left'); if (!el) return;
   const block = (title, f, key, fmt) => {
-    const c = counts(list.filter((m) => !MF.type || f === 'y' || m.y === MF.type), f);
+    const c = countBy(st, f, byType);
     if (!c.length) return '';
     return `<div class="card"><div class="card-h"><h3>${title}</h3></div><div class="flist" style="padding-bottom:8px">
-      <button type="button" data-f="${key}" data-v="" aria-pressed="${!MF[key]}">Todas <span class="n">${c.reduce((a, x) => a + x[1], 0)}</span></button>
-      ${c.map(([v, n]) => `<button type="button" data-f="${key}" data-v="${esc(v)}" aria-pressed="${MF[key] === v}">${fmt(v)} <span class="n">${n}</span></button>`).join('')}</div></div>`;
+      <button type="button" data-f="${key}" data-v="" aria-pressed="${!MF[key]}">Todas <span class="n">${int(c.reduce((a, x) => a + x[1], 0))}</span></button>
+      ${c.map(([v, n]) => `<button type="button" data-f="${key}" data-v="${esc(v)}" aria-pressed="${MF[key] === v}">${fmt(v)} <span class="n">${int(n)}</span></button>`).join('')}</div></div>`;
   };
-  el.innerHTML = block('Regiones', 'r', 'region', (v) => `<span class="region">${esc(regionShort(v))}</span>${esc(regionLabel(v))}`) + block('Arenas', 'a', 'arena', (v) => esc(v || 'Sin arena'));
-  $$('[data-f]', el).forEach((b) => b.addEventListener('click', () => { MF[b.getAttribute('data-f')] = b.getAttribute('data-v'); MF.limit = 120; drawLeft(list); drawList(list, S._day); }));
+  el.innerHTML = block('Regiones', 1, 'region', (v) => `<span class="region">${esc(regionShort(v))}</span>${esc(regionLabel(v))}`) + block('Arenas', 2, 'arena', (v) => esc(v || 'Sin arena'));
+  $$('[data-f]', el).forEach((b) => b.addEventListener('click', () => { MF[b.getAttribute('data-f')] = b.getAttribute('data-v'); MF.limit = 120; drawLeft(st); drawSelects(st); refreshList(st); }));
 }
-function drawList(list, day) {
-  S._day = day;
+function drawList(st) {
   const el = $('#m-list'); if (!el) return;
-  const rows = filtered(list);
+  el.dataset.ready = '1';
+  const rows = filtered(loadedRows(st));
   if (!rows.length) { el.innerHTML = `<div class="card empty in"><strong>Ningún partido con estos filtros.</strong>Prueba a quitar algún filtro o cambia de día.</div>`; return; }
   const q = fold(MF.q.trim());
+  // total de cada grupo (tipo + región): del resumen del día, o de lo cargado si se filtra por nombre
+  const tot = new Map();
+  if (q) for (const m of rows) tot.set(m.y + '|' + m.r, (tot.get(m.y + '|' + m.r) || 0) + 1);
+  else for (const t of st.meta.counts || []) if (byType(t) && (!MF.region || t[1] === MF.region) && (!MF.arena || t[2] === MF.arena)) tot.set(t[0] + '|' + t[1], (tot.get(t[0] + '|' + t[1]) || 0) + t[3]);
   const groups = new Map();
   for (const m of rows) { const k = m.y + '|' + m.r; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(m); }
-  let budget = MF.limit, html = '';
-  for (const [k, ms] of [...groups.entries()].sort((a, b) => b[1].length - a[1].length)) {
+  let budget = MF.limit, html = '', shown = 0;
+  for (const [k, ms] of [...groups.entries()].sort((a, b) => (tot.get(b[0]) || b[1].length) - (tot.get(a[0]) || a[1].length))) {
     if (budget <= 0) break;
-    const [y, r] = k.split('|'); const shown = ms.slice(0, budget); budget -= shown.length;
+    const [y, r] = k.split('|'); const part = ms.slice(0, budget); budget -= part.length; shown += part.length;
     const open = !MF.closed.has(k);
-    html += `<div class="card grp in" data-open="${open}" data-k="${esc(k)}"><button class="grp-h" type="button" aria-expanded="${open}"><span class="region">${esc(regionShort(r))}</span>${esc(typeLabel(y))}<span class="sub">${esc(regionLabel(r))}</span><span class="n">${ms.length}</span>${ICON.down}</button>
-      <div class="grp-b"><div>${shown.map((m) => evRow(m, q)).join('')}</div></div></div>`;
+    html += `<div class="card grp in" data-open="${open}" data-k="${esc(k)}"><button class="grp-h" type="button" aria-expanded="${open}"><span class="region">${esc(regionShort(r))}</span>${esc(typeLabel(y))}<span class="sub">${esc(regionLabel(r))}</span><span class="n">${int(Math.max(tot.get(k) || 0, ms.length))}</span>${ICON.down}</button>
+      <div class="grp-b"><div>${part.map((m) => evRow(m, q)).join('')}</div></div></div>`;
   }
-  if (rows.length > MF.limit) html += `<div class="card more"><button class="btn" type="button" id="m-more">Ver más partidos (${rows.length - MF.limit})</button></div>`;
+  const total = Math.max(rows.length, [...tot.values()].reduce((a, b) => a + b, 0));
+  if (total > shown) html += `<div class="card more"><button class="btn" type="button" id="m-more">Ver más partidos (${int(total - shown)})</button></div>`;
   el.innerHTML = html;
   const byId = new Map(rows.map((m) => [m.i, m]));
   el.onclick = (e) => {
@@ -353,7 +500,7 @@ function drawList(list, day) {
     const g = b.closest('.grp'); const k = g.getAttribute('data-k'); const open = g.getAttribute('data-open') !== 'true';
     g.setAttribute('data-open', String(open)); b.setAttribute('aria-expanded', String(open)); open ? MF.closed.delete(k) : MF.closed.add(k);
   }));
-  const more = $('#m-more'); if (more) more.addEventListener('click', () => { MF.limit += 120; drawList(list, day); });
+  const more = $('#m-more'); if (more) more.addEventListener('click', () => { more.disabled = true; MF.limit += 120; refreshList(st); });
 }
 function evRow(m, q) {
   const side = (tm) => {
@@ -380,37 +527,31 @@ function evBox(m) {
     ${[0, 1].map((tm) => `<tr class="tg"><td colspan="${MINI.length + 1}"><span class="pc">${crest(tm, 16)}${tm === 0 ? 'Local' : 'Visitante'} · ${m.s[tm]}</span></td></tr>` + m.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map(row).join('')).join('')}
   </tbody></table></div><div class="ev-box-f"><a href="${matchHref(m.k, m.i)}">Ver el partido completo</a></div>`;
 }
-function leaders(list) {
-  const map = new Map();
-  for (const m of list) for (const p of m.p) {
-    let a = map.get(p[0]);
-    if (!a) { a = { id: p[0], n: p[1], rk: p[6], gp: 0, g: 0, a: 0, rs: 0, t: 0 }; map.set(p[0], a); }
-    a.gp++; a.g += p[4]; a.a += p[5]; a.rs += p[3];
-    if (m.t > a.t) { a.t = m.t; a.n = p[1]; if (p[6]) a.rk = p[6]; }
-  }
-  return [...map.values()].sort((x, y) => (y.g + y.a) - (x.g + x.a) || y.g - x.g || y.rs / y.gp - x.rs / x.gp).slice(0, 8);
-}
-function leadersCard(list, day, cls = '') {
-  const L = leaders(list); if (!L.length) return '';
+function leadersCard(meta, day, cls = '') {
+  const L = (meta && meta.lead) || []; if (!L.length) return '';
   return `<div class="card in ${cls}"><div class="card-h"><h3>Líderes del día</h3><small>${esc(dayLong(day))}</small></div><div class="tscroll"><table class="tbl lead"><thead><tr><th>Jugador</th><th title="Partidos jugados">PJ</th><th title="Goles">G</th><th title="Asistencias">A</th><th title="Goles más asistencias">G+A</th><th>Nota</th></tr></thead><tbody>
     ${L.map((x, i) => `<tr class="${i >= 5 ? 'xtra' : ''}"><td><a class="pc" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${rank(x.rk, 16)}<span class="nm">${esc(x.n)}</span></a></td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${badge(x.rs / x.gp)}</td></tr>`).join('')}
   </tbody></table></div></div>`;
 }
-function drawRight(list, top, day) {
+function supportCard(cls = '') {
+  const url = supportUrl(); if (!url) return '';
+  return `<div class="card in support ${cls}"><div class="card-b"><b>SlapScore es gratis y sin anuncios</b><p>Lo hace un jugador de la comunidad. Si te resulta útil, puedes ayudar a mantenerlo.</p><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}Invítame a un café</a></div></div>`;
+}
+function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
-  let html = leadersCard(list, day, 'hide-mobile');
-  const best = list.slice().sort((a, b) => (b.p[b.v] ? b.p[b.v][3] : 0) - (a.p[a.v] ? a.p[a.v][3] : 0))[0];
+  const { meta, day } = st;
+  let html = leadersCard(meta, day, 'hide-mobile');
+  const best = meta.best && !S.hidden.has(meta.best.i) ? meta.best : null;
   if (best && best.p[best.v]) {
     const mv = best.p[best.v];
     html += `<div class="card in"><div class="card-h"><h3>Partido destacado</h3><small>${esc(typeLabel(best.y))} · ${esc(regionLabel(best.r))}</small></div>
       <a class="mini" href="${matchHref(best.k, best.i)}"><div class="side">${crest(0, 34)}Local</div><div class="sc">${best.s[0]}<i>-</i>${best.s[1]}</div><div class="side">${crest(1, 34)}Visitante</div></a>
       <a class="lrow" href="${matchHref(best.k, best.i)}" style="border-top:1px solid var(--line)"><span class="i"></span>${avatar(mv[1], mv[0], 'sm')}<span class="nm"><span>${esc(mv[1])}</span>${rank(mv[6], 16, { approx: mv[7] })}</span><span>${badge(mv[3])}</span></a></div>`;
   }
-  const perf = [];
-  for (const m of list) m.p.forEach((p) => perf.push({ m, p }));
-  perf.sort((a, b) => b.p[3] - a.p[3]);
-  if (perf.length) html += `<div class="card in"><div class="card-h"><h3>Mejores actuaciones</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.slice(0, 6).map(({ m, p }, i) =>
-    `<a class="lrow" href="${matchHref(m.k, m.i)}"><span class="i">${i + 1}</span>${avatar(p[1], p[0], 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p[1])}</span>${rank(p[6], 16, { approx: p[7] })}</span><span class="sub">${p[4]} G · ${p[5]} A · ${m.s[0]}-${m.s[1]}</span></span>${badge(p[3])}</a>`).join('')}</div></div>`;
+  const perf = (meta.perf || []).filter((p) => !S.hidden.has(p.i)).slice(0, 6);
+  if (perf.length) html += `<div class="card in"><div class="card-h"><h3>Mejores actuaciones</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.map((p, i) =>
+    `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 16, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
+  html += supportCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>Top MMR</h3><a href="#rankings">Ver rankings</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
   if (top && top.active && top.active.length) html += `<div class="card in"><div class="card-h"><h3>Más activos</h3><small>7 días</small></div><div style="padding-bottom:8px">${top.active.slice(0, 5).map((p, i) =>
@@ -424,16 +565,19 @@ function drawRight(list, top, day) {
 let MTAB = 'resumen';
 async function viewMatch(r, tok) {
   MAIN.innerHTML = `<div class="card evh"><div class="sk" style="height:14px;width:220px;margin-bottom:18px"></div><div style="display:flex;justify-content:space-around;align-items:center"><div class="sk" style="width:60px;height:60px;border-radius:50%"></div><div class="sk" style="width:140px;height:48px"></div><div class="sk" style="width:60px;height:60px;border-radius:50%"></div></div></div><div style="height:16px"></div>${skeletonList(6)}`;
-  let shard, sum;
-  try { [shard, sum] = await Promise.all([loadShard(r.key), loadDay(r.key.slice(0, 10)).catch(() => [])]); }
+  let res;
+  try { res = await loadMatch(r.key, r.id); }
   catch (e) { if (!live(tok)) return; if (e.status === 404) return notFound('No encuentro este partido.', '<p>Puede que todavía no se haya guardado o que el enlace sea antiguo.</p>'); return errorBox(e); }
   if (!live(tok)) return;
-  const raw = shard.find((x) => x.id === r.id);
-  if (!raw) return notFound('No encuentro este partido.');
-  const m = C.normalize(raw, S.W); m.key = r.key; m.raw = raw;
-  const se = sum.find((x) => x.i === r.id);
-  const rk = new Map(); if (se) for (const p of se.p) rk.set(p[0], { rk: p[6], approx: !!p[7] });
-  m.players.forEach((p) => { const x = rk.get(p.pid); p.rk = x ? x.rk : ''; p.rkApprox = x ? x.approx : false; });
+  const { meta, e: se, raw } = res;
+  let m;
+  if (raw) {
+    m = C.normalize(raw, S.W); m.raw = raw;
+    const rk = new Map(); if (se) for (const p of se.p) rk.set(p[0], { rk: p[6], approx: !!p[7] });
+    m.players.forEach((p) => { const x = rk.get(p.pid); p.rk = x ? x.rk : ''; p.rkApprox = x ? x.approx : false; });
+  } else m = fromSummary(se);
+  m.key = r.key; m.archived = !raw; m.dayArchived = !!meta.x;
+  if (m.archived && MTAB === 'json') MTAB = 'resumen';
   S.curMatch = m;
   const teamAvg = (tm) => { const ps = m.players.filter((p) => p.team === tm); return ps.length ? ps.reduce((a, p) => a + p.rating, 0) / ps.length : 0; };
   const lose = (tm) => m.winner && m.winner !== tm ? 'lose' : '';
@@ -452,18 +596,18 @@ async function viewMatch(r, tok) {
     <div style="height:16px"></div>
     <div class="layout two">
       <div class="col">
-        <div class="card"><div class="tabs" role="tablist" id="mtabs">${[['resumen', 'Resumen'], ['alineaciones', 'Alineaciones'], ['estadisticas', 'Estadísticas'], ['json', 'JSON']].map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${MTAB === k}">${l}</button>`).join('')}<span class="ind"></span></div>
+        <div class="card"><div class="tabs" role="tablist" id="mtabs">${[['resumen', 'Resumen'], ['alineaciones', 'Alineaciones'], ['estadisticas', 'Estadísticas'], ...(m.archived ? [] : [['json', 'JSON']])].map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${MTAB === k}">${l}</button>`).join('')}<span class="ind"></span></div>
         <div class="panel" id="mpanel" role="tabpanel"></div></div>
       </div>
-      <aside class="col sticky">${mvpCard(m)}${infoCard(m)}${isAdmin() ? `<div class="adminbar"><b>Admin</b><span class="muted" style="flex:1">${hidden ? 'Este partido está oculto.' : 'Oculta partidos con datos erróneos.'}</span><button class="btn sm ${hidden ? '' : 'danger'}" type="button" id="m-hide">${hidden ? 'Mostrar partido' : 'Ocultar partido'}</button></div>` : ''}</aside>
+      <aside class="col sticky">${m.archived ? archiveCard(m) : ''}${mvpCard(m)}${infoCard(m)}${isAdmin() && !m.dayArchived ? `<div class="adminbar"><b>Admin</b><span class="muted" style="flex:1">${hidden ? 'Este partido está oculto.' : 'Oculta partidos con datos erróneos.'}</span><button class="btn sm ${hidden ? '' : 'danger'}" type="button" id="m-hide">${hidden ? 'Mostrar partido' : 'Ocultar partido'}</button></div>` : ''}</aside>
     </div>`;
   const tabs = $('#mtabs');
   const moveInd = () => { const b = $('[aria-selected="true"]', tabs), ind = $('.ind', tabs); if (b && ind) { ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`; } };
   $$('[data-tab]', tabs).forEach((b) => b.addEventListener('click', () => {
     if (MTAB === b.getAttribute('data-tab')) return;
     MTAB = b.getAttribute('data-tab'); $$('[data-tab]', tabs).forEach((x) => x.setAttribute('aria-selected', String(x === b))); moveInd();
-    const run = () => drawPanel(m);
-    if (document.startViewTransition && !REDUCED.matches) document.startViewTransition(run); else run();
+    drawPanel(m);
+    const p = $('#mpanel'); if (p && !REDUCED.matches) { p.classList.remove('swap'); void p.offsetWidth; p.classList.add('swap'); }
   }));
   S.onResize = moveInd; requestAnimationFrame(moveInd); if (document.fonts) document.fonts.ready.then(() => { if (S.onResize === moveInd) moveInd(); });
   drawPanel(m);
@@ -471,8 +615,30 @@ async function viewMatch(r, tok) {
   const hb = $('#m-hide');
   if (hb) hb.addEventListener('click', async () => {
     hb.disabled = true;
-    try { const A = await import('./admin.js'); await A.toggleHidden(m.id, !hidden, ctx()); } catch (e) { toast(e.message || 'No se pudo guardar.'); hb.disabled = false; }
+    try { const A = await import('./admin.js'); await A.toggleHidden(m.id, !hidden, ctx(), m.key); } catch (e) { toast(e.message || 'No se pudo guardar.'); hb.disabled = false; }
   });
+}
+// Partido archivado: se reconstruye con el resumen guardado (nota y estadísticas principales de cada jugador)
+function fromSummary(e) {
+  const players = e.p.map((p) => ({
+    pid: p[0], name: p[1], team: p[2] === 0 ? 'home' : 'away', rating: p[3], rawRating: p[3], parts: [], rk: p[6], rkApprox: !!p[7],
+    res: e.w === -1 ? 'D' : e.w === p[2] ? 'W' : 'L',
+    st: { goals: p[4], assists: p[5], shots: p[8], saves: p[9], passes: p[10], score: p[11], takeaways: p[12], blocks: p[13], turnovers: p[14] || 0,
+      possession_time_sec: p[15] || 0, faceoffs_won: p[16] || 0, faceoffs_lost: p[17] || 0, post_hits: p[18] || 0 },
+  }));
+  const tot = { home: {}, away: {} };
+  for (const p of players) for (const k of Object.keys(p.st)) tot[p.team][k] = (tot[p.team][k] || 0) + p.st[k];
+  const home = players.filter((p) => p.team === 'home').length;
+  return { id: e.i, t: e.t, type: e.y, region: e.r, arena: e.a, endReason: e.e, ot: !!e.o, length: null, periods: null, score: { home: e.s[0], away: e.s[1] },
+    winner: e.w === 0 ? 'home' : e.w === 1 ? 'away' : null, players, mvp: e.v, size: { home, away: players.length - home }, tot, format: e.f };
+}
+function archiveUrl(day) {
+  const a = S.index.archive || {};
+  return a.repo ? `https://github.com/${a.repo}/releases/download/${a.tag || 'archivo-'}${day.slice(0, 7)}/${a.file || 'partidos-'}${day}.json.gz` : '';
+}
+function archiveCard(m) {
+  const day = m.key.slice(0, 10), url = m.dayArchived ? archiveUrl(day) : '';
+  return `<div class="card in note"><div class="card-b"><b>Partido archivado</b><p>Guardamos el detalle completo de los partidos de los últimos ${int(S.index.retain || 60)} días. De este se conservan la nota y las estadísticas principales de cada jugador.</p>${url ? `<a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">Descargar el archivo del día ${ICON.ext}</a>` : ''}</div></div>`;
 }
 function mvpCard(m) {
   const p = m.players[m.mvp]; if (!p) return '';
@@ -532,19 +698,22 @@ const BOX = [['rating', 'Nota', 'Nota'], ['goals', 'G', 'Goles'], ['primary_assi
   ['score', 'PTS', 'Puntos de juego'], ['shots', 'TIR', 'Tiros'], ['saves', 'PAR', 'Paradas'], ['blocks', 'BLQ', 'Bloqueos'], ['passes', 'PAS', 'Pases'],
   ['post_hits', 'PST', 'Postes'], ['takeaways', 'ROB', 'Robos'], ['turnovers', 'PÉR', 'Pérdidas'], ['possession_time_sec', 'POS', 'Posesión'],
   ['faceoffs_won', 'FO+', 'Faceoffs ganados'], ['faceoffs_lost', 'FO−', 'Faceoffs perdidos']];
+// En partidos archivados no hay asistencias primarias/secundarias: se muestra A
+const BOX_ARCH = (() => { const b = BOX.filter(([k]) => k !== 'primary_assists' && k !== 'secondary_assists'); b.splice(2, 0, ['assists', 'A', 'Asistencias']); return b; })();
 function boxScore(m) {
+  const cols = m.archived ? BOX_ARCH : BOX;
   const best = {};
-  for (const [k] of BOX) if (!['rating', 'turnovers', 'faceoffs_lost'].includes(k)) best[k] = Math.max(0, ...m.players.map((p) => p.st[k] || 0));
+  for (const [k] of cols) if (!['rating', 'turnovers', 'faceoffs_lost'].includes(k)) best[k] = Math.max(0, ...m.players.map((p) => p.st[k] || 0));
   const cell = (k, v) => k === 'possession_time_sec' ? C.fmtPoss(v || 0) : int(v || 0);
   const team = (tm) => {
     const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
     return `<div class="bx-team"><div class="bx-h">${crest(tm, 22)}<b>${tm === 'home' ? 'Local' : 'Visitante'}</b><span class="sc">${m.score[tm]}</span>${m.winner === tm ? '<span class="pill live">Ganador</span>' : ''}<span class="avg">Nota media ${badge(avg(m, tm))}</span></div>
-      <div class="tscroll"><table class="tbl bx"><thead><tr><th>Jugador</th>${BOX.map(([, s, l]) => `<th title="${l}">${s}</th>`).join('')}</tr></thead><tbody>
-      ${ps.map(([p, i]) => `<tr><td><button type="button" class="linkish" data-perf="${i}">${avatar(p.name, p.pid, 'sm')}<span class="nm">${esc(p.name)}</span>${rank(p.rk, 16, { approx: p.rkApprox })}${i === m.mvp ? '<span class="mvp-tag">MVP</span>' : ''}</button></td>${BOX.map(([k]) => k === 'rating' ? `<td>${badge(p.rating)}</td>`
+      <div class="tscroll"><table class="tbl bx"><thead><tr><th>Jugador</th>${cols.map(([, s, l]) => `<th title="${l}">${s}</th>`).join('')}</tr></thead><tbody>
+      ${ps.map(([p, i]) => `<tr><td><button type="button" class="linkish" data-perf="${i}">${avatar(p.name, p.pid, 'sm')}<span class="nm">${esc(p.name)}</span>${rank(p.rk, 16, { approx: p.rkApprox })}${i === m.mvp ? '<span class="mvp-tag">MVP</span>' : ''}</button></td>${cols.map(([k]) => k === 'rating' ? `<td>${badge(p.rating)}</td>`
         : `<td class="${best[k] && (p.st[k] || 0) === best[k] ? 'best' : ''}">${cell(k, p.st[k])}</td>`).join('')}</tr>`).join('')}
-      <tr class="tot"><td>Total</td>${BOX.map(([k]) => k === 'rating' ? '<td></td>' : `<td>${cell(k, m.tot[tm][k])}</td>`).join('')}</tr></tbody></table></div></div>`;
+      <tr class="tot"><td>Total</td>${cols.map(([k]) => k === 'rating' ? '<td></td>' : `<td>${cell(k, m.tot[tm][k])}</td>`).join('')}</tr></tbody></table></div></div>`;
   };
-  return team('home') + team('away') + `<p class="legend">${BOX.slice(1).map(([, s, l]) => `<b>${s}</b> ${l}`).join(' · ')}. En azul, el mejor del partido en cada columna.</p>`;
+  return team('home') + team('away') + `<p class="legend">${cols.slice(1).map(([, s, l]) => `<b>${s}</b> ${l}`).join(' · ')}. En azul, el mejor del partido en cada columna.</p>`;
 }
 const avg = (m, tm) => { const ps = m.players.filter((p) => p.team === tm); return ps.length ? ps.reduce((a, p) => a + p.rating, 0) / ps.length : 0; };
 function lineupList(m, tm) {
@@ -596,9 +765,9 @@ function openPerf(m, p) {
   openSheet(`<div class="sheet-h">${avatar(p.name, p.pid, 'md')}<div style="min-width:0"><div class="nm" id="sheet-title"><span>${esc(p.name)}</span>${rank(p.rk, 22, { approx: p.rkApprox })}</div>
       <small>${crest(p.team, 16)}${p.team === 'home' ? 'Local' : 'Visitante'} · <span class="res ${p.res}">${p.res === 'W' ? 'V' : p.res === 'L' ? 'D' : 'E'}</span> ${res} ${m.score.home}-${m.score.away}${m.players[m.mvp] === p ? ' · <span class="mvp-tag">MVP</span>' : ''}</small></div>${badge(p.rating, 'xl')}</div>
     <div class="sgrid">${(keys.length ? keys : ['goals']).map((k) => `<div><b>${k === 'possession_time_sec' ? C.fmtPoss(p.st[k]) : int(p.st[k])}</b><span>${esc(C.LABELS[k] ? C.LABELS[k][0] : k)}</span></div>`).join('')}</div>
-    <div class="bd"><h3>Cómo sale la nota</h3><div class="bd-row"><span>Nota de partida</span><span></span><b>${fmtR(S.W.base)}</b></div>
+    ${m.archived ? `<div class="bd"><p class="muted" style="margin:0">El desglose de la nota no está disponible en los partidos archivados.</p></div>` : `<div class="bd"><h3>Cómo sale la nota</h3><div class="bd-row"><span>Nota de partida</span><span></span><b>${fmtR(S.W.base)}</b></div>
       ${p.parts.map((x) => `<div class="bd-row"><span>${esc(x.label)}${x.n !== '' && x.n != null ? ` <span class="muted">(${esc(x.n)})</span>` : ''}</span><span class="bar"><i class="${x.c >= 0 ? 'pos' : 'neg'}" style="width:${Math.round(Math.abs(x.c) / maxAbs * 50)}%"></i></span><b class="${x.c >= 0 ? 'pos' : 'neg'}">${x.c >= 0 ? '+' : '−'}${dec(Math.abs(x.c), 2)}</b></div>`).join('')}
-      <div class="bd-row tot"><span>Nota final</span><span></span><b>${fmtR(p.rating)}</b></div></div>
+      <div class="bd-row tot"><span>Nota final</span><span></span><b>${fmtR(p.rating)}</b></div></div>`}
     <div class="sheet-f"><button class="btn" type="button" data-close>Cerrar</button><a class="btn primary" href="#j-${esc(p.pid)}">Ver perfil</a></div>`);
 }
 
@@ -608,13 +777,16 @@ function openPerf(m, p) {
 const PV = { hist: 'all', histN: 15, statMode: 'pg' };
 async function viewPlayer(pid, tok) {
   MAIN.innerHTML = `<div class="card"><div class="ph"><div class="sk" style="width:76px;height:76px;border-radius:50%"></div><div><div class="sk" style="height:26px;width:220px"></div><div class="sk" style="height:12px;width:260px;margin-top:10px"></div></div></div></div><div style="height:16px"></div>${skeletonList(5)}`;
-  let P;
-  try { P = await loadP(pid); }
+  let P, AT;
+  try { [P, AT] = await Promise.all([loadP(pid), loadAttr().catch(() => null)]); }
   catch (e) { if (!live(tok)) return; if (e.status === 404) return notFound('Este jugador no tiene partidos guardados todavía.', `<p><a href="https://slapshot.gg/players/${encodeURIComponent(pid)}" target="_blank" rel="noopener">Ver su perfil en slapshot.gg</a></p>`); return errorBox(e); }
   if (!live(tok)) return;
   PV.hist = 'all'; PV.histN = 15;
-  const games = (P.games || []).filter((g) => !S.hidden.has(g.i));
-  const meta = P.meta || {}, a = P.a || {};
+  const games = P._g.filter((g) => !S.hidden.has(g.i));
+  const meta = P.meta || {}, a = P._a;
+  // atributos: percentil frente al resto de jugadores con 5 partidos o más
+  let attr = null;
+  if (AT && AT.n > 1 && a.gp >= 5) { const raw = C.attrRaw(a); attr = {}; for (const [k] of C.ATTRS) attr[k] = C.percentile(AT.q[k], raw[k]); }
   const avgR = a.gp ? a.rs / a.gp : 0;
   const curRank = meta.rk ? `<div class="rank-c">${rank(meta.rk, 56)}<div><div class="k">Rango actual</div><div class="nm">${esc(meta.rank || C.parseRank(meta.rk)?.name || '')}</div><div class="pts"><b>${int(meta.mmr)}</b> MMR${meta.season ? ' · ' + esc(String(meta.season).replace(/^season/i, 'Temporada ')) : ''}${meta.rmp != null ? ' · ' + meta.rmp + ' partidas' : ''}</div></div></div>`
     : `<div class="rank-c"><svg width="56" height="56" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2.5 35.5 11.5v17L20 37.5 4.5 28.5v-17Z" fill="none" stroke="var(--line-2)" stroke-width="1.6" stroke-dasharray="3 3"/></svg><div><div class="k">Rango actual</div><div class="nm">${meta.unr ? 'Sin clasificar' : 'Sin consultar'}</div><div class="pts">${meta.unr ? 'No ha jugado clasificatorias esta temporada' : 'El robot aún no ha mirado su rango'}</div></div></div>`;
@@ -636,7 +808,7 @@ async function viewPlayer(pid, tok) {
         <div class="card in"><div class="card-h"><h3>Forma</h3><small>últimos ${last10.length} partidos</small></div><div class="form">${last10.map((g) => `<a href="${matchHref(g.k, g.i)}" title="${esc(DF_SHORT.format(new Date(g.t)) + ' · ' + g.gf + '-' + g.ga)}">${badge(g.rt)}<span class="res ${g.r}">${g.r === 'W' ? 'V' : g.r === 'L' ? 'D' : 'E'}</span></a>`).join('')}</div></div>
         <div class="card in"><div class="card-h"><h3>Notas por partido</h3><small>la línea es su media</small></div><div class="chart">${ratingChart(games.slice(0, 30).reverse(), avgR)}</div></div>
         ${meta.rh && meta.rh.length > 1 ? `<div class="card in"><div class="card-h"><h3>Evolución del MMR</h3><small>${meta.rh.length} registros</small></div><div class="chart">${mmrChart(meta.rh)}</div></div>` : ''}
-        ${P.attr ? `<div class="card in"><div class="card-h"><h3>Atributos</h3><small>frente a ${P.pop} jugadores</small></div>${radar(P.attr)}</div>` : ''}
+        ${attr ? `<div class="card in"><div class="card-h"><h3>Atributos</h3><small>frente a ${int(AT.n)} jugadores</small></div>${radar(attr)}</div>` : ''}
       </div>
       <div class="col">
         <div class="card in"><div class="card-h"><h3>Estadísticas</h3><div class="seg" role="group" aria-label="Modo"><button type="button" data-sm="pg" aria-pressed="${PV.statMode === 'pg'}">Por partido</button><button type="button" data-sm="tot" aria-pressed="${PV.statMode === 'tot'}">Totales</button></div></div><div id="pstats"></div></div>
@@ -677,7 +849,8 @@ function drawHist(P, games) {
   el.innerHTML = list.slice(0, PV.histN).map((g) => {
     const opp = g.op.map((id) => (P.names && P.names[id]) || id).join(', ');
     return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(DF_SHORT.format(new Date(g.t)))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${g.r === 'W' ? 'V' : g.r === 'L' ? 'D' : 'E'}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} G · ${g.st.assists || 0} A</span>${badge(g.rt)}</a>`;
-  }).join('') + (list.length > PV.histN ? `<div class="more"><button class="btn" type="button" id="h-more">Ver más (${list.length - PV.histN})</button></div>` : '');
+  }).join('') + (list.length > PV.histN ? `<div class="more"><button class="btn" type="button" id="h-more">Ver más (${list.length - PV.histN})</button></div>`
+    : P._a.gp > P._g.length && PV.hist === 'all' ? `<p class="muted hnote">Aquí salen sus últimos ${int(P._g.length)} partidos. Las estadísticas cuentan los ${int(P._a.gp)} de su carrera.</p>` : '');
   const b = $('#h-more'); if (b) b.addEventListener('click', () => { PV.histN += 20; drawHist(P, games); });
 }
 function ratingChart(gs, avgR) {
@@ -705,7 +878,7 @@ function mmrChart(rh) {
     <text x="${L}" y="${H - 4}">${esc(DF_SHORT.format(new Date(t0)))}</text><text x="${Wd - R}" y="${H - 4}" text-anchor="end">${esc(DF_SHORT.format(new Date(t1)))}</text></svg>`;
 }
 function radar(attr) {
-  const ax = [['atk', 'Ataque'], ['cre', 'Creación'], ['def', 'Defensa'], ['ctl', 'Control'], ['fo', 'Faceoffs']];
+  const ax = C.ATTRS;
   const cx = 110, cy = 110, R = 78;
   const pt = (i, v) => { const a = -Math.PI / 2 + i * 2 * Math.PI / ax.length; return [cx + Math.cos(a) * R * v, cy + Math.sin(a) * R * v]; };
   const ring = (v) => ax.map((_, i) => pt(i, v).map((n) => n.toFixed(1)).join(',')).join(' ');
@@ -727,22 +900,27 @@ async function viewPlayers(tok) {
       <div class="seg" role="group" aria-label="Periodo">${[['a', 'Siempre'], ['m', '30 días'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-w="${k}" aria-pressed="${PF.win === k}">${l}</button>`).join('')}</div>
       <select class="select" id="p-min" aria-label="Mínimo de partidos">${[1, 3, 5, 10, 25].map((v) => `<option value="${v}" ${PF.min === v ? 'selected' : ''}>Mín. ${v} PJ</option>`).join('')}</select>
     </div></div><div class="tscroll" id="ptable">${Array.from({ length: 8 }, skRow).join('')}</div></div>`;
-  let P; try { P = await loadPlayers(); } catch (e) { if (live(tok)) errorBox(e); return; }
+  let rows; try { rows = await loadTable(PF.win); } catch (e) { if (live(tok)) errorBox(e); return; }
   if (!live(tok)) return;
-  const draw = () => drawPlayers(P);
-  $('#p-q').addEventListener('input', (e) => { PF.q = e.target.value; PF.limit = 50; draw(); });
-  $('#p-min').addEventListener('change', (e) => { PF.min = Number(e.target.value); PF.limit = 50; draw(); });
-  $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', () => { PF.win = b.getAttribute('data-w'); PF.limit = 50; $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); draw(); }));
-  $('#ptable').addEventListener('click', (e) => { const b = e.target.closest('[data-sort]'); if (!b) return; const k = b.getAttribute('data-sort'); if (PF.sort === k) PF.dir *= -1; else { PF.sort = k; PF.dir = -1; } draw(); });
-  draw();
+  let tq;
+  $('#p-q').addEventListener('input', (e) => { clearTimeout(tq); tq = setTimeout(() => { PF.q = e.target.value; PF.limit = 50; drawPlayers(rows); }, 120); });
+  $('#p-min').addEventListener('change', (e) => { PF.min = Number(e.target.value); PF.limit = 50; drawPlayers(rows); });
+  $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', async () => {
+    PF.win = b.getAttribute('data-w'); PF.limit = 50; $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const el = $('#ptable'); el.classList.add('busy');
+    try { rows = await loadTable(PF.win); } catch { toast('No se pudo cargar la tabla.'); }
+    if (live(tok)) { el.classList.remove('busy'); drawPlayers(rows); }
+  }));
+  $('#ptable').addEventListener('click', (e) => { const b = e.target.closest('[data-sort]'); if (!b) return; const k = b.getAttribute('data-sort'); if (PF.sort === k) PF.dir *= -1; else { PF.sort = k; PF.dir = -1; } drawPlayers(rows); });
+  drawPlayers(rows);
 }
-function drawPlayers(P) {
+function drawPlayers(all) {
   const q = fold(PF.q.trim());
   const rows = [];
-  for (const [id, p] of Object.entries(P)) {
-    const a = p[PF.win]; if (!a || a.gp < PF.min) continue;
+  for (const p of all) {
+    const a = p.a; if (a.gp < PF.min) continue;
     if (q && !fold(p.n).includes(q)) continue;
-    rows.push({ id, p, v: { mmr: p.mmr ?? -1, gp: a.gp, w: a.w, wp: a.w / a.gp, avg: a.rs / a.gp, mvp: a.mvp, g: a.g, as: a.as, ga: a.g + a.as, ppg: (a.pt || 0) / a.gp, shp: a.sh ? a.g / a.sh : 0, sh: a.sh, sv: a.sv, ps: a.ps, tk: a.tk, to: a.to, po: a.po / a.gp } });
+    rows.push({ p, v: { mmr: p.mmr ?? -1, gp: a.gp, w: a.w, wp: a.w / a.gp, avg: a.rs / a.gp, mvp: a.mvp, g: a.g, as: a.as, ga: a.g + a.as, ppg: (a.pt || 0) / a.gp, shp: a.sh ? a.g / a.sh : 0, sh: a.sh, sv: a.sv, ps: a.ps, tk: a.tk, to: a.to, po: a.po / a.gp } });
   }
   rows.sort((x, y) => (PF.dir === -1 ? y.v[PF.sort] - x.v[PF.sort] : x.v[PF.sort] - y.v[PF.sort]) || y.v.avg - x.v.avg);
   const el = $('#ptable'); if (!el) return;
@@ -750,9 +928,9 @@ function drawPlayers(P) {
   const shown = rows.slice(0, PF.limit);
   const fmt = (k, v) => k === 'avg' ? badge(v) : k === 'wp' || k === 'shp' ? pct(v) : k === 'po' ? C.fmtPoss(v) : k === 'ppg' ? int(Math.round(v)) : k === 'mmr' ? '' : int(v);
   el.innerHTML = `<table class="tbl"><thead><tr><th>Jugador</th>${PCOLS.map(([k, l]) => `<th><button type="button" data-sort="${k}" class="${PF.sort === k ? 'on' : ''}" aria-label="Ordenar por ${l}">${l}${PF.sort === k ? (PF.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead><tbody>
-    ${shown.map((r) => `<tr><td><a class="pc" href="#j-${esc(r.id)}">${avatar(r.p.n, r.id, 'sm')}${esc(r.p.n)}</a></td><td><span class="pc" style="justify-content:flex-end">${r.p.rk ? `${int(r.p.mmr)} ${rank(r.p.rk, 20)}` : '<span class="muted">–</span>'}</span></td>${PCOLS.slice(1).map(([k]) => `<td>${fmt(k, r.v[k])}</td>`).join('')}</tr>`).join('')}
-  </tbody></table>${rows.length > PF.limit ? `<div class="more"><button class="btn" type="button" id="p-more">Ver más (${rows.length - PF.limit})</button></div>` : ''}`;
-  const b = $('#p-more'); if (b) b.addEventListener('click', () => { PF.limit += 50; drawPlayers(P); });
+    ${shown.map((r) => `<tr><td><a class="pc" href="#j-${esc(r.p.id)}">${avatar(r.p.n, r.p.id, 'sm')}${esc(r.p.n)}</a></td><td><span class="pc" style="justify-content:flex-end">${r.p.rk ? `${r.p.mmr != null ? int(r.p.mmr) : ''} ${rank(r.p.rk, 20)}` : '<span class="muted">–</span>'}</span></td>${PCOLS.slice(1).map(([k]) => `<td>${fmt(k, r.v[k])}</td>`).join('')}</tr>`).join('')}
+  </tbody></table>${rows.length > PF.limit ? `<div class="more"><button class="btn" type="button" id="p-more">Ver más (${int(rows.length - PF.limit)})</button></div>` : ''}`;
+  const b = $('#p-more'); if (b) b.addEventListener('click', () => { PF.limit += 50; drawPlayers(all); });
 }
 
 // =====================================================================
@@ -763,38 +941,37 @@ async function viewRankings(tok) {
   MAIN.innerHTML = `<h1 class="h1 in">Rankings</h1><p class="lead">Los mejores de la comunidad. Las medias piden un mínimo de partidos para contar.</p>
     <div class="toolbar" style="margin-bottom:16px"><div class="seg" role="group" aria-label="Periodo">${[['a', 'Siempre'], ['m', '30 días'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-w="${k}" aria-pressed="${RK.win === k}">${l}</button>`).join('')}</div></div>
     <div class="rk-grid" id="rk">${Array.from({ length: 6 }, () => skeletonList(5)).join('')}</div>`;
-  let P; try { P = await loadPlayers(); } catch (e) { if (live(tok)) errorBox(e); return; }
+  let R; try { R = await loadRankings(); } catch (e) { if (live(tok)) errorBox(e); return; }
   if (!live(tok)) return;
-  $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', () => { RK.win = b.getAttribute('data-w'); $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawRankings(P); }));
-  drawRankings(P);
+  $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', () => { RK.win = b.getAttribute('data-w'); $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawRankings(R); }));
+  drawRankings(R);
 }
-function drawRankings(P) {
+function drawRankings(R) {
   const el = $('#rk'); if (!el) return;
-  const rows = Object.entries(P).map(([id, p]) => ({ id, p, a: p[RK.win] })).filter((r) => r.a && r.a.gp);
-  const minGp = rows.filter((r) => r.a.gp >= 5).length >= 5 ? 5 : rows.filter((r) => r.a.gp >= 3).length >= 5 ? 3 : 1;
-  const card = (title, note, fn, fmt, filt) => {
-    const list = rows.filter(filt || (() => true)).map((r) => ({ r, v: fn(r) })).filter((x) => x.v > 0).sort((x, y) => y.v - x.v || y.r.a.gp - x.r.a.gp).slice(0, 10);
-    if (!list.length) return '';
+  const W = R[RK.win] || {};
+  const card = (title, note, list, fmt) => {
+    if (!list || !list.length) return '';
     return `<div class="card in"><div class="card-h"><h3>${title}</h3><small>${note}</small></div><div style="padding-bottom:8px">${list.map((x, i) =>
-      `<a class="lrow" href="#j-${esc(x.r.id)}"><span class="i">${i + 1}</span>${avatar(x.r.p.n, x.r.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px">${esc(x.r.p.n)}${rank(x.r.p.rk, 16)}</span><span class="sub">${x.r.a.gp} partidos</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
+      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px">${esc(x.n)}${rank(x.rk, 16)}</span><span class="sub">${int(x.gp)} ${x.gp === 1 ? 'partido' : 'partidos'}</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
   };
   const v = (x) => `<span class="v">${int(x)}</span>`;
-  const mmr = Object.entries(P).filter(([, p]) => p.mmr != null).sort((a, b) => b[1].mmr - a[1].mmr).slice(0, 10);
-  const mmrCard = mmr.length ? `<div class="card in"><div class="card-h"><h3>Top MMR</h3><small>clasificatoria</small></div><div style="padding-bottom:8px">${mmr.map(([id, p], i) =>
-    `<a class="lrow" href="#j-${esc(id)}"><span class="i">${i + 1}</span>${rank(p.rk, 28)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>` : '';
-  const minF = (r) => r.a.gp >= minGp;
-  el.innerHTML = mmrCard
-    + card('Nota media', `mín. ${minGp} PJ`, (r) => r.a.rs / r.a.gp, (x) => badge(x), minF)
-    + card('Goles', 'total', (r) => r.a.g, v)
-    + card('Asistencias', 'total', (r) => r.a.as, v)
-    + card('Goles + asistencias', 'total', (r) => r.a.g + r.a.as, v)
-    + card('Jugador del partido', 'veces MVP', (r) => r.a.mvp, v)
-    + card('Paradas', 'total', (r) => r.a.sv, v)
-    + card('Pases', 'total', (r) => r.a.ps, v)
-    + card('Robos', 'total', (r) => r.a.tk, v)
-    + card('Bloqueos', 'total', (r) => r.a.bl, v)
-    + card('% de victorias', `mín. ${minGp} PJ`, (r) => r.a.w / r.a.gp, (x) => `<span class="v">${pct(x)}</span>`, minF)
-    + card('Más partidos', 'jugados', (r) => r.a.gp, v);
+  const mmr = R.mmr || [];
+  const mmrCard = mmr.length ? `<div class="card in"><div class="card-h"><h3>Top MMR</h3><small>clasificatoria</small></div><div style="padding-bottom:8px">${mmr.map((p, i) =>
+    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 28)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>` : '';
+  const minGp = W.min || 1;
+  const html = mmrCard
+    + card('Nota media', `mín. ${minGp} PJ`, W.avg, (x) => badge(x))
+    + card('Goles', 'total', W.g, v)
+    + card('Asistencias', 'total', W.as, v)
+    + card('Goles + asistencias', 'total', W.ga, v)
+    + card('Jugador del partido', 'veces MVP', W.mvp, v)
+    + card('Paradas', 'total', W.sv, v)
+    + card('Pases', 'total', W.ps, v)
+    + card('Robos', 'total', W.tk, v)
+    + card('Bloqueos', 'total', W.bl, v)
+    + card('% de victorias', `mín. ${minGp} PJ`, W.wp, (x) => `<span class="v">${pct(x)}</span>`)
+    + card('Más partidos', 'jugados', W.gp, v);
+  el.innerHTML = html || '<div class="card empty">Todavía no hay datos para este periodo.</div>';
 }
 
 // =====================================================================
@@ -816,6 +993,7 @@ function viewMethod() {
         </div><p class="muted" style="margin:14px 0 0;font-size:13px">El rango de cada jugador en un partido es el que tenía según el último registro de SlapScore anterior a ese partido. Si el partido es de antes de empezar a seguirle, se muestra atenuado como aproximado.</p></div></div>
       <div class="card in"><div class="card-h"><h3>De dónde salen los datos</h3></div><div class="card-b">
         <p>Un robot revisa cada 30 minutos los perfiles públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>: los últimos 10 partidos de cada jugador con todas sus estadísticas, y su rango y MMR. Cada jugador que aparece en un partido entra en la lista y los más activos se revisan más a menudo.</p>
+        <p>Guardamos el detalle completo de los partidos de los últimos ${int((S.index && S.index.retain) || 60)} días. Los anteriores pasan a un archivo descargable, pero sus notas, los perfiles y las estadísticas de carrera de cada jugador se conservan siempre.</p>
         <p class="muted">Ahora mismo: ${int(t.matches)} partidos, ${int(t.players)} jugadores con partidos, ${int(t.ranked)} con rango. Última pasada ${lr.at ? esc(ago(Date.parse(lr.at))) : '–'}: ${int(lr.newMatches)} partidos nuevos.</p>
       </div></div>
     </div><div class="col">
@@ -829,7 +1007,7 @@ function viewMethod() {
 // ADMIN
 // =====================================================================
 function ctx() {
-  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial };
+  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl };
 }
 async function viewAdmin(tok) {
   MAIN.innerHTML = skeletonList(4);
@@ -852,9 +1030,9 @@ async function refreshData(manual) {
     if (set) applySettings(set);
     const changed = idx.updated !== S.ver;
     const prev = S.index && S.index.totals ? S.index.totals.matches : 0;
-    S.index = idx; S.ver = idx.updated; resetCaches(); $('#newbar').hidden = true;
+    setIndex(idx); $('#newbar').hidden = true;
     renderChrome(); go({ keepScroll: true });
-    if (manual) toast(changed ? `Datos actualizados${idx.totals.matches > prev ? ` · ${idx.totals.matches - prev} partidos nuevos` : ''}` : 'Ya tienes lo último');
+    if (manual) toast(changed ? `Datos actualizados${idx.totals.matches > prev ? ` · ${int(idx.totals.matches - prev)} partidos nuevos` : ''}` : 'Ya tienes lo último');
     return changed;
   } catch (e) { if (manual) toast('No se pudo actualizar. Comprueba tu conexión.'); return false; }
   finally { btn.classList.remove('spin'); }
@@ -866,12 +1044,45 @@ setInterval(async () => {
   try { const idx = await getJSON('data/index.json', true); if (idx.updated !== S.ver) $('#newbar').hidden = false; } catch {}
 }, 4 * 60_000);
 
+// ---------- precarga al señalar un enlace (ratón encima o dedo apoyado) ----------
+(() => {
+  let hov = 0;
+  const warm = (a) => {
+    if (!S.index || S.index.v !== 3) return;
+    const h = decodeURIComponent((a.getAttribute('href') || '').slice(1));
+    try {
+      if (h.startsWith('m-')) { const m = parseMatch(h); if (m) loadMatch(m.key, m.id).catch(() => {}); }
+      else if (h.startsWith('j-')) Promise.all([loadP(h.slice(2)), loadAttr()]).catch(() => {});
+      else if (h.startsWith('d-')) { const d = h.slice(2); loadMeta(d).then((m) => firstChunks(d, m)).catch(() => {}); }
+      else if (h === 'jugadores') loadTable(PF.win).catch(() => {});
+      else if (h === 'rankings') loadRankings().catch(() => {});
+    } catch {}
+  };
+  const target = (e) => e.target.closest && e.target.closest('a[href^="#"]');
+  document.addEventListener('pointerover', (e) => { const a = target(e); if (!a || e.pointerType === 'touch') return; clearTimeout(hov); hov = setTimeout(() => warm(a), 70); }, { passive: true });
+  document.addEventListener('pointerout', () => clearTimeout(hov), { passive: true });
+  document.addEventListener('touchstart', (e) => { const a = target(e); if (a) warm(a); }, { passive: true });
+  document.addEventListener('pointerdown', (e) => { const a = target(e); if (a) warm(a); }, { passive: true });
+  // botones de día: también se precargan
+  document.addEventListener('pointerover', (e) => { const b = e.target.closest && e.target.closest('button[data-day]'); const d = b && b.getAttribute('data-day'); if (d && S.index) loadMeta(d).then((m) => firstChunks(d, m)).catch(() => {}); }, { passive: true });
+})();
+
+// Si la web se muda (ajuste "home"), la dirección antigua de GitHub Pages lleva a la nueva
+function moved() {
+  try {
+    const u = new URL(String(S.settings.home || ''));
+    if (u.protocol === 'https:' && u.origin !== location.origin && /\.github\.io$/.test(location.hostname)) { location.replace(u.origin + u.pathname + location.hash); return true; }
+  } catch {}
+  return false;
+}
+
 // ---------- arranque ----------
 (async function boot() {
   renderChrome(); go({ instant: true });
   try {
     const { idx, set } = await fetchIndex();
-    applySettings(set || {}); S.index = idx; S.ver = idx.updated;
+    applySettings(set || {}); setIndex(idx);
+    if (moved()) return;
   } catch (e) {
     MAIN.innerHTML = `<div class="card empty"><strong>No se pudieron cargar los partidos.</strong><p>${e.status === 404 ? 'El robot aún no ha publicado datos.' : 'Comprueba tu conexión y vuelve a intentarlo.'}</p><button class="btn" type="button" onclick="location.reload()">Reintentar</button></div>`;
     return;

@@ -1,0 +1,17 @@
+# Despliegue en Cloudflare Workers (gratis). Lo hace el flujo de GitHub Actions si existen
+# los secretos CLOUDFLARE_API_TOKEN y CLOUDFLARE_ACCOUNT_ID. Ver README.
+name = "slapscore"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[assets]
+directory = "./_site"
+binding = "ASSETS"
+not_found_handling = "none"
+
+[vars]
+GH_REPO = "mansowtcg/slapscore"
+
+[triggers]
+crons = ["7,37 * * * *"]

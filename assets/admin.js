@@ -59,9 +59,11 @@ async function writeSettings(mutate, message) {
   }
   throw lastErr;
 }
-export async function toggleHidden(id, hide, ctx) {
+// Los ocultos se guardan como "día/hora|id" para que el robot los encuentre sin buscar
+const hidId = (h) => String(h).split('|').pop();
+export async function toggleHidden(id, hide, ctx, key) {
   X = ctx;
-  await writeSettings((s) => { s.hidden = (s.hidden || []).filter((x) => x !== id); if (hide) s.hidden.push(id); return s; }, `${hide ? 'Ocultar' : 'Mostrar'} partido ${id}`);
+  await writeSettings((s) => { s.hidden = (s.hidden || []).filter((x) => hidId(x) !== id); if (hide) s.hidden.push(key ? `${key}|${id}` : id); return s; }, `${hide ? 'Ocultar' : 'Mostrar'} partido ${id}`);
   X.toast(hide ? 'Partido oculto. Desaparece de las listas al momento y de los rankings en unos minutos.' : 'Partido visible de nuevo.');
   X.go({ keepScroll: true, instant: true });
 }
@@ -86,6 +88,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>se revisan primero</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Partidos ocultos</h3></div><div id="hidden"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
     </div>
   </div>`;
@@ -95,8 +98,8 @@ export async function mount(root, ctx) {
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
   loadWorkflow(); loadRuns(); drawRanks();
-  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); }
-  catch (e) { for (const id of ['seeds', 'hidden']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
+  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawExtra(st.data); }
+  catch (e) { for (const id of ['seeds', 'hidden', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
 }
 
@@ -248,7 +251,7 @@ async function track() {
       await sleep(4000);
     }
     if (run.conclusion !== 'success') { drawProgress({ pct: 100, stage: 1, title, error: run.conclusion === 'cancelled' ? 'La pasada se canceló.' : 'La pasada falló.', url: run.html_url }); loadRuns(); return finish(); }
-    drawProgress({ pct: 96, stage: 3, title, time: 'esperando a GitHub Pages' });
+    drawProgress({ pct: 96, stage: 3, title, time: 'publicando la web' });
     let idx = null;
     for (let i = 0; i < 30; i++) {
       try { idx = await X.getJSON('data/index.json', true); if (idx.updated !== prevVer) break; } catch {}
@@ -265,17 +268,18 @@ async function track() {
 }
 
 // ---------- jugadores seguidos ----------
+const pendingSeeds = new Set();
 async function drawSeeds(set) {
   const el = $('#seeds'); if (!el) return;
   const { esc, int } = X;
   let P = {}; try { P = await X.loadPlayers(); } catch {}
   const seeds = (set.seeds || []).map(String);
-  el.innerHTML = `${seeds.length ? seeds.map((id) => { const p = P[id]; return `<div class="seedrow">${X.avatar(p ? p.n : id, id, 'sm')}<span class="nm">${esc(p ? p.n : 'Jugador ' + id)}<small>ID ${esc(id)}${p ? ` · ${int(p.a.gp)} partidos` : ' · aún sin partidos'}</small></span>${p ? X.rank(p.rk, 20) : ''}<button class="btn sm" type="button" data-rm="${esc(id)}">Quitar</button></div>`; }).join('') : '<div class="card-b muted">Nadie en la lista.</div>'}
+  el.innerHTML = `${seeds.length ? seeds.map((id) => { const p = P[id]; return `<div class="seedrow">${X.avatar(p ? p.n : id, id, 'sm')}<span class="nm">${esc(p ? p.n : 'Jugador ' + id)}<small>ID ${esc(id)}${p ? ` · ${int(p.a.gp)} partidos` : ' · aún sin partidos'}</small></span>${p ? X.rank(p.rk, 20) : ''}<button class="btn sm" type="button" data-rm="${esc(id)}" ${pendingSeeds.has(id) ? 'disabled' : ''}>Quitar</button></div>`; }).join('') : '<div class="card-b muted">Nadie en la lista.</div>'}
     <form class="card-b" id="seed-add" style="display:flex;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--line)"><input class="input" style="flex:1 1 200px" id="seed-in" placeholder="ID o enlace de slapshot.gg" autocomplete="off" aria-label="ID o enlace de slapshot.gg"><button class="btn primary" type="submit">Añadir</button></form>`;
   $$('[data-rm]', el).forEach((b) => b.addEventListener('click', async () => {
-    const id = b.getAttribute('data-rm'); b.disabled = true;
-    try { const s = await writeSettings((x) => { x.seeds = (x.seeds || []).map(String).filter((y) => y !== id); return x; }, `Dejar de seguir ${id}`); X.toast('Jugador quitado de la lista'); drawSeeds(s); }
-    catch (e) { X.toast(e.message); b.disabled = false; }
+    const id = b.getAttribute('data-rm'); if (pendingSeeds.has(id)) return; b.disabled = true; pendingSeeds.add(id);
+    try { const s = await writeSettings((x) => { x.seeds = (x.seeds || []).map(String).filter((y) => y !== id); return x; }, `Dejar de seguir ${id}`); pendingSeeds.delete(id); X.toast('Jugador quitado de la lista'); drawSeeds(s); }
+    catch (e) { pendingSeeds.delete(id); X.toast(e.message); b.disabled = false; }
   }));
   $('#seed-add').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -283,8 +287,9 @@ async function drawSeeds(set) {
     if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
     const id = m[1];
     if (seeds.includes(id)) { X.toast('Ese jugador ya está en la lista'); return; }
+    const sb = $('#seed-add button'); if (sb.disabled) return; sb.disabled = true;
     try { const s = await writeSettings((x) => { x.seeds = [...new Set([...(x.seeds || []).map(String), id])]; return x; }, `Seguir jugador ${id}`); X.toast('Añadido: se revisará en la próxima pasada'); drawSeeds(s); }
-    catch (ex) { X.toast(ex.message); }
+    catch (ex) { X.toast(ex.message); sb.disabled = false; }
   });
 }
 
@@ -292,14 +297,46 @@ async function drawSeeds(set) {
 function drawHidden(set) {
   const el = $('#hidden'); if (!el) return;
   const { esc } = X;
-  const list = set.hidden || [];
-  el.innerHTML = list.length ? list.map((id) => `<div class="seedrow"><span class="nm"><span class="code">${esc(id)}</span></span><button class="btn sm" type="button" data-un="${esc(id)}">Mostrar</button></div>`).join('')
+  const list = (set.hidden || []).map((h) => { const s2 = String(h), i = s2.indexOf('|'); return i > 0 ? { id: s2.slice(i + 1), key: s2.slice(0, i) } : { id: hidId(s2), key: '' }; });
+  el.innerHTML = list.length ? list.map(({ id, key }) => `<div class="seedrow"><span class="nm">${key ? `<a href="#m-${esc(key.replace(/[-/]/g, ''))}-${esc(id)}">Partido del ${esc(key.slice(8, 10) + '/' + key.slice(5, 7) + ' a las ' + key.slice(11) + ' h')}</a>` : 'Partido'}<small class="code">${esc(id)}</small></span><button class="btn sm" type="button" data-un="${esc(id)}">Mostrar</button></div>`).join('')
     : '<div class="card-b muted">Ninguno. Para ocultar un partido, ábrelo y pulsa «Ocultar partido».</div>';
   $$('[data-un]', el).forEach((b) => b.addEventListener('click', async () => {
     const id = b.getAttribute('data-un'); b.disabled = true;
-    try { const s = await writeSettings((x) => { x.hidden = (x.hidden || []).filter((y) => y !== id); return x; }, `Mostrar partido ${id}`); X.toast('Partido visible de nuevo'); drawHidden(s); }
+    try { const s = await writeSettings((x) => { x.hidden = (x.hidden || []).filter((y) => hidId(y) !== id); return x; }, `Mostrar partido ${id}`); X.toast('Partido visible de nuevo'); drawHidden(s); }
     catch (e) { X.toast(e.message); b.disabled = false; }
   }));
+}
+
+// ---------- archivo y apoyo ----------
+function drawExtra(set) {
+  const el = $('#extra'); if (!el) return;
+  const { esc, int } = X;
+  const ret = Number(set.retainDays) || 60;
+  const idx = X.S.index || {}, t = idx.totals || {};
+  el.innerHTML = `<form id="x-ret"><div class="field"><label for="x-days">Días con el detalle completo en la web</label>
+      <div style="display:flex;gap:10px"><input class="input" id="x-days" type="number" min="35" max="400" step="1" value="${ret}" inputmode="numeric" style="max-width:120px"><button class="btn" type="submit">Guardar</button></div></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Los partidos más antiguos pasan al <a href="https://github.com/${esc(REPO)}/releases" target="_blank" rel="noopener">archivo de GitHub</a> (un archivo por día). Sus notas, los perfiles y las estadísticas de carrera se quedan en la web. Ahora: ${int(t.stored)} partidos con detalle de ${int(t.matches)} en total.</p></form>
+    <form id="x-sup" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-url">Enlace de apoyo (Ko-fi, Patreon…)</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-url" type="url" placeholder="https://ko-fi.com/tu-usuario" value="${esc(set.support || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Si lo rellenas, aparece un recuadro discreto en la portada y un enlace en el pie. Vacío, no se muestra nada.</p></form>`;
+  $('#x-ret').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = Math.round(Number($('#x-days').value));
+    if (!(v >= 35 && v <= 400)) { X.toast('Elige entre 35 y 400 días.'); return; }
+    const b = $('#x-ret button'); b.disabled = true;
+    try { await writeSettings((x) => { if (v === 60) delete x.retainDays; else x.retainDays = v; return x; }, `Guardar ${v} días de partidos completos`); X.toast('Guardado. Se aplica en la próxima pasada.'); }
+    catch (ex) { X.toast(ex.message); }
+    b.disabled = false;
+  });
+  $('#x-sup').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const u = $('#x-url').value.trim();
+    if (u && !/^https:\/\/[^\s"'<>]+$/.test(u)) { X.toast('Pega un enlace que empiece por https://'); return; }
+    const b = $('#x-sup button'); b.disabled = true;
+    try { await writeSettings((x) => { if (u) x.support = u; else delete x.support; return x; }, u ? 'Añadir enlace de apoyo' : 'Quitar enlace de apoyo'); X.renderChrome(); X.toast(u ? 'Enlace guardado: ya se ve en la web.' : 'Enlace quitado.'); }
+    catch (ex) { X.toast(ex.message); }
+    b.disabled = false;
+  });
 }
 
 // ---------- fórmula ----------
@@ -308,7 +345,7 @@ function drawWeights(set) {
   const el = $('#weights'); if (!el) return;
   const { C, esc, dec } = X;
   const cur = C.weightsFrom(set.weights);
-  el.innerHTML = `<p class="muted" style="margin-top:0">Los cambios recalculan las notas de todos los partidos. Tardan unos 3 minutos en verse en la web.</p>
+  el.innerHTML = `<p class="muted" style="margin-top:0">Los cambios recalculan las notas de los partidos de los últimos ${X.int((X.S.index && X.S.index.retain) || 60)} días (los archivados conservan la suya). Tardan unos minutos en verse en la web.</p>
     <form id="wform"><div class="wgrid">${C.WEIGHT_FIELDS.map(([k, l, step]) => `<div class="field"><label for="w-${k}">${esc(l)}</label><input class="input" id="w-${k}" name="${k}" type="number" step="${step}" value="${cur[k]}" inputmode="decimal"></div>`).join('')}</div>
     <div style="display:flex;align-items:center;gap:12px;margin:16px 0;padding:12px;border-radius:12px;background:var(--surface-2)"><span style="flex:1;font-size:13px"><b>Ejemplo:</b> 1 gol, 1 asistencia, 4 tiros, 2 paradas, 9 pases, 2 robos, 2 pérdidas y victoria en 3v3 encajando 2.</span><span id="w-prev"></span></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit">Guardar fórmula</button><button class="btn" type="button" id="w-reset">Restaurar valores por defecto</button></div></form>`;

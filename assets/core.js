@@ -181,5 +181,55 @@ export function madrid(t) {
   return { day: `${p.year}-${p.month}-${p.day}`, hour: p.hour };
 }
 
-// Nombre de archivo seguro para un jugador (data/p/<id>.json)
+// Nombre de archivo seguro para un jugador
 export const fileId = (pid) => String(pid).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80) || '_';
+
+// ---------- formato de datos v3 ----------
+// Los perfiles van agrupados en 4096 archivos (data/p/<bucket>.json.gz) para no tener decenas de miles de archivos.
+export const BUCKETS = 4096;
+export function hash32(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+export const bucketOf = (pid) => (hash32(pid) % BUCKETS).toString(16).padStart(3, '0');
+
+// Totales de un jugador como array compacto (en este orden)
+export const AGG_KEYS = ['gp', 'w', 'l', 'd', 'mvp', 'rs', 'g', 'as', 'sh', 'sv', 'ps', 'tk', 'bl', 'to', 'po', 'fw', 'fl', 'ph', 'pt'];
+export function aggObj(arr) { const o = {}; AGG_KEYS.forEach((k, i) => { o[k] = (arr && arr[i]) || 0; }); return o; }
+
+// Resumen de cada jugador en un partido (data/days/<día>/<hora>.json.gz):
+// [id, nombre, equipo, nota, G, A, rango, aprox, tiros, paradas, pases, puntos, robos, bloqueos, pérdidas, posesión, FO+, FO−, postes]
+export const SP = { id: 0, name: 1, team: 2, rating: 3, g: 4, a: 5, rk: 6, approx: 7, sh: 8, sv: 9, ps: 10, pts: 11, tk: 12, bl: 13, to: 14, po: 15, fw: 16, fl: 17, ph: 18 };
+// Aportación de un jugador (posición i del resumen e) a sus totales
+export function contrib(e, i) {
+  const p = e.p[i];
+  const n = (k) => p[SP[k]] || 0;
+  return [1, e.w === p[2] ? 1 : 0, e.w !== -1 && e.w !== p[2] ? 1 : 0, e.w === -1 ? 1 : 0, e.v === i ? 1 : 0, n('rating'),
+    n('g'), n('a'), n('sh'), n('sv'), n('ps'), n('tk'), n('bl'), n('to'), n('po'), n('fw'), n('fl'), n('ph'), n('pts')];
+}
+
+// Partido de un perfil como array compacto:
+// [clave día/hora, id, t, equipo, GF, GC, resultado, nota, mvp, rango, tipo, formato, arena, compañeros, rivales, estadísticas (orden STAT_ORDER)]
+export function gamePack(g) {
+  const st = STAT_ORDER.map((k) => g.st[k] || 0);
+  while (st.length && !st[st.length - 1]) st.pop();
+  return [g.k, g.i, g.t, g.tm, g.gf, g.ga, g.r, g.rt, g.mv, g.rk || '', g.y, g.f, g.ar, g.mt, g.op, st];
+}
+export function gameObj(a) {
+  const st = {}; (a[15] || []).forEach((v, i) => { if (v) st[STAT_ORDER[i]] = v; });
+  return { k: a[0], i: a[1], t: a[2], tm: a[3], gf: a[4], ga: a[5], r: a[6], rt: a[7], mv: a[8], rk: a[9], y: a[10], f: a[11], ar: a[12], mt: a[13] || [], op: a[14] || [], st };
+}
+
+// Atributos (ataque, creación, defensa, control, faceoffs) a partir de los totales
+export const ATTRS = [['atk', 'Ataque'], ['cre', 'Creación'], ['def', 'Defensa'], ['ctl', 'Control'], ['fo', 'Faceoffs']];
+export function attrRaw(a) {
+  if (!a || !a.gp) return null;
+  return {
+    atk: (a.g + 0.3 * a.sh + 0.2 * a.ph) / a.gp, cre: (a.as + 0.12 * a.ps) / a.gp, def: (0.5 * a.tk + 0.6 * a.bl + 0.6 * a.sv) / a.gp,
+    ctl: (0.02 * a.po - 0.5 * a.to) / a.gp, fo: (a.fw + a.fl) >= 5 ? a.fw / (a.fw + a.fl) : null,
+  };
+}
+// Percentil (0-100) de un valor frente a los cortes publicados en data/attr.json
+export function percentile(q, v) {
+  if (!q || !q.length || v == null) return null;
+  let lo = 0, hi = q.length - 1, ans = 0;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (q[mid] <= v + 1e-9) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+  return Math.round(ans / (q.length - 1) * 100);
+}
