@@ -88,7 +88,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>se revisan primero</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
-      <div class="card in"><div class="card-h"><h3>Archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Web, archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Partidos ocultos</h3></div><div id="hidden"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
     </div>
   </div>`;
@@ -318,13 +318,27 @@ function drawExtra(set) {
       <p class="muted" style="margin:8px 0 0;font-size:13px">Los partidos más antiguos pasan al <a href="https://github.com/${esc(REPO)}/releases" target="_blank" rel="noopener">archivo de GitHub</a> (un archivo por día). Sus notas, los perfiles y las estadísticas de carrera se quedan en la web. Ahora: ${int(t.stored)} partidos con detalle de ${int(t.matches)} en total.</p></form>
     <form id="x-sup" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-url">Enlace de apoyo (Ko-fi, Patreon…)</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-url" type="url" placeholder="https://ko-fi.com/tu-usuario" value="${esc(set.support || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
-      <p class="muted" style="margin:8px 0 0;font-size:13px">Si lo rellenas, aparece un recuadro discreto en la portada y un enlace en el pie. Vacío, no se muestra nada.</p></form>`;
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Si lo rellenas, aparece un recuadro discreto en la portada y un enlace en el pie. Vacío, no se muestra nada.</p></form>
+    <form id="x-home" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-hurl">Dirección principal de la web</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-hurl" type="url" placeholder="https://slapscore.tu-nombre.workers.dev" value="${esc(set.home || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Si la web se muda (por ejemplo a Cloudflare o a un dominio propio), escribe aquí la dirección nueva: quien entre por ${esc(location.host)} irá allí automáticamente. Ábrela antes para comprobar que funciona.</p></form>`;
   $('#x-ret').addEventListener('submit', async (e) => {
     e.preventDefault();
     const v = Math.round(Number($('#x-days').value));
     if (!(v >= 35 && v <= 400)) { X.toast('Elige entre 35 y 400 días.'); return; }
     const b = $('#x-ret button'); b.disabled = true;
     try { await writeSettings((x) => { if (v === 60) delete x.retainDays; else x.retainDays = v; return x; }, `Guardar ${v} días de partidos completos`); X.toast('Guardado. Se aplica en la próxima pasada.'); }
+    catch (ex) { X.toast(ex.message); }
+    b.disabled = false;
+  });
+  $('#x-home').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    let u = $('#x-hurl').value.trim();
+    if (u && !/^https:\/\/[^\s"'<>/]+(\/[^\s"'<>]*)?$/.test(u)) { X.toast('Pega una dirección que empiece por https://'); return; }
+    if (u && !u.endsWith('/')) u += '/';
+    try { if (u && new URL(u).origin === location.origin) { X.toast('Esa es la dirección en la que ya estás.'); return; } } catch { X.toast('Esa dirección no es válida.'); return; }
+    const b = $('#x-home button'); b.disabled = true;
+    try { await writeSettings((x) => { if (u) x.home = u; else delete x.home; return x; }, u ? `Dirección principal: ${u}` : 'Quitar la dirección principal'); X.toast(u ? 'Guardado: en unos minutos esta dirección llevará a la nueva.' : 'Quitado: ya no se redirige.'); }
     catch (ex) { X.toast(ex.message); }
     b.disabled = false;
   });

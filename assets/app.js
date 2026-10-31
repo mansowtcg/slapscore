@@ -142,6 +142,7 @@ const ICON = {
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c0 1 .8 1.2.8 2.2M12 3.5c0 1 .8 1.2.8 2.2"/><path d="M5 21h10"/></svg>',
   ext: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
 };
@@ -277,7 +278,7 @@ function setNav(view) {
   const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', notas: 'notas' };
   $$('[data-nav]').forEach((a) => a.getAttribute('data-nav') === map[view] ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
 }
-let lastPath = null, lastHash = location.hash || '#';
+let lastPath = null, lastHash = location.hash || '#', lastView = '';
 const SCROLL = new Map(), STACK = [lastHash];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Barra de carga fina bajo la cabecera (solo si la espera se nota)
@@ -318,14 +319,17 @@ async function go(opts = {}) {
     if (!done && !opts.instant) { progress(true); await Promise.race([pp, sleep(650)]); progress(false); }
     if (!live(tok)) return;
   }
-  closeSheet(true); MAIN.onclick = null; S.onResize = null;
+  closeSheet(true); closeCal(); MAIN.onclick = null; S.onResize = null;
+  const sameView = r.view === 'matches' && lastView === 'matches'; lastView = r.view;
   const run = () => { const p = render(r, tok); if (y != null) restoreScroll(y, tok); else if (scroll) window.scrollTo(0, 0); return p; };
   const vt = S.booted && !opts.instant && document.startViewTransition && !REDUCED.matches;
   // Si la página entra con la transición, sus tarjetas no se animan otra vez; si llega más tarde (red lenta), sí
   MAIN.dataset.static = vt && pre ? '1' : '0';
   if (vt) {
-    try { quiet(document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)]))); }
-    catch { run(); }
+    // entre días, la tira de días no se difumina: solo cambia la lista
+    const root = document.documentElement; if (sameView) root.classList.add('vt-same');
+    try { const t = quiet(document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)]))); t.finished.finally(() => root.classList.remove('vt-same')).catch(() => {}); }
+    catch { root.classList.remove('vt-same'); run(); }
   } else run();
 }
 function restoreScroll(y, tok) {
@@ -364,6 +368,108 @@ const skeletonList = (n) => `<div class="card">${'<div class="card-h"><div class
 // =====================================================================
 // PARTIDOS
 // =====================================================================
+// ---------- selector de día: tira de días seguidos (de más antiguo a hoy) + calendario ----------
+const dayAdd = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+const DF_WD1 = new Intl.DateTimeFormat('es-ES', { weekday: 'short', timeZone: 'UTC' });
+const DF_MON = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const wdShort = (d) => DF_WD1.format(dayDate(d)).replace('.', '').toUpperCase();
+const countShort = (n) => n >= 10000 ? Math.round(n / 1000) + ' mil' : n >= 1000 ? NF1.format(Math.round(n / 100) / 10) + ' mil' : String(n);
+const dayN = (d) => { const x = S.dayMap.get(d); return x ? x.n : 0; };
+// días con partidos, de más antiguo a más nuevo
+const daysAsc = () => (S.index.days || []).map((x) => x.d).sort();
+function prevDay(d) { const a = daysAsc(); let r = null; for (const x of a) { if (x < d) r = x; else break; } return r; }
+function nextDay(d) { for (const x of daysAsc()) if (x > d) return x; return null; }
+function dayBar(day) {
+  const t = today();
+  const end = day > t ? day : (dayAdd(day, 10) < t ? dayAdd(day, 10) : t);
+  const cells = [];
+  for (let d = dayAdd(end, -29); d <= end; d = dayAdd(d, 1)) {
+    const n = dayN(d), lbl = d === t ? 'HOY' : d === yesterday() ? 'AYER' : wdShort(d);
+    cells.push(`<button type="button" class="day${n ? '' : ' empty'}${d === t ? ' today' : ''}" data-day="${d}" ${n ? '' : 'disabled'} aria-pressed="${d === day}" aria-label="${esc(dayLong(d))}${n ? ', ' + int(n) + ' partidos' : ', sin partidos'}"><small>${lbl}</small><b>${esc(DF_DM.format(dayDate(d)).replace('.', ''))}</b><i>${n ? countShort(n) : '–'}</i></button>`);
+  }
+  const p = prevDay(day), nx = nextDay(day);
+  return `<div class="days" id="daybar">
+    <button class="ibtn" type="button" data-day="${p || ''}" ${p ? '' : 'disabled'} aria-label="Día anterior con partidos" title="Día anterior">${ICON.left}</button>
+    <div class="days-list" id="days" role="group" aria-label="Días">${cells.join('')}</div>
+    <button class="ibtn" type="button" data-day="${nx || ''}" ${nx ? '' : 'disabled'} aria-label="Día siguiente con partidos" title="Día siguiente">${ICON.right}</button>
+    <button class="cal-btn" type="button" id="cal-btn" aria-haspopup="dialog" aria-expanded="false" title="Elegir fecha">${ICON.cal}<span>${esc(day === t ? 'Hoy' : DF_DM.format(dayDate(day)).replace('.', ''))}</span></button>
+  </div>`;
+}
+let dayKey = false;   // el último cambio de día se hizo con el teclado: mantener el foco en la tira
+function goDay(d) { if (!d) return; MF.limit = 120; closeCal(); location.hash = 'd-' + d; }
+function wireDayBar(day) {
+  const bar = $('#daybar'); if (!bar) return;
+  bar.addEventListener('click', (e) => { const b = e.target.closest('[data-day]'); if (b && !b.disabled && b.getAttribute('data-day') !== day) goDay(b.getAttribute('data-day')); });
+  bar.addEventListener('keydown', (e) => {
+    if (e.target.closest('#cal')) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const d = e.key === 'ArrowLeft' ? prevDay(day) : nextDay(day); if (d) { e.preventDefault(); dayKey = true; goDay(d); } }
+  });
+  $('#cal-btn').addEventListener('click', (e) => { e.stopPropagation(); if ($('#cal')) closeCal(); else openCal(day); });
+  // el día elegido, centrado en la tira (sin animación)
+  const L = $('#days'), cur = $('.day[aria-pressed="true"]', L);
+  if (cur) { const lr = L.getBoundingClientRect(), cr = cur.getBoundingClientRect(); L.scrollLeft += (cr.left - lr.left) - (L.clientWidth - cr.width) / 2; }
+  if (dayKey && cur) cur.focus({ preventScroll: true });
+  dayKey = false;
+}
+// calendario
+let calMonth = '';
+addEventListener('resize', () => closeCal(), { passive: true });
+function closeCal() { const c = $('#cal'); if (!c) return; c.remove(); const o = $('#cal-ovl'); if (o) o.remove(); const b = $('#cal-btn'); if (b) { b.setAttribute('aria-expanded', 'false'); } document.removeEventListener('click', calOutside, true); }
+function calOutside(e) { if (!e.target.closest('#cal') && !e.target.closest('#cal-btn')) closeCal(); }
+function openCal(day) {
+  closeCal();
+  calMonth = day.slice(0, 7);
+  const btn = $('#cal-btn'); if (!btn) return;
+  const mobile = matchMedia('(max-width:720px)').matches;
+  if (mobile) document.body.insertAdjacentHTML('beforeend', '<div class="cal-ovl" id="cal-ovl"></div>');
+  document.body.insertAdjacentHTML('beforeend', `<div class="cal" id="cal" role="dialog" aria-label="Elegir fecha"></div>`);
+  if (!mobile) {   // bajo el botón, alineado a su derecha
+    const r = btn.getBoundingClientRect(), c = $('#cal');
+    c.style.top = (r.bottom + scrollY + 8) + 'px';
+    c.style.left = Math.max(8, r.right + scrollX - 316) + 'px';
+  }
+  $('#cal-btn').setAttribute('aria-expanded', 'true');
+  drawCal(day);
+  setTimeout(() => document.addEventListener('click', calOutside, true), 0);
+  const f = $('#cal .cd[aria-pressed="true"]') || $('#cal .cd:not([disabled])'); if (f) f.focus({ preventScroll: true });
+}
+function drawCal(day) {
+  const el = $('#cal'); if (!el) return;
+  const [y, m] = calMonth.split('-').map(Number);
+  const startWd = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;   // lunes = 0
+  const len = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const t = today(), all = daysAsc();
+  const months = [...new Set(all.map((d) => d.slice(0, 7)))];
+  const pm = months.filter((x) => x < calMonth).pop() || '', nm = months.find((x) => x > calMonth) || '';
+  const max = Math.max(1, ...all.filter((d) => d.startsWith(calMonth)).map(dayN));
+  let cells = '';
+  for (let i = 0; i < startWd; i++) cells += '<span></span>';
+  for (let i = 1; i <= len; i++) {
+    const d = `${calMonth}-${String(i).padStart(2, '0')}`, n = dayN(d);
+    const lvl = n ? Math.max(1, Math.ceil(Math.sqrt(n / max) * 4)) : 0;
+    cells += `<button type="button" class="cd${d === t ? ' today' : ''}${lvl ? ' l' + lvl : ''}" data-cd="${d}" ${n ? '' : 'disabled'} aria-pressed="${d === day}" aria-label="${esc(dayLong(d))}${n ? ', ' + int(n) + ' partidos' : ', sin partidos'}"><b>${i}</b>${n ? `<i>${countShort(n)}</i>` : ''}</button>`;
+  }
+  const title = DF_MON.format(new Date(Date.UTC(y, m - 1, 15)));
+  const last = all[all.length - 1];
+  el.innerHTML = `<div class="cal-h"><button class="ibtn" type="button" data-cm="${pm}" ${pm ? '' : 'disabled'} aria-label="Mes anterior con partidos">${ICON.left}</button><b>${esc(title[0].toUpperCase() + title.slice(1))}</b><button class="ibtn" type="button" data-cm="${nm}" ${nm ? '' : 'disabled'} aria-label="Mes siguiente con partidos">${ICON.right}</button></div>
+    <div class="cal-w">${['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((x) => `<span>${x}</span>`).join('')}</div>
+    <div class="cal-g">${cells}</div>
+    <div class="cal-f"><span class="muted">Más color, más partidos</span>${last ? `<button class="btn sm" type="button" data-cd="${last}">${last === t ? 'Hoy' : 'Último día'}</button>` : ''}</div>`;
+  el.onclick = (e) => {
+    const c = e.target.closest('[data-cd]'); if (c && !c.disabled) { goDay(c.getAttribute('data-cd')); return; }
+    const mo = e.target.closest('[data-cm]'); if (mo && !mo.disabled) { calMonth = mo.getAttribute('data-cm'); drawCal(day); const f = $('#cal .cd:not([disabled])'); if (f) f.focus({ preventScroll: true }); }
+  };
+  el.onkeydown = (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); closeCal(); const b = $('#cal-btn'); if (b) b.focus(); return; }
+    const cur = e.target.closest('.cd'); if (!cur) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key]; if (!step) return;
+    e.preventDefault();
+    let d = cur.getAttribute('data-cd');
+    for (let k = 0; k < 40; k++) { d = dayAdd(d, step > 0 ? 1 : -1); if (Math.abs(step) === 7 && k < 6) continue; const b = $(`#cal .cd[data-cd="${d}"]`); if (!b) break; if (!b.disabled) { b.focus(); break; } }
+  };
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#cal')) closeCal(); });
+
 const MF = { type: '', region: '', arena: '', q: '', limit: 120, closed: new Set() };
 // Primeros trozos (horas) del día hasta tener unos 120 partidos
 function firstChunks(d, meta, need = 120) {
@@ -380,11 +486,7 @@ async function viewMatches(dayArg, tok) {
     <aside class="col col-left" id="m-left">${skeletonList(4)}</aside>
     <section class="col" aria-label="Partidos">
       <div class="card">
-        <div class="days">
-          <button class="ibtn" type="button" data-day="${days[idx + 1] ? days[idx + 1].d : ''}" ${days[idx + 1] ? '' : 'disabled'} aria-label="Día anterior">${ICON.left}</button>
-          <div class="days-list" id="days">${days.slice(0, Math.max(30, idx + 4)).map((d) => `<button type="button" class="day" data-day="${d.d}" aria-pressed="${d.d === day}"><b>${esc(dayShort(d.d))}</b><small>${esc(DF_DM.format(dayDate(d.d)))} · ${int(d.n)}</small></button>`).join('')}</div>
-          <button class="ibtn" type="button" data-day="${days[idx - 1] ? days[idx - 1].d : ''}" ${days[idx - 1] ? '' : 'disabled'} aria-label="Día siguiente">${ICON.right}</button>
-        </div>
+        ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
       </div>
       <div id="m-lead" class="only-mobile"></div>
@@ -392,9 +494,7 @@ async function viewMatches(dayArg, tok) {
     </section>
     <aside class="col" id="m-right">${skeletonList(5)}</aside>
   </div>`;
-  $$('[data-day]', MAIN).forEach((b) => b.addEventListener('click', () => { const d = b.getAttribute('data-day'); if (d) { MF.limit = 120; location.hash = 'd-' + d; } }));
-  const cur = $(`#days .day[aria-pressed="true"]`);
-  if (cur) { const L = $('#days'); L.scrollLeft = cur.offsetLeft - (L.clientWidth - cur.offsetWidth) / 2; }
+  wireDayBar(day);
   let meta, top;
   try { [meta, top] = await Promise.all([loadMeta(day), loadTop().catch(() => null)]); }
   catch (e) { if (live(tok)) errorBox(e); return; }
@@ -557,7 +657,7 @@ function drawRight(st, top) {
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>Top MMR</h3><a href="#rankings">Ver rankings</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
   if (top && top.active && top.active.length) html += `<div class="card in"><div class="card-h"><h3>Más activos</h3><small>7 días</small></div><div style="padding-bottom:8px">${top.active.slice(0, 5).map((p, i) =>
-    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;gap:6px;align-items:center">${esc(p.n)}${rank(p.rk, 16)}</span><span class="sub">${p.gp} partidos</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}</span>${rank(p.rk, 16)}</span><span class="sub">${p.gp} partidos</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
   el.innerHTML = html || '<div class="card empty">Sin destacados todavía.</div>';
 }
 
@@ -930,7 +1030,7 @@ function drawPlayers(all) {
   const shown = rows.slice(0, PF.limit);
   const fmt = (k, v) => k === 'avg' ? badge(v) : k === 'wp' || k === 'shp' ? pct(v) : k === 'po' ? C.fmtPoss(v) : k === 'ppg' ? int(Math.round(v)) : k === 'mmr' ? '' : int(v);
   el.innerHTML = `<table class="tbl"><thead><tr><th>Jugador</th>${PCOLS.map(([k, l]) => `<th><button type="button" data-sort="${k}" class="${PF.sort === k ? 'on' : ''}" aria-label="Ordenar por ${l}">${l}${PF.sort === k ? (PF.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead><tbody>
-    ${shown.map((r) => `<tr><td><a class="pc" href="#j-${esc(r.p.id)}">${avatar(r.p.n, r.p.id, 'sm')}${esc(r.p.n)}</a></td><td><span class="pc" style="justify-content:flex-end">${r.p.rk ? `${r.p.mmr != null ? int(r.p.mmr) : ''} ${rank(r.p.rk, 20)}` : '<span class="muted">–</span>'}</span></td>${PCOLS.slice(1).map(([k]) => `<td>${fmt(k, r.v[k])}</td>`).join('')}</tr>`).join('')}
+    ${shown.map((r) => `<tr><td><a class="pc" href="#j-${esc(r.p.id)}">${avatar(r.p.n, r.p.id, 'sm')}${esc(r.p.n)}</a></td><td class="rkc"><span class="pc" style="justify-content:flex-end">${r.p.rk ? `${r.p.mmr != null ? int(r.p.mmr) : ''} ${rank(r.p.rk, 20)}` : '<span class="muted">–</span>'}</span></td>${PCOLS.slice(1).map(([k]) => `<td>${fmt(k, r.v[k])}</td>`).join('')}</tr>`).join('')}
   </tbody></table>${rows.length > PF.limit ? `<div class="more"><button class="btn" type="button" id="p-more">Ver más (${int(rows.length - PF.limit)})</button></div>` : ''}`;
   const b = $('#p-more'); if (b) b.addEventListener('click', () => { PF.limit += 50; drawPlayers(all); });
 }
@@ -954,7 +1054,7 @@ function drawRankings(R) {
   const card = (title, note, list, fmt) => {
     if (!list || !list.length) return '';
     return `<div class="card in"><div class="card-h"><h3>${title}</h3><small>${note}</small></div><div style="padding-bottom:8px">${list.map((x, i) =>
-      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px">${esc(x.n)}${rank(x.rk, 16)}</span><span class="sub">${int(x.gp)} ${x.gp === 1 ? 'partido' : 'partidos'}</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
+      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 16)}</span><span class="sub">${int(x.gp)} ${x.gp === 1 ? 'partido' : 'partidos'}</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
   };
   const v = (x) => `<span class="v">${int(x)}</span>`;
   const mmr = R.mmr || [];
@@ -1073,7 +1173,8 @@ setInterval(async () => {
 function moved() {
   try {
     const u = new URL(String(S.settings.home || ''));
-    if (u.protocol === 'https:' && u.origin !== location.origin && /\.github\.io$/.test(location.hostname)) { location.replace(u.origin + u.pathname + location.hash); return true; }
+    // solo desde las direcciones de GitHub Pages y workers.dev; #admin nunca redirige, para poder corregirlo si algo falla
+    if (u.protocol === 'https:' && u.origin !== location.origin && /\.(github\.io|workers\.dev)$/.test(location.hostname) && location.hash !== '#admin') { location.replace(u.origin + u.pathname + location.hash); return true; }
   } catch {}
   return false;
 }
