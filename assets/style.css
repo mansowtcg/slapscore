@@ -503,8 +503,12 @@ main{view-transition-name:main}
 .linkish .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .linkish:hover .nm{color:var(--primary)}
 .legend{color:var(--muted);font-size:12px;margin:-4px 0 20px;line-height:1.6}
-.tbl.lead th,.tbl.lead td{padding:8px 10px}
-.tbl.lead th:first-child,.tbl.lead td:first-child{padding-left:16px}
+.tbl.lead{font-size:13px}
+.tbl.lead th,.tbl.lead td{padding:8px 6px}
+.tbl.lead th:first-child,.tbl.lead td:first-child{padding-left:14px}
+.tbl.lead th:last-child,.tbl.lead td:last-child{padding-right:14px}
+.tbl.lead .pc{gap:6px}
+.tbl.lead .pc .nm{max-width:104px}
 .tbl.lead .i{color:var(--faint);font-weight:700;font-size:12px;min-width:14px;display:inline-block}
 .emb-img{display:block;object-fit:contain}
 /* barra inferior en móvil */
