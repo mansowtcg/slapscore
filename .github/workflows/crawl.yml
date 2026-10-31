@@ -3,13 +3,12 @@ name: Rastrear partidos
 on:
   push:
     branches: [main]
-    paths-ignore: ['data/**']
   schedule:
     - cron: '7,37 * * * *'   # cada 30 minutos
   workflow_dispatch:
     inputs:
       minutes:
-        description: 'Minutos de rastreo en esta ejecución'
+        description: 'Minutos de rastreo en esta pasada'
         default: '8'
 
 permissions:
@@ -24,35 +23,45 @@ concurrency:
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Bajar datos
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: data
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Rastrear slapshot.gg
         env:
-          MINUTES: ${{ github.event.inputs.minutes || '8' }}
-          MAX_REQUESTS: '150'
-        run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node crawler/crawl.mjs
-      - name: Guardar datos en el repo
+          MINUTES: ${{ github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
+          MAX_REQUESTS: '200'
+        run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node crawler/crawl.js
+      - name: Guardar datos
+        working-directory: data
         run: |
           git config user.name "slapscore-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data
-          if git diff --cached --quiet; then
-            echo "Sin cambios"
-          else
-            git commit -m "Datos $(date -u +%Y-%m-%dT%H:%MZ)"
-            git pull --rebase --autostash
-            git push
-          fi
+          git checkout -q --orphan nuevo
+          git add -A
+          git commit -q -m "Datos $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f origin nuevo:data
+      - name: Preparar la web
+        run: |
+          mkdir _site
+          cp -r index.html assets config _site/
+          cp -r data _site/data
+          rm -rf _site/data/.git _site/data/state.json
+          touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-      - id: deploy
+          path: _site
+      - name: Publicar la web
+        id: deploy
         uses: actions/deploy-pages@v4
