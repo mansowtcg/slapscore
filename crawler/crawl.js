@@ -102,7 +102,8 @@ function rankedScore(p) {
   const age = started - p.seen;
   if (age > 14 * D) return -1;
   const since = p.rchk ? Date.now() - p.rchk : Infinity;
-  if (since < (age < 2 * D ? D : 3 * D)) return -1;
+  const need = p.seed ? 3 * H : age < D ? 12 * H : age < 2 * D ? D : 3 * D;
+  if (since < need) return -1;
   return (p.rchk ? 0 : 1e9) + (age < 2 * D ? 1e8 : 0) + (p.seed ? 5e7 : 0) + (p.hits || 0) * 1e3 - age / 1e6;
 }
 function pick(scoreFn) {
