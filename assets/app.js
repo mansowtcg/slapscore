@@ -190,6 +190,8 @@ function renderChrome() {
   const sup = supportUrl();
   $('#foot').innerHTML = `<span>Datos públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>${i ? ` · actualizado ${esc(ago(Date.parse(i.updated)))}` : ''} · SlapScore no está afiliado a Oddshot Games.</span><span class="foot-r">${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">Apoya el proyecto</a>` : ''}<a href="#admin">Administrador</a></span>`;
 }
+// Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
+function quiet(t) { if (t) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (t[k]) t[k].catch(() => {}); return t; }
 // tema
 function applyTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
 try { applyTheme(localStorage.getItem('slapscore-theme')); } catch {}
@@ -199,7 +201,7 @@ themeIcon(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 $('#btn-theme').addEventListener('click', () => {
   const next = isDark() ? 'light' : 'dark';
   const doIt = () => { applyTheme(next); themeIcon(); try { localStorage.setItem('slapscore-theme', next); } catch {} };
-  if (document.startViewTransition && !REDUCED.matches) document.startViewTransition(doIt); else doIt();
+  if (document.startViewTransition && !REDUCED.matches) quiet(document.startViewTransition(doIt)); else doIt();
 });
 
 // ---------- hoja (modal) ----------
@@ -322,7 +324,7 @@ async function go(opts = {}) {
   // Si la página entra con la transición, sus tarjetas no se animan otra vez; si llega más tarde (red lenta), sí
   MAIN.dataset.static = vt && pre ? '1' : '0';
   if (vt) {
-    try { document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)])); }
+    try { quiet(document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)]))); }
     catch { run(); }
   } else run();
 }
