@@ -14,14 +14,14 @@ export default {
       authorization: `Bearer ${env.GH_DISPATCH_TOKEN}`, accept: 'application/vnd.github+json',
       'x-github-api-version': '2022-11-28', 'content-type': 'application/json', 'user-agent': 'slapscore-cron',
     };
-    // ¿Hay alguna pasada en marcha, en cola o de hace menos de 25 minutos? Entonces la cadena funciona.
+    // ¿Hay alguna pasada en marcha, en cola o de hace menos de 15 minutos? Entonces la cadena funciona.
     const r = await fetch(`${api}/runs?per_page=5`, { headers });
     if (r.ok) {
       const runs = (await r.json()).workflow_runs || [];
-      const alive = runs.some((x) => x.status !== 'completed' || Date.now() - Date.parse(x.updated_at) < 25 * 60_000);
+      const alive = runs.some((x) => x.status !== 'completed' || Date.now() - Date.parse(x.updated_at) < 15 * 60_000);
       if (alive) return;
     }
-    const d = await fetch(`${api}/dispatches`, { method: 'POST', headers, body: JSON.stringify({ ref: 'main', inputs: { minutes: '20', chain: '1' } }) });
+    const d = await fetch(`${api}/dispatches`, { method: 'POST', headers, body: JSON.stringify({ ref: 'main', inputs: { minutes: '4', chain: '1' } }) });
     if (!d.ok) console.log(`GitHub respondió ${d.status}: ${(await d.text()).slice(0, 300)}`);
   },
 };

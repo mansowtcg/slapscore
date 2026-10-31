@@ -63,11 +63,16 @@ jobs:
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:
-          # encadenadas: 20 min a ritmo suave (5 peticiones/min); a mano: lo que se pida a 9/min; cambios de ajustes: 1 min
-          MINUTES: ${{ inputs.chain == '1' && '20' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
-          GAP_MS: ${{ inputs.chain == '1' && '12000' || '6700' }}
+          # encadenadas: 4 min (7,5 peticiones/min) y se publica; así la web se actualiza cada 5 min aprox.
+          # a mano: lo que se pida a 9/min; cambios de ajustes: 1 min
+          MINUTES: ${{ inputs.chain == '1' && '4' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
+          GAP_MS: ${{ inputs.chain == '1' && '8000' || '6700' }}
           MAX_REQUESTS: '200'
         run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node --max-old-space-size=6144 crawler/crawl.js
+      - name: Liga EUSL
+        if: steps.gate.outputs.go == 'true'
+        continue-on-error: true
+        run: node crawler/eusl.js
       - name: Subir el archivo
         if: steps.gate.outputs.go == 'true'
         env:
@@ -146,8 +151,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # Si esta pasada ha fallado, se espera un poco para no repetir el fallo en bucle
-          if [ "${{ job.status }}" != "success" ]; then echo "Esta pasada no ha ido bien: la siguiente, en 10 minutos."; sleep 600; fi
+          if [ "${{ job.status }}" != "success" ]; then echo "Esta pasada no ha ido bien: la siguiente, en 5 minutos."; sleep 300; fi
           others=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 20 --json databaseId,status \
             --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\")] | length" || echo 0)
           if [ "${others:-0}" -gt 0 ]; then echo "Ya hay otra pasada en cola: ella programará la siguiente."; exit 0; fi
-          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=20 && echo "Siguiente pasada en cola."
+          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=4 && echo "Siguiente pasada en cola."

@@ -479,7 +479,7 @@ function firstChunks(d, meta, need = 120) {
 }
 async function viewMatches(dayArg, tok) {
   const days = (S.index.days || []);
-  if (!days.length) { MAIN.innerHTML = `<div class="card empty"><strong>Todavía no hay partidos.</strong>El robot rastrea slapshot.gg sin parar y publica cada media hora más o menos.</div>`; return; }
+  if (!days.length) { MAIN.innerHTML = `<div class="card empty"><strong>Todavía no hay partidos.</strong>El robot rastrea slapshot.gg sin parar y publica cada pocos minutos.</div>`; return; }
   const day = pickDay(dayArg);
   const idx = days.findIndex((d) => d.d === day);
   MAIN.innerHTML = `<div class="layout">
@@ -1094,7 +1094,7 @@ function viewMethod() {
         ${['BRONZE_I', 'SILVER_II', 'GOLD_III', 'PLAT_I', 'PLAT_II', 'PLAT_III', 'DIAMOND', 'LEGEND'].map((k) => `<div style="display:flex;align-items:center;gap:10px">${rank(k, 34)}<b>${esc(C.parseRank(k).name)}</b></div>`).join('')}
         </div><p class="muted" style="margin:14px 0 0;font-size:13px">El rango de cada jugador en un partido es el que tenía según el último registro de SlapScore anterior a ese partido. Si el partido es de antes de empezar a seguirle, se muestra atenuado como aproximado.</p></div></div>
       <div class="card in"><div class="card-h"><h3>De dónde salen los datos</h3></div><div class="card-b">
-        <p>Un robot revisa sin parar los perfiles públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>: los últimos 10 partidos de cada jugador con todas sus estadísticas, y su rango y MMR. Cada jugador que aparece en un partido entra en la lista y los más activos se revisan más a menudo. La web se actualiza cada 25 minutos aprox.</p>
+        <p>Un robot revisa sin parar los perfiles públicos de <a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>: los últimos 10 partidos de cada jugador con todas sus estadísticas, y su rango y MMR. Cada jugador que aparece en un partido entra en la lista y los más activos se revisan más a menudo. La web se actualiza cada 5 minutos aprox.</p>
         <p>Guardamos el detalle completo de los partidos de los últimos ${int((S.index && S.index.retain) || 60)} días. Los anteriores pasan a un archivo descargable, pero sus notas, los perfiles y las estadísticas de carrera de cada jugador se conservan siempre.</p>
         <p class="muted">Ahora mismo: ${int(t.matches)} partidos, ${int(t.players)} jugadores con partidos, ${int(t.ranked)} con rango. Última pasada ${lr.at ? esc(ago(Date.parse(lr.at))) : '–'}: ${int(lr.newMatches)} partidos nuevos.</p>
       </div></div>
