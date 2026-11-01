@@ -63,10 +63,10 @@ jobs:
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:
-          # encadenadas: 3 min (8,5 peticiones/min) y se publica; así la web se actualiza cada 3-4 min
+          # encadenadas: 3 min (9 peticiones/min, el límite de slapshot.gg es 10) y se publica; así la web se actualiza cada 3-4 min
           # a mano: lo que se pida a 9/min; cambios de ajustes: 1 min
           MINUTES: ${{ inputs.chain == '1' && '3' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
-          GAP_MS: ${{ inputs.chain == '1' && '7000' || '6700' }}
+          GAP_MS: ${{ inputs.chain == '1' && '6500' || '6700' }}
           MAX_REQUESTS: '200'
         run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node --max-old-space-size=6144 crawler/crawl.js
       - name: Liga EUSL

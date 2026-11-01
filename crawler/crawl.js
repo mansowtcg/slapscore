@@ -184,11 +184,11 @@ const MIN = 60_000;
 const seedSet = new Set(seeds);
 const prio = new Set(seeds);
 Object.entries(players).filter(([, p]) => p.mmr != null && !p.gone).sort((a, b) => b[1].mmr - a[1].mmr).slice(0, TOP_N).forEach(([id]) => prio.add(id));
-const PRIO_SHARE = 0.6;      // como mucho el 60 % de las peticiones (los seguidos van siempre)
-// Rangos: mientras haya jugadores sin rango consultado, más de la mitad del resto de peticiones son de rango
+// Rangos: mientras haya muchos jugadores sin rango consultado, los destacados ceden sitio y el 70 % del resto son de rango
 const RANK_WINDOW = 60 * D;
 const backlog = Object.values(players).filter((p) => !p.rchk && !p.gone && p.seen && NOW - p.seen < RANK_WINDOW).length;
-const RANKED_SHARE = backlog > 40 ? 0.6 : 0.35;
+const PRIO_SHARE = backlog > 200 ? 0.45 : 0.6;   // tope de peticiones para destacados (los seguidos van siempre)
+const RANKED_SHARE = backlog > 40 ? 0.7 : 0.35;
 const known = (p) => Math.max(p.chk || 0, p.cov || 0);
 function interval(id, p) {
   if (!p.seen) return 3 * D;
