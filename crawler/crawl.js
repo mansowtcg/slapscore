@@ -176,42 +176,55 @@ async function addRaw(raw, allowOld) {
 }
 
 // ---------- rastreo ----------
-// Destacados: los jugadores seguidos y los de más MMR. Si están jugando, se revisan cada 5 minutos y van los primeros.
-const PRIO_N = 60;
+// Destacados: los jugadores seguidos y los 100 de más MMR. Van los primeros y, mientras juegan, se revisan en cada pasada.
+// Para no gastar peticiones de más, un partido visto en el historial de otro jugador cuenta como revisión de todos los
+// que jugaron en él (p.cov): si tres destacados juegan juntos, basta con mirar a uno de ellos.
+const TOP_N = Number(process.env.TOP_N ?? 100);
+const MIN = 60_000;
+const seedSet = new Set(seeds);
 const prio = new Set(seeds);
-Object.entries(players).filter(([, p]) => p.mmr != null && !p.gone).sort((a, b) => b[1].mmr - a[1].mmr).slice(0, PRIO_N).forEach(([id]) => prio.add(id));
-// mientras haya muchos jugadores recientes sin rango consultado, la mitad de las peticiones son de rango
-const backlog = Object.values(players).filter((p) => !p.rchk && !p.gone && p.seen && Date.now() - p.seen < 14 * D).length;
-const RANKED_SHARE = backlog > 40 ? 0.5 : 0.3;
+Object.entries(players).filter(([, p]) => p.mmr != null && !p.gone).sort((a, b) => b[1].mmr - a[1].mmr).slice(0, TOP_N).forEach(([id]) => prio.add(id));
+const PRIO_SHARE = 0.6;      // como mucho el 60 % de las peticiones (los seguidos van siempre)
+// Rangos: mientras haya jugadores sin rango consultado, más de la mitad del resto de peticiones son de rango
+const RANK_WINDOW = 60 * D;
+const backlog = Object.values(players).filter((p) => !p.rchk && !p.gone && p.seen && NOW - p.seen < RANK_WINDOW).length;
+const RANKED_SHARE = backlog > 40 ? 0.6 : 0.35;
+const known = (p) => Math.max(p.chk || 0, p.cov || 0);
 function interval(id, p) {
   if (!p.seen) return 3 * D;
   const age = Date.now() - p.seen;
-  if (prio.has(id)) return age < 2 * H ? 5 * 60_000 : age < D ? 20 * 60_000 : age < 7 * D ? 2 * H : 12 * H;
-  if (age < D) return 45 * 60_000;
+  if (seedSet.has(id)) return age < H ? 3 * MIN : age < 6 * H ? 10 * MIN : age < 3 * D ? 30 * MIN : 3 * H;
+  if (prio.has(id)) return age < H ? 5 * MIN : age < 6 * H ? 20 * MIN : age < 3 * D ? H : 6 * H;
+  if (age < D) return 45 * MIN;
   if (age < 7 * D) return 4 * H;
   if (age < 30 * D) return D;
   return 7 * D;
 }
-const PRIO_DUE = 1e13;
 function historyScore(id, p) {
-  if (p.gone && started - (p.chk || 0) < 30 * D) return -1;
-  if (!p.chk) return 1e12 + (prio.has(id) ? 1e11 : 0) + (p.mmr || 0) * 1e3 + (p.hits || 0);
-  const over = (Date.now() - p.chk) / interval(id, p);
+  if (p.gone && Date.now() - (p.chk || 0) < 30 * D) return -1;
+  if (!p.chk) return 1e12 + (p.mmr || 0) * 1e3 + (p.hits || 0);
+  const over = (Date.now() - known(p)) / interval(id, p);
   if (over < 1) return -1;
-  return (prio.has(id) ? PRIO_DUE : 0) + over * 1e6 + (p.mmr || 0);
+  return over * 1e6 + (p.mmr || 0);
+}
+// destacados: primero los seguidos, después los que más se han pasado de su momento (y con más MMR)
+function prioScore(id, p) {
+  const s = historyScore(id, p);
+  return s < 0 ? -1 : (seedSet.has(id) ? 1e14 : 0) + s;
 }
 function rankedScore(id, p) {
   if (p.gone || !p.seen) return -1;
   const age = Date.now() - p.seen;
-  if (age > 14 * D) return -1;
+  if (age > RANK_WINDOW) return -1;
   const since = p.rchk ? Date.now() - p.rchk : Infinity;
-  const need = prio.has(id) ? (age < 3 * H ? 30 * 60_000 : 6 * H) : age < D ? 12 * H : age < 2 * D ? D : 3 * D;
+  const need = prio.has(id) ? (age < 3 * H ? 30 * MIN : 6 * H) : age < D ? 12 * H : age < 2 * D ? D : age < 14 * D ? 3 * D : 14 * D;
   if (since < need) return -1;
-  return (p.rchk ? 0 : 1e9) + (prio.has(id) ? 5e8 : 0) + (age < 2 * D ? 1e8 : 0) + (p.hits || 0) * 1e3 - age / 1e6;
+  return (p.rchk ? 0 : 1e9) + (prio.has(id) ? 5e8 : 0) + (age < 2 * D ? 1e8 : 0) + Math.min(p.hits || 0, 9999) * 1e3 - age / 1e6;
 }
-function pick(scoreFn) {
+function pick(scoreFn, ids) {
   let best = null, bestScore = -1;
-  for (const [id, p] of Object.entries(players)) { const s = scoreFn(id, p); if (s > bestScore) { bestScore = s; best = id; } }
+  if (ids) { for (const id of ids) { const p = players[id]; if (!p) continue; const s = scoreFn(id, p); if (s > bestScore) { bestScore = s; best = id; } } }
+  else for (const [id, p] of Object.entries(players)) { const s = scoreFn(id, p); if (s > bestScore) { bestScore = s; best = id; } }
   return [best, bestScore];
 }
 const rhChanged = new Set();
@@ -249,16 +262,18 @@ if (legacy) {
   for (const raw of legacy) if (await addRaw(raw, true)) migrated++;
 }
 
-let newMatches = 0, checked = 0, rankedChecked = 0, discovered = 0, prioChecked = 0;
+let newMatches = 0, checked = 0, rankedChecked = 0, discovered = 0, prioChecked = 0, prioMatches = 0;
+const featuredNew = [];   // partidos nuevos de destacados en esta pasada
 while (Date.now() - started < BUDGET_MS && reqs < MAX_REQ && !blocked) {
-  // primero los destacados que toca revisar; después, historiales y rangos a partes
-  const [hid, hs] = pick(historyScore);
+  // 1) destacados que toca revisar (seguidos siempre; el resto, sin pasar del 60 %)
+  // 2) rangos e historiales del resto, a partes
   let id = null, kind = 'history';
-  if (hid && hs >= PRIO_DUE) { id = hid; prioChecked++; }
+  const [pid, ps] = pick(prioScore, prio);
+  if (pid && (ps >= 1e14 || prioChecked < PRIO_SHARE * (reqs + 1))) { id = pid; prioChecked++; }
   else {
-    const wantRanked = rankedChecked < RANKED_SHARE * (reqs + 1);
-    if (wantRanked) { id = pick(rankedScore)[0]; if (id) kind = 'ranked'; }
-    if (!id && hid) { id = hid; kind = 'history'; }
+    const other = reqs - prioChecked;
+    if (rankedChecked < RANKED_SHARE * (other + 1)) { id = pick(rankedScore)[0]; if (id) kind = 'ranked'; }
+    if (!id) { id = pick(historyScore)[0]; kind = 'history'; }
     if (!id) { id = pick(rankedScore)[0]; kind = 'ranked'; }
   }
   if (!id) break;
@@ -304,10 +319,12 @@ while (Date.now() - started < BUDGET_MS && reqs < MAX_REQ && !blocked) {
       if (!q) { q = players[pid] = { n: pl.username || null, found: Date.now() }; discovered++; }
       if (pl.username && !q.chk && t >= (q.seen || 0)) q.n = pl.username;
       if (t > (q.seen || 0)) q.seen = t;
+      if (t > (q.cov || 0)) q.cov = t;
     }
     if (await addRaw(m)) {
       newMatches++;
       for (const pl of plist) { const q = players[String(pl.game_user_id || '')]; if (q) q.hits = (q.hits || 0) + 1; }
+      if (plist.some((pl) => prio.has(String(pl.game_user_id || '')))) { prioMatches++; featuredNew.push(String(m.id)); }
     }
   }
 }
@@ -369,7 +386,7 @@ S.wHash = wHash;
 // Pasada completa (tablas, rankings, récords y todos los perfiles) como mucho cada 20 minutos;
 // en las pasadas ligeras solo se publican los partidos, los días y los perfiles de los destacados.
 const HEAVY_MS = Number(process.env.HEAVY_EVERY_MS ?? 20 * 60_000);
-const META_V = 2, PROF_V = 2;
+const META_V = 3, PROF_V = 3;
 const upgradeMeta = S.metaV !== META_V, upgradeProf = S.profV !== PROF_V;
 const hiddenChanged = Object.keys(S.hid).length !== (S._hidN || 0);
 const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || hiddenChanged;
@@ -390,6 +407,25 @@ for (const day of [TODAY, RECENT]) {
   }
 }
 for (const pid of rhChanged) touch(pid).rh = true;
+// Días anteriores (hasta dos semanas): en las pasadas completas se pone el rango a los jugadores que ya lo tienen
+S.rhPend = [...new Set([...(S.rhPend || []), ...rhChanged])];
+if (heavy && S.rhPend.length) {
+  const want = new Set(S.rhPend);
+  for (let i = 2; i < 14; i++) {
+    const day = dayAdd(TODAY, -i);
+    if (!S.days[day] || isArchived(day)) continue;
+    for (const f of await list(path.join(DATA, 'days', day))) {
+      const ch = await chunk(day, f.replace('.json.gz', ''));
+      for (const e of ch.list) for (const p of e.p) {
+        if (!want.has(p[0])) continue;
+        const ra = C.rankAt(players[p[0]] && players[p[0]].rh, e.t);
+        const rk = ra ? ra.rk : '', ap = ra && ra.approx ? 1 : 0;
+        if (p[6] !== rk || p[7] !== ap) { p[6] = rk; p[7] = ap; ch.dirty = true; dirtyDays.add(day); }
+      }
+    }
+  }
+  S.rhPend = [];
+}
 
 lap('ranks');
 // ---------- guardar partidos en bruto ----------
@@ -490,13 +526,15 @@ for (const day of [...dirtyDays].sort()) {
   perf.sort((a, b) => b.p[3] - a.p[3] || (b.p[4] + b.p[5]) - (a.p[4] + a.p[5]));
   let best = null;
   for (const e of all) { const mv = e.p[e.v]; if (mv && (!best || mv[3] > best.p[best.v][3])) best = e; }
-  // marcas del día para la página de récords
-  const topBy = (idx) => perf.filter((x) => (x.p[idx] || 0) > 0).sort((a, b) => b.p[idx] - a.p[idx] || b.p[3] - a.p[3]).slice(0, 5)
+  // marcas del día para la página de récords (sin partidas personalizadas, que pueden ser de modos especiales)
+  const pubPerf = perf.filter((x) => x.e.y !== 'custom'), pubAll = all.filter((e) => e.y !== 'custom');
+  const topBy = (idx) => pubPerf.filter((x) => (x.p[idx] || 0) > 0).sort((a, b) => b.p[idx] - a.p[idx] || b.p[3] - a.p[3]).slice(0, 5)
     .map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], v: p[idx], rt: p[3], s: e.s }));
   const gpd = new Map(); for (const { p } of perf) { const x = gpd.get(p[0]) || { id: p[0], n: p[1], rk: p[6], gp: 0 }; x.gp++; gpd.set(p[0], x); }
   const rec = {
+    rt: pubPerf.slice(0, 5).map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], ap: p[7], rt: p[3], g: p[4], as: p[5], s: e.s, tm: p[2] })),
     g: topBy(4), as: topBy(5), sv: topBy(9), pts: topBy(11),
-    tot: all.slice().sort((a, b) => (b.s[0] + b.s[1]) - (a.s[0] + a.s[1])).slice(0, 3).map((e) => ({ i: e.i, k: e.k, t: e.t, s: e.s, y: e.y, r: e.r, a: e.a })),
+    tot: pubAll.slice().sort((a, b) => (b.s[0] + b.s[1]) - (a.s[0] + a.s[1])).slice(0, 3).map((e) => ({ i: e.i, k: e.k, t: e.t, s: e.s, y: e.y, r: e.r, a: e.a })),
     gpd: [...gpd.values()].sort((a, b) => b.gp - a.gp).slice(0, 5),
   };
   const archived = isArchived(day);
@@ -552,7 +590,7 @@ const meta = (pid) => {
 S.pendGames = S.pendGames || {};
 if (!heavy) for (const [pid, x] of [...pend]) {
   if (prio.has(pid) || x.rm.size || x.rh) continue;
-  if (x.add.length) (S.pendGames[pid] = S.pendGames[pid] || []).push(...x.add);
+  (S.pendGames[pid] = S.pendGames[pid] || []).push(...x.add);   // también sin partidos: cambió su rango o su MMR
   pend.delete(pid);
 }
 const schedB = new Set([...pend.keys()].map(C.bucketOf));
@@ -564,7 +602,7 @@ const byBucket = new Map();
 for (const pid of pend.keys()) { const b = C.bucketOf(pid); if (!byBucket.has(b)) byBucket.set(b, []); byBucket.get(b).push(pid); }
 const sweep = rerate || legacy || upgradeProf;
 if (sweep) for (const f of await list(path.join(DATA, 'p'))) if (f.endsWith('.json.gz')) { const b = f.slice(0, -8); if (!byBucket.has(b)) byBucket.set(b, []); }
-S.streak = S.streak || {};
+S.streak = S.streak || {}; S.cur = S.cur || {};
 const recentT = Date.parse(RECENT + 'T00:00:00Z') - 2 * H;
 let profiles = 0;
 for (const [b, pids] of byBucket) {
@@ -578,7 +616,7 @@ for (const [b, pids] of byBucket) {
     const add = x.add.filter((g) => !hiddenNow.has(g[1]));
     if (add.length) { const ids = new Set(add.map((g) => g[1])); games = games.filter((g) => !ids.has(g[1])).concat(add); }
     if (rerate) for (const g of games) { const r = rerate.get(g[1]); const v = r && r.get(pid); if (v) { g[7] = v[0]; g[8] = v[1]; } }
-    if (x.rh && players[pid] && players[pid].rh) for (const g of games) if (g[2] >= recentT) { const ra = C.rankAt(players[pid].rh, g[2]); g[9] = ra ? ra.rk : ''; }
+    if ((x.rh || sweep) && players[pid] && players[pid].rh) for (const g of games) if (g[2] >= recentT || !g[9]) { const ra = C.rankAt(players[pid].rh, g[2]); g[9] = ra ? ra.rk : ''; }
     games.sort((a, b) => b[2] - a[2]); games = games.slice(0, CAP);
     const a = TA.get(pid);
     if (!a || !games.length) { delete obj[pid]; continue; }
@@ -589,6 +627,7 @@ for (const [b, pids] of byBucket) {
     if (r0 === 'W' || r0 === 'L') for (const g of games) { if (g[6] === r0) cs++; else break; }
     let bs = 0, run = 0; for (let i = games.length - 1; i >= 0; i--) { if (games[i][6] === 'W') { run++; if (run > bs) bs = run; } else run = 0; }
     if (bs >= 3) S.streak[pid] = bs; else delete S.streak[pid];
+    if (r0 === 'W' && cs >= 3) S.cur[pid] = [cs, games[0][2]]; else delete S.cur[pid];
     obj[pid] = { id: pid, n: displayName(pid), meta: meta(pid), a, names, cs: r0 === 'L' ? -cs : cs, bs, games };
     profiles++;
   }
@@ -662,8 +701,8 @@ verOf.attr = (await out.json(path.join(DATA, 'attr.json'), { n: pool.length, q }
 const R = { rt: [], g: [], as: [], sv: [], pts: [], tot: [], gpd: [] };
 for (const day of Object.keys(S.days)) {
   const mt = await readJSON(P.meta(day), null); if (!mt) continue;
-  for (const x of mt.perf || []) R.rt.push({ ...x, d: day });
   const rc = mt.rec || {};
+  for (const x of rc.rt || mt.perf || []) R.rt.push({ ...x, d: day });
   for (const k of ['g', 'as', 'sv', 'pts', 'tot']) for (const x of rc[k] || []) R[k].push({ ...x, d: day });
   for (const x of rc.gpd || []) R.gpd.push({ ...x, d: day });
 }
@@ -671,6 +710,8 @@ const topN = (list, f, n = 10) => list.filter((x) => !hiddenNow.has(x.i)).sort((
 const records = {
   rt: topN(R.rt, (x) => x.rt, 15), g: topN(R.g, (x) => x.v), as: topN(R.as, (x) => x.v), sv: topN(R.sv, (x) => x.v), pts: topN(R.pts, (x) => x.v),
   tot: topN(R.tot, (x) => x.s[0] + x.s[1]), gpd: R.gpd.sort((a, b) => b.gp - a.gp).slice(0, 10),
+  hot: Object.entries(S.cur).filter(([, [, t]]) => NOW - t < 2 * D).sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).slice(0, 10)
+    .map(([id, [v, t]]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', v, t })),
   streak: Object.entries(S.streak).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, v]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', v })),
 };
 for (const x of records.gpd) x.n = displayName(x.id);
@@ -688,7 +729,7 @@ await out.json(path.join(INT, 'state.json.gz'), S);
 const nowIso = new Date().toISOString();
 const lastRun = {
   at: nowIso, requests: reqs, ok, checked, ranked: rankedChecked, newMatches, discovered, seconds: Math.round((Date.now() - started) / 1000),
-  crawl: Math.round(crawlMs / 1000), heavy, prio: prioChecked, pending: Object.keys(S.pendGames).length, blocked, files: out.files, removed: out.removed, profiles, archived: archivedNow.length, ...(migrated ? { migrated } : {}), ...(rerate ? { rerated: rerate.size } : {}),
+  crawl: Math.round(crawlMs / 1000), heavy, prio: prioChecked, prioNew: prioMatches, pending: Object.keys(S.pendGames).length, blocked, files: out.files, removed: out.removed, profiles, archived: archivedNow.length, ...(migrated ? { migrated } : {}), ...(rerate ? { rerated: rerate.size } : {}),
 };
 const runs = [lastRun, ...((prevIdx.runs || []).filter((r) => r.at !== nowIso))].slice(0, 20);
 const repo = process.env.GITHUB_REPOSITORY || 'mansowtcg/slapscore';
@@ -696,9 +737,11 @@ await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
   updated: nowIso, source: 'slapshot.gg', v: 3, retain: RETAIN,
   archive: { repo, tag: 'archivo-', file: 'partidos-' },
   files: verOf,
+  featured: [...prio].filter((id) => players[id] && (players[id].mmr != null || seedSet.has(id))),
   totals: {
     matches: totalMatches, stored, hidden: hiddenNow.size, players: pubIds.length, known: Object.keys(players).length,
     tracked: Object.values(players).filter((p) => p.chk && !p.gone).length, ranked: Object.values(players).filter((p) => p.mmr != null).length,
+    rankChecked: Object.values(players).filter((p) => p.rchk).length, rankBacklog: backlog,
   },
   lastRun, runs, days: dayList,
 }));

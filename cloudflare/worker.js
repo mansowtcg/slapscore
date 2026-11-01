@@ -21,7 +21,7 @@ export default {
       const alive = runs.some((x) => x.status !== 'completed' || Date.now() - Date.parse(x.updated_at) < 15 * 60_000);
       if (alive) return;
     }
-    const d = await fetch(`${api}/dispatches`, { method: 'POST', headers, body: JSON.stringify({ ref: 'main', inputs: { minutes: '4', chain: '1' } }) });
+    const d = await fetch(`${api}/dispatches`, { method: 'POST', headers, body: JSON.stringify({ ref: 'main', inputs: { minutes: '3', chain: '1' } }) });
     if (!d.ok) console.log(`GitHub respondió ${d.status}: ${(await d.text()).slice(0, 300)}`);
   },
 };

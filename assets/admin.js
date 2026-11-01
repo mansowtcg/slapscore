@@ -85,7 +85,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Últimas pasadas</h3><a href="https://github.com/${esc(REPO)}/actions" target="_blank" rel="noopener">Ver en GitHub</a></div><div class="runs" id="runs"><div class="card-b"><div class="sk" style="height:120px"></div></div></div></div>
     </div>
     <div class="col">
-      <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan cada 5 min</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan en cada pasada</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Web, archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
@@ -146,17 +146,17 @@ async function loadWorkflow() {
     const live = runs.find((r) => r.status === 'in_progress'), queued = runs.find((r) => r.status !== 'completed' && r.status !== 'in_progress');
     const now = live ? `en marcha desde hace ${Math.max(1, Math.round((Date.now() - Date.parse(live.run_started_at || live.created_at)) / 60000))} min` : queued ? 'en cola, empieza enseguida' : on ? 'parada: pulsa «Traer partidos ahora» para relanzarla' : '–';
     pill.innerHTML = `<span class="pill ${on ? 'live' : 'warn'}"><span class="dot ${on ? 'pulse' : ''}"></span>${on ? 'Activo' : 'En pausa'}</span>`;
-    el.innerHTML = `<dl class="kv"><dt>Pasadas automáticas</dt><dd>${on ? 'seguidas, la web se actualiza cada 5 min aprox.' : 'paradas'}</dd>
+    el.innerHTML = `<dl class="kv"><dt>Pasadas automáticas</dt><dd>${on ? 'seguidas, la web se actualiza cada 3-4 min' : 'paradas'}</dd>
       <dt>Ahora</dt><dd>${esc(now)}</dd>
       <dt>Última pasada</dt><dd>${lr.at ? esc(ago(Date.parse(lr.at))) + ` · ${int(lr.newMatches)} nuevos` : '–'}</dd>
-      <dt>Partidos guardados</dt><dd>${int(t.matches)}</dd><dt>Jugadores conocidos</dt><dd>${int(t.known)} (${int(t.tracked)} revisados)</dd><dt>Con rango</dt><dd>${int(t.ranked)}</dd></dl>
+      <dt>Partidos guardados</dt><dd>${int(t.matches)}</dd><dt>Jugadores conocidos</dt><dd>${int(t.known)} (${int(t.tracked)} revisados)</dd><dt>Con rango</dt><dd>${int(t.ranked)}${t.rankBacklog ? ` · ${int(t.rankBacklog)} por consultar` : ''}</dd>${lr.prio != null ? `<dt>Destacados</dt><dd>${int(lr.prio)} revisados en la última pasada · ${int(lr.prioNew || 0)} partidos nuevos</dd>` : ''}</dl>
       <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="btn ${on ? 'danger' : 'primary'}" type="button" id="wf-toggle">${on ? 'Pausar robot' : 'Reanudar robot'}</button></div>`;
     $('#wf-toggle').addEventListener('click', async (e) => {
       const b = e.currentTarget; b.disabled = true;
       try {
         await gh(`/actions/workflows/${WF}/${on ? 'disable' : 'enable'}`, { method: 'PUT' });
         // al reanudar, se relanza la cadena de pasadas automáticas
-        if (!on) await gh(`/actions/workflows/${WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { minutes: '4', chain: '1' } }) }).catch(() => {});
+        if (!on) await gh(`/actions/workflows/${WF}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { minutes: '3', chain: '1' } }) }).catch(() => {});
         X.toast(on ? 'Robot en pausa: la pasada en marcha termina y no habrá más' : 'Robot reanudado: la primera pasada empieza ya'); loadWorkflow(); loadRuns();
       }
       catch (ex) { X.toast(ex.message); b.disabled = false; }
@@ -185,7 +185,7 @@ async function loadRuns() {
 
 // ---------- traer ahora + seguimiento ----------
 const AUTO = 'Pasada automática';
-const runMinutes = (r) => (r.display_title === AUTO ? 4 : r.event === 'push' ? 1 : 8);
+const runMinutes = (r) => (r.display_title === AUTO ? 3 : r.event === 'push' ? 1 : 8);
 async function bringNow(minutes) {
   if (tracking) { X.toast('Ya hay una pasada en marcha'); return; }
   if (wfState && wfState !== 'active') { X.toast('El robot está en pausa: reanúdalo para traer partidos.'); return; }

@@ -63,10 +63,10 @@ jobs:
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:
-          # encadenadas: 4 min (7,5 peticiones/min) y se publica; así la web se actualiza cada 5 min aprox.
+          # encadenadas: 3 min (8,5 peticiones/min) y se publica; así la web se actualiza cada 3-4 min
           # a mano: lo que se pida a 9/min; cambios de ajustes: 1 min
-          MINUTES: ${{ inputs.chain == '1' && '4' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
-          GAP_MS: ${{ inputs.chain == '1' && '8000' || '6700' }}
+          MINUTES: ${{ inputs.chain == '1' && '3' || github.event.inputs.minutes || (github.event_name == 'push' && '1') || '8' }}
+          GAP_MS: ${{ inputs.chain == '1' && '7000' || '6700' }}
           MAX_REQUESTS: '200'
         run: TIME_BUDGET_MS=$(( MINUTES * 60000 )) node --max-old-space-size=6144 crawler/crawl.js
       - name: Liga EUSL
@@ -155,4 +155,4 @@ jobs:
           others=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 20 --json databaseId,status \
             --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\")] | length" || echo 0)
           if [ "${others:-0}" -gt 0 ]; then echo "Ya hay otra pasada en cola: ella programará la siguiente."; exit 0; fi
-          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=4 && echo "Siguiente pasada en cola."
+          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=3 && echo "Siguiente pasada en cola."
