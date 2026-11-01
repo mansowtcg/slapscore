@@ -386,7 +386,7 @@ S.wHash = wHash;
 // Pasada completa (tablas, rankings, récords y todos los perfiles) como mucho cada 20 minutos;
 // en las pasadas ligeras solo se publican los partidos, los días y los perfiles de los destacados.
 const HEAVY_MS = Number(process.env.HEAVY_EVERY_MS ?? 20 * 60_000);
-const META_V = 3, PROF_V = 3;
+const META_V = 4, PROF_V = 3;
 const upgradeMeta = S.metaV !== META_V, upgradeProf = S.profV !== PROF_V;
 const hiddenChanged = Object.keys(S.hid).length !== (S._hidN || 0);
 const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || hiddenChanged;
@@ -524,10 +524,12 @@ for (const day of [...dirtyDays].sort()) {
   const perf = [];
   for (const e of all) e.p.forEach((p) => perf.push({ e, p }));
   perf.sort((a, b) => b.p[3] - a.p[3] || (b.p[4] + b.p[5]) - (a.p[4] + a.p[5]));
-  let best = null;
-  for (const e of all) { const mv = e.p[e.v]; if (mv && (!best || mv[3] > best.p[best.v][3])) best = e; }
   // marcas del día para la página de récords (sin partidas personalizadas, que pueden ser de modos especiales)
   const pubPerf = perf.filter((x) => x.e.y !== 'custom'), pubAll = all.filter((e) => e.y !== 'custom');
+  // partido destacado y mejores actuaciones: mejor de partidas públicas (si apenas hay, de todas)
+  const bestPool = pubAll.length ? pubAll : all, perfPool = pubPerf.length >= 3 ? pubPerf : perf;
+  let best = null;
+  for (const e of bestPool) { const mv = e.p[e.v]; if (mv && (!best || mv[3] > best.p[best.v][3])) best = e; }
   const topBy = (idx) => pubPerf.filter((x) => (x.p[idx] || 0) > 0).sort((a, b) => b.p[idx] - a.p[idx] || b.p[3] - a.p[3]).slice(0, 5)
     .map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], v: p[idx], rt: p[3], s: e.s }));
   const gpd = new Map(); for (const { p } of perf) { const x = gpd.get(p[0]) || { id: p[0], n: p[1], rk: p[6], gp: 0 }; x.gp++; gpd.set(p[0], x); }
@@ -542,7 +544,7 @@ for (const day of [...dirtyDays].sort()) {
     d: day, n: all.length, x: archived ? 1 : 0, chunks: parts,
     counts: [...counts.entries()].map(([k, n]) => [...k.split('\u0001'), n]).sort((a, b) => b[3] - a[3]),
     lead: leaders(all),
-    perf: perf.slice(0, 10).map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], ap: p[7], rt: p[3], g: p[4], as: p[5], s: e.s, tm: p[2] })),
+    perf: perfPool.slice(0, 10).map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], ap: p[7], rt: p[3], g: p[4], as: p[5], s: e.s, tm: p[2] })),
     best, rec,
   };
   const { v: u } = await out.json(P.meta(day), meta);
@@ -686,6 +688,12 @@ verOf.top = (await out.json(path.join(DATA, 'top.json'), {
   avg: avgList.slice(0, 10).map(([id, a]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', avg: Math.round(a[5] / a[0] * 100) / 100, gp: a[0] })),
   perf: perf7.slice(0, 10),
   active: [...TK.entries()].sort((x, y) => y[1][0] - x[1][0]).slice(0, 10).map(([id, a]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', gp: a[0], avg: Math.round(a[5] / a[0] * 100) / 100 })),
+  // equipo de la semana: mejores medias de los últimos 7 días con un mínimo de partidos
+  week: (() => {
+    const minW = [10, 6, 3].find((m) => [...TK.values()].filter((a) => a[0] >= m).length >= 5) || 1;
+    return [...TK.entries()].filter(([, a]) => a[0] >= minW).sort((x, y) => y[1][5] / y[1][0] - x[1][5] / x[1][0]).slice(0, 5)
+      .map(([id, a]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', avg: Math.round(a[5] / a[0] * 100) / 100, gp: a[0], g: a[6], as: a[7], mvp: a[4], min: minW }));
+  })(),
 })).v;
 
 // atributos: cortes de percentil entre jugadores con 5+ partidos
@@ -738,6 +746,10 @@ await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
   archive: { repo, tag: 'archivo-', file: 'partidos-' },
   files: verOf,
   featured: [...prio].filter((id) => players[id] && (players[id].mmr != null || seedSet.has(id))),
+  // destacados que acaban de jugar (último partido hace menos de 25 minutos)
+  live: [...prio].filter((id) => players[id] && players[id].seen && NOW - players[id].seen < 25 * MIN)
+    .sort((a, b) => (players[b].mmr || 0) - (players[a].mmr || 0)).slice(0, 12)
+    .map((id) => ({ id, n: displayName(id), rk: players[id].rk || '', t: players[id].seen })),
   totals: {
     matches: totalMatches, stored, hidden: hiddenNow.size, players: pubIds.length, known: Object.keys(players).length,
     tracked: Object.values(players).filter((p) => p.chk && !p.gone).length, ranked: Object.values(players).filter((p) => p.mmr != null).length,

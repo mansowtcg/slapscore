@@ -138,6 +138,13 @@ export default {
   'El robot aún no ha publicado datos.': 'The bot has not published data yet.', 'Comprueba tu conexión y vuelve a intentarlo.': 'Check your connection and try again.',
   'Instala SlapScore': 'Install SlapScore', 'Pulsa Compartir y después «Añadir a pantalla de inicio».': 'Tap Share, then "Add to Home Screen".',
   'Tenla en tu pantalla de inicio y ábrela como una app.': 'Keep it on your home screen and open it like an app.', 'Instalar': 'Install', 'SlapScore instalada en tu dispositivo': 'SlapScore installed on your device',
+  // portada (v4.1)
+  'Jugando ahora': 'Playing now', 'destacados': 'featured', 'Equipo de la semana': 'Team of the week', '7 días · mín. {n} PJ': '7 days · min. {n} GP',
+  'Todos los rangos': 'All ranks',
+  'Compartir': 'Share', 'Compartir imagen': 'Share image', 'Descargar': 'Download', 'No se pudo crear la imagen.': 'Could not create the image.',
+  'Notas y estadísticas de Slapshot: Rebound': 'Slapshot: Rebound ratings and stats', 'Perfil de jugador': 'Player profile',
+  '{n} partidos analizados': '{n} matches analysed', 'Últimos partidos': 'Last matches',
+  'Legend': 'Legend', 'Diamond': 'Diamond', 'Platinum': 'Platinum', 'Gold': 'Gold', 'Silver': 'Silver', 'Bronze': 'Bronze',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

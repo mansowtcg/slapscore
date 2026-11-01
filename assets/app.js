@@ -1,6 +1,6 @@
 // SlapScore — aplicación web
 import * as C from './core.js';
-import { emblem, emblemDefs, setOfficial, hasOfficial, RANK_KEYS } from './emblems.js';
+import { emblem, emblemDefs, setOfficial, hasOfficial, officialSrc, RANK_KEYS } from './emblems.js';
 import { t, LANG, LOC, setLang } from './i18n.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -183,6 +183,7 @@ const ICON = {
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.2 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z"/></svg>',
   flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4 0 7-2.7 7-6.6 0-3.6-2.6-5.8-4.2-8.9-.4 2.3-1.6 3.6-2.8 4.2C12.4 6.6 10.8 4.4 8.6 3c.3 3.2-1.4 5.1-2.6 7.1A7.4 7.4 0 0 0 5 14.4C5 18.3 8 21 12 21Z"/><path d="M12 21c-1.8 0-3-1.3-3-3 0-1.9 1.5-2.9 2.3-4.4.5 1.1 1.4 1.6 2 1.9.9.5 1.7 1.3 1.7 2.5 0 1.7-1.2 3-3 3Z"/></svg>',
   vs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>',
   bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M13 2.5 4.5 13.5H11L10 21.5l8.5-11H12Z"/></svg>',
 };
 
@@ -599,6 +600,7 @@ async function viewMatches(dayArg, tok) {
         ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
       </div>
+      <div id="m-live" class="only-mobile"></div>
       <div id="m-favs" class="only-mobile"></div>
       <div id="m-lead" class="only-mobile"></div>
       <div id="m-list" class="col">${skeletonList(8)}</div>
@@ -790,10 +792,29 @@ function drawFavs(st) {
   Promise.all(ids.map((id) => loadP(id).catch(() => null))).then((ps) => paint(ids.map((id, i) => item(id, ps[i]))
     .sort((a, b) => (playedToday.has(b.id) - playedToday.has(a.id)) || ((b.g ? b.g.t : 0) - (a.g ? a.g.t : 0)))));
 }
+// Destacados que acaban de jugar (último partido hace menos de 25 min): solo en la lista de hoy
+const liveList = () => ((S.index && S.index.live) || []).filter((x) => Date.now() - x.t < 40 * 60_000);
+function liveCard(day, cls = '') {
+  const L = day === today() ? liveList() : []; if (!L.length) return '';
+  return `<div class="card in live-card ${cls}"><div class="card-h"><h3><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</h3><small>${esc(t('destacados'))}</small></div><div style="padding-bottom:8px">${L.slice(0, 6).map((x) =>
+    `<a class="lrow" href="#j-${esc(x.id)}"><span class="i"></span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(t('último partido {x}', { x: ago(x.t) }))}</span></span>${ICON.right}</a>`).join('')}</div></div>`;
+}
+function liveStrip(day) {
+  const L = day === today() ? liveList() : []; if (!L.length) return '';
+  return `<div class="live-strip"><span class="lbl"><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</span>${L.slice(0, 10).map((x) => `<a href="#j-${esc(x.id)}">${rank(x.rk, 18)}<span>${esc(x.n)}</span></a>`).join('')}</div>`;
+}
+// Equipo de la semana: las mejores medias de los últimos 7 días
+function teamWeekCard(top) {
+  const W = (top && top.week) || []; if (W.length < 3) return '';
+  return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
+    <div class="podium">${[1, 0, 2].map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 18)}</span>${badge(x.avg, 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>
+    ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} G · ${x.as} A</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
+}
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
   const { meta, day } = st;
-  let html = `<div class="card in hide-mobile" id="fav-card"></div>` + leadersCard(meta, day, 'hide-mobile');
+  let html = liveCard(day, 'hide-mobile') + `<div class="card in hide-mobile" id="fav-card"></div>` + leadersCard(meta, day, 'hide-mobile');
+  const ml = $('#m-live'); if (ml) ml.innerHTML = liveStrip(day);
   const best = meta.best && !S.hidden.has(meta.best.i) ? meta.best : null;
   if (best && best.p[best.v]) {
     const mv = best.p[best.v];
@@ -804,6 +825,7 @@ function drawRight(st, top) {
   const perf = (meta.perf || []).filter((p) => !S.hidden.has(p.i)).slice(0, 6);
   if (perf.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores actuaciones'))}</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.map((p, i) =>
     `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
+  html += teamWeekCard(top);
   html += supportCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
@@ -838,7 +860,7 @@ async function viewMatch(r, tok) {
   MAIN.innerHTML = `
     <nav class="crumbs in" aria-label="${esc(t('Ruta'))}"><a href="#d-${m.key.slice(0, 10)}">${esc(t('Partidos'))}</a>${ICON.right}<span>${esc(typeLabel(m.type))} · ${esc(regionLabel(m.region))}</span>${ICON.right}<span>${esc(m.arena)}</span></nav>
     <section class="card evh in" aria-label="${esc(t('Marcador'))}">
-      <div class="evh-top"><span>${esc(cap(DF_FULL.format(new Date(m.t))))} · ${DF_TIME.format(new Date(m.t))}</span><a href="https://slapshot.gg/matches/${encodeURIComponent(m.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
+      <div class="evh-top"><span>${esc(cap(DF_FULL.format(new Date(m.t))))} · ${DF_TIME.format(new Date(m.t))}</span><span class="evh-acts"><button type="button" class="tbtn" id="m-share">${ICON.share}<span>${esc(t('Compartir'))}</span></button><a href="https://slapshot.gg/matches/${encodeURIComponent(m.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></span></div>
       <div class="evh-main">
         <div class="evh-team">${crest('home', 56)}<b>${esc(HOME())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'home'))}</span></div>
         <div class="evh-score"><div class="sc" aria-label="${esc(HOME())} ${m.score.home}, ${esc(AWAY())} ${m.score.away}"><span class="${lose('home')}">${m.score.home}</span><i>-</i><span class="${lose('away')}">${m.score.away}</span></div>
@@ -865,6 +887,7 @@ async function viewMatch(r, tok) {
   S.onResize = moveInd; requestAnimationFrame(moveInd); if (document.fonts) document.fonts.ready.then(() => { if (S.onResize === moveInd) moveInd(); });
   drawPanel(m);
   MAIN.onclick = (e) => { const b = e.target.closest('[data-perf]'); if (b && S.curMatch) { const p = S.curMatch.players[Number(b.getAttribute('data-perf'))]; if (p) openPerf(S.curMatch, p); } };
+  $('#m-share').addEventListener('click', () => shareImage('match', m, `slapscore-${m.key.slice(0, 10)}-${m.id.slice(0, 8)}.png`));
   const hb = $('#m-hide');
   if (hb) hb.addEventListener('click', async () => {
     hb.disabled = true;
@@ -1026,6 +1049,33 @@ function openPerf(m, p) {
     <div class="sheet-f"><button class="btn" type="button" data-close>${esc(t('Cerrar'))}</button><a class="btn primary" href="#j-${esc(p.pid)}">${esc(t('Ver perfil'))}</a></div>`);
 }
 
+// ---------- imagen para compartir (partido o perfil) ----------
+function statPlain(st) {
+  const b = [];
+  if (st.goals) b.push(pl(st.goals, 'gol', 'goles'));
+  if (st.assists) b.push(pl(st.assists, 'asistencia', 'asistencias'));
+  if (st.saves) b.push(pl(st.saves, 'parada', 'paradas'));
+  if (st.passes) b.push(pl(st.passes, 'pase', 'pases'));
+  return (b.length ? b : [t('Sin acciones destacadas')]).slice(0, 3).join(' · ');
+}
+async function shareImage(kind, obj, fname) {
+  openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
+  try {
+    const Sh = await import('./share.js');
+    const X = { t, lang: LANG, host: location.host + location.pathname.replace(/\/(index\.html)?$/, ''), fmtR, int, resLetter, typeLabel, region: regionLabel,
+      date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
+      endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) : '' };
+    const cv = kind === 'match' ? await Sh.matchImage(obj, X) : await Sh.profileImage(obj, X);
+    const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+    if (!$('#sh-pv')) return;
+    const url = URL.createObjectURL(blob), file = new File([blob], fname, { type: 'image/png' });
+    let canShare = false; try { canShare = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch {}
+    $('#sh-pv').innerHTML = `<img src="${url}" alt="">`;
+    $('#sh-f').innerHTML = `<a class="btn" href="${url}" download="${esc(fname)}">${ICON.install}${esc(t('Descargar'))}</a>${canShare ? `<button class="btn primary" type="button" id="sh-go">${ICON.share}${esc(t('Compartir'))}</button>` : ''}`;
+    const go = $('#sh-go'); if (go) go.addEventListener('click', () => navigator.share({ files: [file], title: 'SlapScore' }).catch(() => {}));
+  } catch (e) { const pv = $('#sh-pv'); if (pv) pv.innerHTML = `<div class="empty">${esc(t('No se pudo crear la imagen.'))}</div>`; }
+}
+
 // =====================================================================
 // JUGADOR
 // =====================================================================
@@ -1086,7 +1136,7 @@ async function viewPlayer(pid, tok) {
         <div class="meta"><span>ID ${esc(P.id)}</span>${games[0] ? `<span>${esc(t('Último partido {x}', { x: ago(games[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${P.bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: P.bs }))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}${esc(t('Nota media'))}</div></div>
-      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
+      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
       <div class="ranks">${curRank}${peakRank}</div>
       <div class="strip"><div><b>${int(a.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${a.w}-${a.l}${a.d ? '-' + a.d : ''}</b><span>${esc(a.d ? t('V-D-E') : t('V-D'))}</span></div><div><b>${pct(a.gp ? a.w / a.gp : 0)}</b><span>${esc(t('Victorias'))}</span></div><div><b>${int(a.mvp)}</b><span>MVP</span></div><div><b>${int(a.g)}</b><span>${esc(t('Goles'))}</span></div><div><b>${int(a.as)}</b><span>${esc(t('Asistencias'))}</span></div></div>
     </section>
@@ -1110,6 +1160,7 @@ async function viewPlayer(pid, tok) {
   $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games); }));
   const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(location.href.split('#')[0] + '#j-' + P.id, sh));
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
+  $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games);
 }
 async function adminFollow(pid, follow, btn) {
@@ -1291,13 +1342,15 @@ async function viewCompare(r, tok) {
 // =====================================================================
 // JUGADORES (tabla)
 // =====================================================================
-const PF = { q: '', win: 'a', min: 3, sort: 'avg', dir: -1, limit: 50, fav: false };
+const PF = { q: '', win: 'a', min: 3, sort: 'avg', dir: -1, limit: 50, fav: false, tier: '' };
+const TIER_OPTS = [['', 'Todos los rangos'], ['LEGEND', 'Legend'], ['DIAMOND', 'Diamond'], ['PLAT', 'Platinum'], ['GOLD', 'Gold'], ['SILVER', 'Silver'], ['BRONZE', 'Bronze'], ['-', 'Sin rango']];
 const PCOLS = [['mmr', 'Rango'], ['gp', 'PJ'], ['w', 'V'], ['wp', '% V'], ['avg', 'Nota'], ['mvp', 'MVP'], ['g', 'G'], ['as', 'A'], ['ga', 'G+A'], ['ppg', 'PTS/PJ'], ['sh', 'Tiros'], ['shp', '% tiro'], ['sv', 'Paradas'], ['ps', 'Pases'], ['tk', 'Robos'], ['to', 'Pérd.'], ['po', 'Posesión/PJ']];
 async function viewPlayers(tok) {
   MAIN.innerHTML = `<h1 class="h1 in">${esc(t('Jugadores'))}</h1><p class="lead">${esc(t('Todos los jugadores con partidos guardados. Pulsa una columna para ordenar.'))}</p>
     <div class="card in"><div class="card-h" style="flex-wrap:wrap"><div class="toolbar" style="width:100%">
       <input class="input grow" id="p-q" type="search" placeholder="${esc(t('Buscar jugador'))}" value="${esc(PF.q)}" autocomplete="off" aria-label="${esc(t('Buscar jugador'))}">
       <div class="seg" role="group" aria-label="${esc(t('Periodo'))}">${[['a', 'Siempre'], ['m', '30 días'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-w="${k}" aria-pressed="${PF.win === k}">${esc(t(l))}</button>`).join('')}</div>
+      <select class="select" id="p-tier" aria-label="${esc(t('Rango'))}">${TIER_OPTS.map(([k, l]) => `<option value="${k}" ${PF.tier === k ? 'selected' : ''}>${esc(t(l))}</option>`).join('')}</select>
       <select class="select" id="p-min" aria-label="${esc(t('Mínimo de partidos'))}">${[1, 3, 5, 10, 25].map((v) => `<option value="${v}" ${PF.min === v ? 'selected' : ''}>${esc(t('Mín. {n} PJ', { n: v }))}</option>`).join('')}</select>
       ${FAVS.size ? `<button type="button" class="chip tg" id="p-fav" aria-pressed="${PF.fav}">${ICON.star}${esc(t('Favoritos'))}</button>` : ''}
     </div></div><div class="tscroll" id="ptable">${Array.from({ length: 8 }, skRow).join('')}</div></div>`;
@@ -1306,6 +1359,7 @@ async function viewPlayers(tok) {
   let tq;
   $('#p-q').addEventListener('input', (e) => { clearTimeout(tq); tq = setTimeout(() => { PF.q = e.target.value; PF.limit = 50; drawPlayers(rows); }, 120); });
   $('#p-min').addEventListener('change', (e) => { PF.min = Number(e.target.value); PF.limit = 50; drawPlayers(rows); });
+  $('#p-tier').addEventListener('change', (e) => { PF.tier = e.target.value; PF.limit = 50; drawPlayers(rows); });
   const pf = $('#p-fav'); if (pf) pf.addEventListener('click', () => { PF.fav = !PF.fav; pf.setAttribute('aria-pressed', String(PF.fav)); PF.limit = 50; drawPlayers(rows); });
   $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', async () => {
     PF.win = b.getAttribute('data-w'); PF.limit = 50; $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -1323,6 +1377,7 @@ function drawPlayers(all) {
     const a = p.a; if (a.gp < (fav ? 1 : PF.min)) continue;
     if (q && !fold(p.n).includes(q)) continue;
     if (fav && !FAVS.has(String(p.id))) continue;
+    if (PF.tier) { const rt = p.rk ? (C.parseRank(p.rk) || {}).tier : ''; if (PF.tier === '-' ? !!rt : rt !== PF.tier) continue; }
     rows.push({ p, v: { mmr: p.mmr ?? -1, gp: a.gp, w: a.w, wp: a.w / a.gp, avg: a.rs / a.gp, mvp: a.mvp, g: a.g, as: a.as, ga: a.g + a.as, ppg: (a.pt || 0) / a.gp, shp: a.sh ? a.g / a.sh : 0, sh: a.sh, sv: a.sv, ps: a.ps, tk: a.tk, to: a.to, po: a.po / a.gp } });
   }
   rows.sort((x, y) => (PF.dir === -1 ? y.v[PF.sort] - x.v[PF.sort] : x.v[PF.sort] - y.v[PF.sort]) || y.v.avg - x.v.avg);

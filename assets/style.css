@@ -803,3 +803,32 @@ html.vt-same .days{view-transition-name:daybar}
 @media (max-width:400px){#btn-refresh{display:none}}
 .linkbtn{border:0;background:none;padding:0;color:var(--muted);font:inherit;cursor:pointer}
 .linkbtn:hover{text-decoration:underline}
+/* jugando ahora y equipo de la semana */
+.live-card h3{display:flex;align-items:center;gap:8px}
+.live-card .dot,.live-strip .dot{color:var(--loss)}
+.live-card .lrow>svg{width:16px;height:16px;color:var(--faint)}
+.live-strip{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.live-strip::-webkit-scrollbar{display:none}
+.live-strip .lbl{flex:none;display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;color:var(--loss)}
+.live-strip a{flex:none;display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 10px 0 6px;border-radius:999px;background:var(--surface);color:var(--fg);font-weight:700;font-size:12.5px;text-decoration:none!important;box-shadow:var(--shadow-1)}
+#m-live:empty{display:none}
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:6px;padding:4px 12px 10px}
+.pod{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px 12px;border-radius:14px;background:var(--surface-2);color:var(--fg);text-decoration:none!important;min-width:0;position:relative;transition:transform .15s var(--ease)}
+.pod:hover{transform:translateY(-2px)}
+.pod.p1{padding-top:14px;background:color-mix(in srgb,#F5B400 12%,var(--surface-2))}
+.pod .nr{justify-content:center;font-weight:800;font-size:13px}
+.pod small{color:var(--muted);font-size:11.5px;font-weight:600}
+.pod .medal{position:absolute;top:6px;left:8px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;background:#B0B7C3}
+.pod.p1 .medal{background:#E0A800}.pod.p3 .medal{background:#C27C4A}
+/* compartir imagen */
+.evh-acts{display:flex;align-items:center;gap:14px}
+.tbtn{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:0;color:var(--primary);font:inherit;font-weight:700;cursor:pointer}
+.tbtn svg{width:15px;height:15px}
+.tbtn:hover span{text-decoration:underline}
+.ph-acts .btn svg{width:15px;height:15px}
+.share-pv{padding:0 18px 4px;display:flex;justify-content:center}
+.share-pv img{display:block;width:100%;max-width:360px;height:auto;border-radius:14px;box-shadow:var(--shadow-2)}
+.share-pv .sk{max-width:360px}
+.sheet.share-sheet .sheet-f{justify-content:center}
+.sheet.share-sheet .sheet-f .btn svg{width:16px;height:16px}
+@media (max-width:560px){.evh-acts .tbtn span{display:none}}
