@@ -1426,6 +1426,18 @@ async function viewRankings(tok) {
   if (!live(tok)) return;
   $$('[data-w]', MAIN).forEach((b) => b.addEventListener('click', () => { RK.win = b.getAttribute('data-w'); $$('[data-w]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawRankings(R); }));
   drawRankings(R);
+  // reparto de rangos (de la lista de búsqueda, que tiene el rango de todos)
+  loadSearch().then((rows) => { S.distHTML = rankDist(rows); if (live(tok)) { const el = $('#rk-dist'); if (el) el.outerHTML = S.distHTML; } }).catch(() => {});
+}
+function rankDist(rows) {
+  const cnt = new Map(); let ranked = 0;
+  for (const r of rows) { const k = r[2]; if (!k || !C.parseRank(k)) continue; cnt.set(k, (cnt.get(k) || 0) + 1); ranked++; }
+  if (ranked < 10) return '';
+  const keys = [...RANK_KEYS].reverse(), max = Math.max(...keys.map((k) => cnt.get(k) || 0));
+  return `<div class="card in dist"><div class="card-h"><h3>${esc(t('Reparto de rangos'))}</h3><small>${esc(t('{n} jugadores con rango', { n: int(ranked) }))}</small></div><div class="dist-b">${keys.map((k) => {
+    const n = cnt.get(k) || 0;
+    return `<div class="dist-r">${rank(k, 26)}<span class="nm">${esc(C.parseRank(k).name)}</span><span class="bar"><i style="width:${max ? Math.max(n ? 2 : 0, Math.round(n / max * 100)) : 0}%"></i></span><span class="v">${pct(n / ranked)}</span></div>`;
+  }).join('')}</div></div>`;
 }
 function drawRankings(R) {
   const el = $('#rk'); if (!el) return;
@@ -1437,7 +1449,7 @@ function drawRankings(R) {
   };
   const v = (x) => `<span class="v">${int(x)}</span>`;
   const mmr = R.mmr || [];
-  const mmrCard = mmr.length ? `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><small>${esc(t('clasificatoria'))}</small></div><div style="padding-bottom:8px">${mmr.map((p, i) =>
+  const mmrCard = mmr.length ? `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#jugadores" data-allmmr>${esc(t('Ver todos'))}</a></div><div style="padding-bottom:8px">${mmr.map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 28)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${pname([p.id, p.n])}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>` : '';
   const minGp = W.min || 1, mn = t('mín. {n} PJ', { n: minGp }), tot = t('total');
   const html = mmrCard
@@ -1452,7 +1464,8 @@ function drawRankings(R) {
     + card('Bloqueos', tot, W.bl, v)
     + card('% de victorias', mn, W.wp, (x) => `<span class="v">${pct(x)}</span>`)
     + card('Más partidos', t('jugados'), W.gp, v);
-  el.innerHTML = html || `<div class="card empty">${esc(t('Todavía no hay datos para este periodo.'))}</div>`;
+  el.innerHTML = (html || `<div class="card empty">${esc(t('Todavía no hay datos para este periodo.'))}</div>`) + (S.distHTML || '<div id="rk-dist"></div>');
+  const all = $('[data-allmmr]', el); if (all) all.addEventListener('click', (e) => { e.preventDefault(); PF.sort = 'mmr'; PF.dir = -1; PF.min = 1; PF.win = 'a'; PF.tier = ''; PF.q = ''; location.hash = 'jugadores'; });
 }
 
 // =====================================================================

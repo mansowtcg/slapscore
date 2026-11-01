@@ -147,6 +147,7 @@ export default {
   'Legend': 'Legend', 'Diamond': 'Diamond', 'Platinum': 'Platinum', 'Gold': 'Gold', 'Silver': 'Silver', 'Bronze': 'Bronze',
   'Ascenso a {r}': 'Promoted to {r}', 'Descenso a {r}': 'Dropped to {r}',
   'Menú inferior': 'Bottom menu', 'Filtros': 'Filters',
+  'Reparto de rangos': 'Rank distribution', '{n} jugadores con rango': '{n} ranked players',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',
