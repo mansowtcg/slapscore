@@ -149,6 +149,7 @@ export default {
   'Menú inferior': 'Bottom menu', 'Filtros': 'Filters',
   'Reparto de rangos': 'Rank distribution', '{n} jugadores con rango': '{n} ranked players',
   'Actividad': 'Activity', 'hora de Madrid': 'Madrid time', 'Partidos por hora': 'Matches per hour', 'Hora punta: {h}:00 · {n}': 'Peak hour: {h}:00 · {n}',
+  'Toda su carrera': 'Whole career', '{n} de sus últimos partidos guardados': '{n} of their latest saved matches', 'Mejores partidos': 'Best matches', 'por nota': 'by rating',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

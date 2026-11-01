@@ -1099,7 +1099,7 @@ async function shareImage(kind, obj, fname) {
 // =====================================================================
 // JUGADOR
 // =====================================================================
-const PV = { hist: 'all', histN: 15, statMode: 'pg' };
+const PV = { hist: 'all', histN: 15, statMode: 'pg', type: '' };
 const favBtn = (id, name) => `<button type="button" class="fav-btn" data-fav="${esc(id)}" data-n="${esc(name)}" aria-pressed="${isFav(id)}" aria-label="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}" title="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}">${ICON.star}</button>`;
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-fav]'); if (!b) return;
@@ -1134,7 +1134,7 @@ async function viewPlayer(pid, tok) {
     return errorBox(e);
   }
   if (!live(tok)) return;
-  PV.hist = 'all'; PV.histN = 15;
+  PV.hist = 'all'; PV.histN = 15; PV.type = '';
   document.title = `${P.n} · SlapScore`;
   const games = P._g.filter((g) => !S.hidden.has(g.i));
   const meta = P.meta || {}, a = P._a;
@@ -1149,6 +1149,8 @@ async function viewPlayer(pid, tok) {
     : `<div class="rank-c"><div style="width:56px"></div><div><div class="k">${esc(t('Mejor rango'))}</div><div class="nm">—</div><div class="pts">${esc(t('Sin datos todavía'))}</div></div></div>`;
   const last10 = games.slice(0, 10).reverse();
   const cs = streakOf(games), feat = S.featured.has(String(P.id));
+  const tcount = new Map(); for (const g of games) tcount.set(g.y, (tcount.get(g.y) || 0) + 1);
+  const types = [...tcount.entries()].filter(([y]) => y).sort((x, y) => y[1] - x[1]);
   const seed = (S.settings.seeds || []).map(String).includes(String(P.id));
   MAIN.innerHTML = `
     <nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(P.n)}</span></nav>
@@ -1171,12 +1173,19 @@ async function viewPlayer(pid, tok) {
         ${attr ? `<div class="card in"><div class="card-h"><h3>${esc(t('Atributos'))}</h3><small>${esc(t('frente a {n} jugadores', { n: int(AT.n) }))}</small></div>${radar(attr)}</div>` : ''}
       </div>
       <div class="col">
-        <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><div class="seg" role="group" aria-label="${esc(t('Modo'))}"><button type="button" data-sm="pg" aria-pressed="${PV.statMode === 'pg'}">${esc(t('Por partido'))}</button><button type="button" data-sm="tot" aria-pressed="${PV.statMode === 'tot'}">${esc(t('Totales'))}</button></div></div><div id="pstats"></div></div>
+        <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><div class="seg" role="group" aria-label="${esc(t('Modo'))}"><button type="button" data-sm="pg" aria-pressed="${PV.statMode === 'pg'}">${esc(t('Por partido'))}</button><button type="button" data-sm="tot" aria-pressed="${PV.statMode === 'tot'}">${esc(t('Totales'))}</button></div></div>
+          ${types.length > 1 ? `<div class="chips st-types" role="group" aria-label="${esc(t('Tipo de partida'))}"><button type="button" class="chip" data-sty="" aria-pressed="${!PV.type}">${esc(t('Toda su carrera'))}</button>${types.map(([y, n]) => `<button type="button" class="chip" data-sty="${esc(y)}" aria-pressed="${PV.type === y}">${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}</div>` : ''}<div id="pstats"></div></div>
+        ${bestGamesCard(P, games)}
         ${matesCard(P, games)}
         <div class="card in"><div class="card-h"><h3>${esc(t('Partidos'))}</h3><div class="seg" role="group" aria-label="${esc(t('Filtrar'))}">${[['all', 'Todos'], ['W', 'Victorias'], ['L', 'Derrotas']].map(([k, l]) => `<button type="button" data-hf="${k}" aria-pressed="${PV.hist === k}">${esc(t(l))}</button>`).join('')}</div></div><div id="phist"></div></div>
       </div>
     </div>`;
-  const drawStats = () => { $('#pstats').innerHTML = playerStats(a, PV.statMode); };
+  // estadísticas de toda la carrera o, por tipo de partida, de sus últimos partidos guardados
+  const drawStats = () => {
+    const sub = PV.type ? aggOf(games.filter((g) => g.y === PV.type)) : a;
+    $('#pstats').innerHTML = (PV.type ? `<p class="muted hnote" style="padding-top:0">${esc(t('{n} de sus últimos partidos guardados', { n: int(sub.gp) }))}</p>` : '') + playerStats(sub, PV.statMode);
+  };
+  $$('[data-sty]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.type = b.getAttribute('data-sty'); $$('[data-sty]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawStats(); }));
   $$('[data-sm]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.statMode = b.getAttribute('data-sm'); $$('[data-sm]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawStats(); }));
   $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games); }));
   const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(location.href.split('#')[0] + '#j-' + P.id, sh));
@@ -1212,6 +1221,25 @@ function weekCard(games) {
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Forma semanal'))}</h3><small>${esc(t('últimos 7 días'))}</small></div>
     <div class="wk">${cols}</div>
     <div class="wk-sum"><div><b>${int(cur.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${cur.gp ? pct(cur.w / cur.gp) : '–'}</b><span>${esc(t('Victorias'))}</span></div><div><b>${cur.gp ? fmtR(ca) : '–'} ${trend}</b><span>${esc(prev.gp ? t('Nota media (vs semana anterior)') : t('Nota media'))}</span></div></div></div>`;
+}
+// Totales (mismo formato que los de carrera) a partir de una lista de partidos del perfil
+function aggOf(gs) {
+  const a = C.aggObj([]);
+  for (const g of gs) {
+    const s = g.st; a.gp++; if (g.r === 'W') a.w++; else if (g.r === 'L') a.l++; else a.d++;
+    if (g.mv) a.mvp++; a.rs += g.rt; a.g += s.goals || 0; a.as += s.assists || 0; a.sh += s.shots || 0; a.sv += s.saves || 0; a.ps += s.passes || 0;
+    a.tk += s.takeaways || 0; a.bl += s.blocks || 0; a.to += s.turnovers || 0; a.po += s.possession_time_sec || 0; a.fw += s.faceoffs_won || 0; a.fl += s.faceoffs_lost || 0; a.ph += s.post_hits || 0; a.pt += s.score || 0;
+  }
+  return a;
+}
+// Sus mejores partidos (por nota) entre los guardados
+function bestGamesCard(P, games) {
+  const best = games.slice().sort((x, y) => y.rt - x.rt).slice(0, 5);
+  if (best.length < 3) return '';
+  return `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores partidos'))}</h3><small>${esc(t('por nota'))}</small></div>${best.map((g) => {
+    const opp = g.op.map((id) => (P.names && P.names[id]) || id).join(', ');
+    return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} G · ${g.st.assists || 0} A${g.mv ? ' · MVP' : ''}</span>${badge(g.rt)}</a>`;
+  }).join('')}<div style="height:6px"></div></div>`;
 }
 function playerStats(a, mode) {
   const gp = a.gp || 1, pg = mode === 'pg';
