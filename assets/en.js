@@ -150,6 +150,7 @@ export default {
   'El robot sigue consultando rangos: quedan {n} jugadores por mirar.': 'The bot is still checking ranks: {n} players to go.',
   'Juega en la EUSL': 'Plays in the EUSL',
   'Actualizado {x} · se actualiza solo': 'Updated {x} · refreshes automatically',
+  'Datos actualizados · 1 partido nuevo': 'Data updated · 1 new match',
   'Reparto de rangos': 'Rank distribution', '{n} jugadores con rango': '{n} ranked players',
   'Actividad': 'Activity', 'hora de Madrid': 'Madrid time', 'Partidos por hora': 'Matches per hour', 'Hora punta: {h}:00 · {n}': 'Peak hour: {h}:00 · {n}',
   'Toda su carrera': 'Whole career', '{n} de sus últimos partidos guardados': '{n} of their latest saved matches', 'Mejores partidos': 'Best matches', 'por nota': 'by rating',

@@ -15,12 +15,12 @@ Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://m
 
 ## Qué hay en la web
 
-- **Partidos** por día (tira de días y calendario), filtros por tipo, región, arena, jugador, **destacados** y **favoritos**; estadísticas de todos los jugadores desplegables en cada fila; actualización automática de la lista de hoy.
+- **Partidos** por día (tira de días y calendario), filtros por tipo, región, arena, jugador, **destacados** y **favoritos**; estadísticas de todos los jugadores desplegables en cada fila; la lista de hoy se actualiza sola y dice cuándo fue la última vez.
 - **Portada**: jugando ahora (destacados que acaban de jugar), favoritos, líderes del día, partido destacado, mejores actuaciones, equipo de la semana, top MMR, más activos y actividad por horas.
 - **Partido**: resumen, alineaciones, estadísticas, JSON original e **imagen para compartir** (1080×1350).
-- **Jugador**: rango actual y mejor rango con logos oficiales, racha, forma, forma semanal, notas, MMR con ascensos y descensos, atributos, estadísticas (de toda la carrera o por tipo de partida), mejores partidos, compañeros, historial, comparar e imagen para compartir.
-- **Comparar jugadores**, **tabla de jugadores** (periodo, mínimo de partidos, rango, favoritos), **rankings** (con reparto de rangos), **récords** (siempre o 7 días), **EUSL** (eusl.gg) y **cómo puntuamos**.
-- **Favoritos** guardados en el navegador de cada uno; buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
+- **Jugador**: rango actual y mejor rango con logos oficiales, racha, forma, forma semanal, notas, MMR con ascensos y descensos, atributos, estadísticas (de toda la carrera o por tipo de partida), mejores partidos, compañeros, historial, comparar, imagen para compartir y su equipo de la EUSL si juega en la liga.
+- **Comparar jugadores**, **tabla de jugadores** (periodo, mínimo de partidos, rango, favoritos), **rankings** (con reparto de rangos), **récords** (siempre o 7 días), **EUSL** (eusl.gg, con enlace a cada equipo) y **cómo puntuamos**.
+- **Favoritos** guardados en el navegador de cada uno (con la lista de hoy abierta, sale un aviso cuando un favorito termina un partido); buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
 - Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
 
 ## Datos (rama `data`)

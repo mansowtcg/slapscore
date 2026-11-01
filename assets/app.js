@@ -718,9 +718,29 @@ function activityCard(st) {
     <div class="act-x"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
     <p class="muted act-n">${esc(t('Hora punta: {h}:00 · {n}', { h: String(peak).padStart(2, '0'), n: pl(per[peak], 'partido', 'partidos') }))}</p></div>`;
 }
+// Avisos de favoritos: con los partidos de hoy abiertos, cuando entra un partido nuevo de un favorito sale un aviso con enlace
+const FAVSEEN = new Set(); let favSince = 0;
+function favAlerts(st) {
+  if (!FAVS.size || st.day !== today()) return;
+  const first = !favSince; if (first) favSince = Date.now();
+  const news = [];
+  for (const m of loadedRows(st)) {
+    if (FAVSEEN.has(m.i)) continue; FAVSEEN.add(m.i);
+    if (first || m.t < favSince - 3 * 60_000) continue;   // lo que ya estaba al abrir la página, o más antiguo, no avisa
+    const p = m.p.find((x) => isFav(x[0])); if (p) news.push([m, p]);
+  }
+  for (const [m, p] of news.slice(-3)) {
+    const me = p[2], r = m.w === me ? 'W' : m.w === 1 - me ? 'L' : 'D';
+    const el = document.createElement('a'); el.className = 'toast fav-toast'; el.href = matchHref(m.k, m.i);
+    el.textContent = `★ ${p[1]} · ${resLetter(r)} ${m.s[me]}-${m.s[1 - me]} · ${t('Nota')} ${dec(p[3])}`;
+    $('#toasts').appendChild(el);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 7000);
+  }
+}
 function drawList(st) {
   const el = $('#m-list'); if (!el) return;
   el.dataset.ready = '1';
+  try { favAlerts(st); } catch {}
   const rows = filtered(loadedRows(st));
   if (!rows.length) {
     const why = MF.fav ? t('Tus favoritos no han jugado este día.') : MF.top ? t('Ningún destacado ha jugado este día con estos filtros.') : t('Prueba a quitar algún filtro o cambia de día.');
@@ -1666,7 +1686,7 @@ async function refreshData(manual, silent) {
     const prev = S.index && S.index.totals ? S.index.totals.matches : 0;
     setIndex(idx); $('#newbar').hidden = true;
     renderChrome(); go({ keepScroll: true, silent: !!silent });
-    if (manual) toast(changed ? (idx.totals.matches > prev ? t('Datos actualizados · {n} partidos nuevos', { n: int(idx.totals.matches - prev) }) : t('Datos actualizados')) : t('Ya tienes lo último'));
+    if (manual) toast(changed ? (idx.totals.matches > prev ? (idx.totals.matches - prev === 1 ? t('Datos actualizados · 1 partido nuevo') : t('Datos actualizados · {n} partidos nuevos', { n: int(idx.totals.matches - prev) })) : t('Datos actualizados')) : t('Ya tienes lo último'));
     return changed;
   } catch (e) { if (manual) toast(t('No se pudo actualizar. Comprueba tu conexión.')); return false; }
   finally { btn.classList.remove('spin'); }
