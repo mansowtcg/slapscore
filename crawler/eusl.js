@@ -80,7 +80,8 @@ try {
   }
   const pick = (league) => [...totals.values()].filter((x) => x.league === league).sort((a, b) => (b.g + b.a) - (a.g + a.a) || b.g - a.g).slice(0, 15);
   const scorers = { pro: pick(PRO), challenger: pick(CHALL) };
-  const pids = [...new Set([...scorers.pro, ...scorers.challenger].map((x) => x.pid))];
+  // todos los que han jugado en Pro o Challenger (para poner su equipo en el perfil), no solo los máximos anotadores
+  const pids = [...new Set([...totals.values()].map((x) => x.pid))];
   const names = {};
   for (let i = 0; i < pids.length; i += 100) for (const p of (await get(`players?per_page=100&include=${pids.slice(i, i + 100).join(',')}`)).data) names[p.id] = txt(p.title && p.title.rendered);
 
@@ -101,14 +102,21 @@ try {
   const search = await readJSON(path.join(DATA, 'search.json.gz'), []);
   const byName = new Map();
   for (const r of search) { const k = String(r[1]).toLowerCase(); byName.set(k, byName.has(k) ? null : r[0]); }
-  const row = (x) => ({ pid: x.pid, n: names[x.pid] || '?', sid: byName.get((names[x.pid] || '').toLowerCase()) || null, team: x.team, gp: x.gp, g: x.g, a: x.a, sv: x.sv });
+  const sidOf = (pid) => { const nm = (names[pid] || '').toLowerCase(); return nm.length >= 3 ? byName.get(nm) || null : null; };
+  const row = (x) => ({ pid: x.pid, n: names[x.pid] || '?', sid: sidOf(x.pid), team: x.team, gp: x.gp, g: x.g, a: x.a, sv: x.sv });
+  // plantillas: id de slapshot.gg -> [equipo, competición] (si jugó en las dos, donde más partidos tiene)
+  const roster = {};
+  for (const x of [...totals.values()].sort((a, b) => a.gp - b.gp)) { const sid = sidOf(x.pid); if (sid) roster[sid] = [x.team, x.league]; }
+  for (const id of new Set(Object.values(roster).map((r) => r[0]))) if (!teams[id]) {
+    try { const t = (await get(`teams/${id}`)).data; teams[id] = { n: txt(t.title && t.title.rendered), ab: t.abbreviation || '', logo: '', link: t.link }; } catch { /* sin datos del equipo */ }
+  }
 
   const doc = {
     updated: new Date().toISOString(), source: 'https://www.eusl.gg', season: { id: season.id, name: season.name },
     leagues: Object.fromEntries([...new Set([...results, ...upcoming].map((g) => g.league))].concat([PRO, CHALL]).map((id) => [id, leagues[id] || ''])),
     tables: tables.map(({ perf, ...t }) => t),
     results: results.map(({ perf, ...g }) => g), upcoming: upcoming.map(({ perf, s, ...g }) => g),
-    scorers: { pro: scorers.pro.map(row), challenger: scorers.challenger.map(row) }, teams,
+    scorers: { pro: scorers.pro.map(row), challenger: scorers.challenger.map(row) }, teams, roster,
   };
   const { v } = await new Writer().json(OUT, doc);
   const idxFile = path.join(DATA, 'index.json');

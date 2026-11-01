@@ -608,6 +608,7 @@ async function viewMatches(dayArg, tok) {
       <div class="card">
         ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
+        <div class="upd" id="m-upd" hidden></div>
       </div>
       <div id="m-live" class="only-mobile"></div>
       <div id="m-favs" class="only-mobile"></div>
@@ -623,7 +624,7 @@ async function viewMatches(dayArg, tok) {
   if (!live(tok)) return;
   const st = { day, meta, lists: [], next: 0, tok };
   curMatches = st;
-  drawFilters(st); drawLeft(st);
+  drawFilters(st); drawLeft(st); drawUpd();
   const ml = $('#m-lead'); if (ml) ml.innerHTML = leadersCard(meta, day);
   drawRight(st, top);
   drawFavs(st);
@@ -631,6 +632,16 @@ async function viewMatches(dayArg, tok) {
   // días de al lado, ya preparados para cuando cambies
   idle(() => { for (const d of [days[idx + 1], days[idx - 1]]) if (d) loadMeta(d.d).then((m) => firstChunks(d.d, m)).catch(() => {}); });
 }
+// Hoy: cuándo se actualizaron los datos por última vez (el robot publica cada 3-4 min y la lista se pone al día sola)
+function drawUpd() {
+  const el = $('#m-upd'); if (!el) return;
+  const r = route(), at = S.index && Date.parse(S.index.updated);
+  const on = !!at && r.view === 'matches' && pickDay(r.day) === today();
+  el.hidden = !on; if (!on) return;
+  const fresh = Date.now() - at < 10 * 60_000;
+  el.innerHTML = `<span class="dot${fresh ? ' pulse' : ''}" style="color:${fresh ? 'var(--win)' : 'var(--faint)'}"></span>${esc(t('Actualizado {x} · se actualiza solo', { x: ago(at) }))}`;
+}
+setInterval(() => { if (!document.hidden) drawUpd(); }, 30_000);
 // recuentos del día: exactos aunque todavía no se hayan cargado todos los partidos
 function countBy(st, f, filt) {
   const c = new Map();
@@ -1192,6 +1203,13 @@ async function viewPlayer(pid, tok) {
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
   $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games);
+  // su equipo de la EUSL, si su nombre en la liga coincide con este jugador
+  if (S.index && S.index.files && S.index.files.eusl) loadEusl().then((E) => {
+    const r = E && E.roster && E.roster[String(P.id)], tg = $('.ph-tags', MAIN);
+    if (!r || !tg || location.hash !== '#j-' + P.id || $('.eu-pill', tg)) return;
+    const x = (E.teams || {})[r[0]] || {}, lg = (E.leagues || {})[r[1]] || '';
+    tg.insertAdjacentHTML('beforeend', `<a class="pill eu-pill" href="#eusl" title="${esc(t('Juega en la EUSL'))}">${x.logo ? `<img src="${esc(x.logo)}" width="16" height="16" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}EUSL ${esc(lg)} · ${esc(x.n || '?')}</a>`);
+  }).catch(() => {});
 }
 async function adminFollow(pid, follow, btn) {
   btn.disabled = true;
