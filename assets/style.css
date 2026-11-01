@@ -775,6 +775,7 @@ html.vt-same .days{view-transition-name:daybar}
 .tbl.eu-tbl td:nth-child(2) .eu-t{max-width:180px}
 .tbl.eu-tbl .i{color:var(--faint);font-weight:700;font-size:12px;min-width:18px;display:inline-block}
 .tbl.eu-tbl td a{color:var(--fg)}
+.tbl.eu-tbl a.t{text-decoration:none}.tbl.eu-tbl a.t:hover,.tbl.eu-tbl a.t:focus-visible{text-decoration:underline}
 .eu-ev{grid-template-columns:52px minmax(0,1fr) 28px 46px}
 .eu-ev .ev-team .eu-t{max-width:100%}
 .eu-ev:first-child{border-top:0}
@@ -853,6 +854,7 @@ html.vt-same .days{view-transition-name:daybar}
 .dist-r .bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}
 .dist-r .bar i{display:block;height:100%;border-radius:4px;background:var(--primary);transform-origin:left;animation:grow .7s var(--ease) both}
 .dist-r .v{text-align:right;font-family:var(--font-num);font-size:14px}
+.dist-n{margin:-4px 16px 14px;font-size:12px}
 /* actividad por horas */
 .act-b{display:flex;align-items:flex-end;gap:2px;height:84px;padding:0 16px}
 .act-b span{flex:1;border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--primary) 35%,var(--surface-3));transform-origin:bottom;animation:rise .5s var(--ease) both}

@@ -1471,11 +1471,12 @@ function rankDist(rows) {
   const cnt = new Map(); let ranked = 0;
   for (const r of rows) { const k = r[2]; if (!k || !C.parseRank(k)) continue; cnt.set(k, (cnt.get(k) || 0) + 1); ranked++; }
   if (ranked < 10) return '';
+  const pend = ((S.index && S.index.totals) || {}).rankBacklog || 0;
   const keys = [...RANK_KEYS].reverse(), max = Math.max(...keys.map((k) => cnt.get(k) || 0));
   return `<div class="card in dist"><div class="card-h"><h3>${esc(t('Reparto de rangos'))}</h3><small>${esc(t('{n} jugadores con rango', { n: int(ranked) }))}</small></div><div class="dist-b">${keys.map((k) => {
     const n = cnt.get(k) || 0;
-    return `<div class="dist-r">${rank(k, 26)}<span class="nm">${esc(C.parseRank(k).name)}</span><span class="bar"><i style="width:${max ? Math.max(n ? 2 : 0, Math.round(n / max * 100)) : 0}%"></i></span><span class="v">${pct(n / ranked)}</span></div>`;
-  }).join('')}</div></div>`;
+    return `<div class="dist-r">${rank(k, 26)}<span class="nm">${esc(C.parseRank(k).name)}</span><span class="bar"><i style="width:${max ? Math.max(n ? 2 : 0, Math.round(n / max * 100)) : 0}%"></i></span><span class="v">${n && n / ranked < 0.005 ? '&lt;' + pct(0.01) : pct(n / ranked)}</span></div>`;
+  }).join('')}</div>${pend > 0 ? `<p class="muted dist-n">${esc(t('El robot sigue consultando rangos: quedan {n} jugadores por mirar.', { n: int(pend) }))}</p>` : ''}</div>`;
 }
 function drawRankings(R) {
   const el = $('#rk'); if (!el) return;
@@ -1548,9 +1549,11 @@ async function viewEusl(tok) {
   let E; try { E = await loadEusl(); } catch (e) { if (!live(tok)) return; if (e.status === 404) return notFound(t('Los datos de la EUSL aparecerán en unos minutos.')); return errorBox(e); }
   if (!live(tok)) return;
   // escudo del equipo (de eusl.gg); si no carga, sus iniciales
-  const team = (id, size = 22) => {
+  // con link, el nombre lleva a la ficha del equipo en eusl.gg (no en los resultados: la fila entera ya es un enlace)
+  const team = (id, size = 22, link = false) => {
     const x = E.teams[id] || { n: '?' }, ab = `<span class="eu-x" style="--h:${hue(x.n)};width:${size}px;height:${size}px"${x.logo ? ' hidden' : ''}>${esc((x.ab || x.n).slice(0, 3))}</span>`;
-    return `<span class="eu-t">${x.logo ? `<img src="${esc(x.logo)}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">` : ''}${ab}<span class="t">${esc(x.n)}</span></span>`;
+    const nm = link && /^https:\/\/(www\.)?eusl\.gg\//.test(x.link || '') ? `<a class="t" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.n)}</a>` : `<span class="t">${esc(x.n)}</span>`;
+    return `<span class="eu-t">${x.logo ? `<img src="${esc(x.logo)}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">` : ''}${ab}${nm}</span>`;
   };
   const lg = (id) => E.leagues[id] || '';
   const tabs = [['tabla', 'Clasificación'], ['res', 'Resultados'], ['prox', 'Próximos'], ['gol', 'Jugadores']];
@@ -1562,7 +1565,7 @@ async function viewEusl(tok) {
       el.innerHTML = E.tables.length ? E.tables.map((tb) => {
         const ot = tb.rows.some((r) => r.otw || r.otl);
         return `<div class="sgrp-h eu-sh">${esc(tb.title.replace(/Season \d+/i, '').trim() || tb.title)}</div><div class="tscroll"><table class="tbl eu-tbl"><thead><tr><th>#&nbsp;&nbsp;${esc(t('Equipo'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Victorias'))}">${esc(t('V'))}</th><th title="${esc(t('Derrotas'))}">${esc(t('D'))}</th>${ot ? `<th title="${esc(t('Victorias en prórroga'))}">${esc(t('VP'))}</th><th title="${esc(t('Derrotas en prórroga'))}">${esc(t('DP'))}</th>` : ''}<th title="${esc(t('Goles a favor'))}">${esc(t('GF'))}</th><th title="${esc(t('Goles en contra'))}">${esc(t('GC'))}</th><th title="${esc(t('Diferencia de goles'))}">${esc(t('DG'))}</th><th title="${esc(t('Puntos'))}">${esc(t('PTS'))}</th></tr></thead><tbody>
-          ${tb.rows.map((r) => `<tr><td><span class="pc"><span class="i">${r.pos}</span>${team(r.id)}</span></td><td>${r.gp}</td><td>${r.w}</td><td>${r.l}</td>${ot ? `<td>${r.otw}</td><td>${r.otl}</td>` : ''}<td>${r.gf}</td><td>${r.ga}</td><td>${r.gd > 0 ? '+' : ''}${r.gd}</td><td><b>${r.pts}</b></td></tr>`).join('')}</tbody></table></div>`;
+          ${tb.rows.map((r) => `<tr><td><span class="pc"><span class="i">${r.pos}</span>${team(r.id, 22, true)}</span></td><td>${r.gp}</td><td>${r.w}</td><td>${r.l}</td>${ot ? `<td>${r.otw}</td><td>${r.otl}</td>` : ''}<td>${r.gf}</td><td>${r.ga}</td><td>${r.gd > 0 ? '+' : ''}${r.gd}</td><td><b>${r.pts}</b></td></tr>`).join('')}</tbody></table></div>`;
       }).join('') : `<div class="empty">${esc(t('Sin clasificación todavía.'))}</div>`;
     } else if (EU.tab === 'res' || EU.tab === 'prox') {
       const list = EU.tab === 'res' ? E.results : E.upcoming;
@@ -1574,7 +1577,7 @@ async function viewEusl(tok) {
       }).join('') : `<div class="empty"><strong>${esc(EU.tab === 'res' ? t('Sin resultados todavía.') : t('No hay partidos programados.'))}</strong>${EU.tab === 'prox' ? esc(t('Cuando la liga publique el calendario, aparecerá aquí.')) : ''}</div>`;
     } else {
       const block = (title, rows) => rows.length ? `<div class="sgrp-h eu-sh">${esc(title)}</div><div class="tscroll"><table class="tbl eu-tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Equipo'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">G</th><th title="${esc(t('Asistencias'))}">A</th><th title="${esc(t('Goles más asistencias'))}">G+A</th><th title="${esc(t('Paradas'))}">${esc(t('PAR'))}</th></tr></thead><tbody>
-        ${rows.map((x, i) => `<tr><td><span class="pc"><span class="i">${i + 1}</span>${x.sid ? `<a href="#j-${esc(x.sid)}">${esc(x.n)}</a>` : esc(x.n)}</span></td><td>${team(x.team, 18)}</td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${x.sv}</td></tr>`).join('')}</tbody></table></div>` : '';
+        ${rows.map((x, i) => `<tr><td><span class="pc"><span class="i">${i + 1}</span>${x.sid ? `<a href="#j-${esc(x.sid)}">${esc(x.n)}</a>` : esc(x.n)}</span></td><td>${team(x.team, 18, true)}</td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${x.sv}</td></tr>`).join('')}</tbody></table></div>` : '';
       el.innerHTML = (block('Pro', E.scorers.pro || []) + block('Challenger', E.scorers.challenger || [])) || `<div class="empty">${esc(t('Sin estadísticas todavía.'))}</div>`;
       el.insertAdjacentHTML('beforeend', `<p class="muted hnote">${esc(t('Los nombres enlazados llevan a su perfil de SlapScore.'))}</p>`);
     }
