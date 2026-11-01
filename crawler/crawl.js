@@ -202,7 +202,8 @@ function interval(id, p) {
 }
 function historyScore(id, p) {
   if (p.gone && Date.now() - (p.chk || 0) < 30 * D) return -1;
-  if (!p.chk) return 1e12 + (p.mmr || 0) * 1e3 + (p.hits || 0);
+  // nunca revisados: cuentan como si llevaran un rato pendientes (más si jugaron hace poco), sin tapar a los que juegan ahora
+  if (!p.chk) { const age = Date.now() - (p.seen || p.found || 0); return (age < D ? 3 : 1.5) * 1e6 + Math.min(p.hits || 0, 50) * 1e4 + (p.mmr || 0); }
   const over = (Date.now() - known(p)) / interval(id, p);
   if (over < 1) return -1;
   return over * 1e6 + (p.mmr || 0);
