@@ -855,6 +855,7 @@ async function viewMatch(r, tok) {
   m.key = r.key; m.archived = !raw; m.dayArchived = !!meta.x;
   if (m.archived && MTAB === 'json') MTAB = 'resumen';
   S.curMatch = m;
+  document.title = `${HOME()} ${m.score.home}-${m.score.away} ${AWAY()} · ${typeLabel(m.type)} · SlapScore`;
   const lose = (tm) => m.winner && m.winner !== tm ? 'lose' : '';
   const hidden = S.hidden.has(m.id);
   MAIN.innerHTML = `
@@ -1115,6 +1116,7 @@ async function viewPlayer(pid, tok) {
   }
   if (!live(tok)) return;
   PV.hist = 'all'; PV.histN = 15;
+  document.title = `${P.n} · SlapScore`;
   const games = P._g.filter((g) => !S.hidden.has(g.i));
   const meta = P.meta || {}, a = P._a;
   // atributos: percentil frente al resto de jugadores con 5 partidos o más
@@ -1436,11 +1438,19 @@ function drawRankings(R) {
 // =====================================================================
 // RÉCORDS
 // =====================================================================
+const REC = { win: 'a' };
 async function viewRecords(tok) {
   MAIN.innerHTML = `${rkTabs('records')}<h1 class="h1 in">${esc(t('Récords'))}</h1><p class="lead">${esc(t('Las mejores marcas desde que SlapScore guarda partidos. Sin contar las partidas personalizadas, que pueden ser de modos especiales.'))}</p>
+    <div class="toolbar" style="margin-bottom:16px"><div class="seg" role="group" aria-label="${esc(t('Periodo'))}">${[['a', 'Siempre'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-rw="${k}" aria-pressed="${REC.win === k}">${esc(t(l))}</button>`).join('')}</div></div>
     <div class="rk-grid" id="rec">${Array.from({ length: 6 }, () => skeletonList(5)).join('')}</div>`;
   let R; try { R = await loadRecords(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#rec').innerHTML = `<div class="card empty">${esc(t('Los récords aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
   if (!live(tok)) return;
+  $$('[data-rw]', MAIN).forEach((b) => b.addEventListener('click', () => { REC.win = b.getAttribute('data-rw'); $$('[data-rw]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawRecords(R); }));
+  drawRecords(R);
+}
+function drawRecords(R0) {
+  const el = $('#rec'); if (!el) return;
+  const R = REC.win === 'k' && R0.week ? { ...R0.week, hot: R0.hot } : R0;
   const when = (x) => `${shortDate(x.t || Date.parse(x.d + 'T12:00:00Z'))}`;
   const mrow = (x, i, val, sub) => `<a class="lrow" href="${x.i ? matchHref(x.k, x.i) : '#j-' + esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${pname([x.id, x.n])}</span>${rank(x.rk, 20, { approx: x.ap })}</span><span class="sub">${esc(sub)}</span></span>${val}</a>`;
   const card = (title, note, list, fn) => list && list.length ? `<div class="card in"><div class="card-h"><h3>${esc(t(title))}</h3>${note ? `<small>${esc(t(note))}</small>` : ''}</div><div style="padding-bottom:8px">${list.map(fn).join('')}</div></div>` : '';
@@ -1455,7 +1465,7 @@ async function viewRecords(tok) {
     + card('Mejores rachas', 'victorias seguidas', R.streak, (x, i) => mrow(x, i, v(x.v), t('entre sus últimos partidos')))
     + card('Más partidos en un día', '', R.gpd, (x, i) => mrow(x, i, v(x.gp), dayLong(x.d)))
     + card('Partidos con más goles', 'goles en total', R.tot, (x, i) => `<a class="lrow" href="${matchHref(x.k, x.i)}"><span class="i">${i + 1}</span><span class="region">${esc(regionShort(x.r))}</span><span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${x.s[0]}-${x.s[1]} · ${esc(typeLabel(x.y))}</span><span class="sub">${esc(when(x))} · ${esc(x.a || '')}</span></span>${v(x.s[0] + x.s[1])}</a>`);
-  $('#rec').innerHTML = html || `<div class="card empty">${esc(t('Todavía no hay récords.'))}</div>`;
+  el.innerHTML = html || `<div class="card empty">${esc(t('Todavía no hay récords.'))}</div>`;
 }
 
 // =====================================================================

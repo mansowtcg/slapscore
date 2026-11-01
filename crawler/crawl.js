@@ -722,7 +722,15 @@ const records = {
     .map(([id, [v, t]]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', v, t })),
   streak: Object.entries(S.streak).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id, v]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', v })),
 };
-for (const x of records.gpd) x.n = displayName(x.id);
+// las mismas marcas, solo de los últimos 7 días
+const wk = (list) => list.filter((x) => x.d >= K7);
+records.week = {
+  rt: topN(wk(R.rt), (x) => x.rt, 15), g: topN(wk(R.g), (x) => x.v), as: topN(wk(R.as), (x) => x.v), sv: topN(wk(R.sv), (x) => x.v), pts: topN(wk(R.pts), (x) => x.v),
+  tot: topN(wk(R.tot), (x) => x.s[0] + x.s[1]), gpd: wk(R.gpd).sort((a, b) => b.gp - a.gp).slice(0, 10),
+};
+for (const x of records.gpd.concat(records.week.gpd)) x.n = displayName(x.id);
+// nombres y rangos al día (los guardados en cada día pueden ser antiguos)
+for (const list of [records.rt, records.g, records.as, records.sv, records.pts, ...Object.values(records.week)]) for (const x of list) if (x.id && players[x.id]) { x.n = displayName(x.id); if (!x.rk && players[x.id].rk) { x.rk = players[x.id].rk; x.ap = 1; } }
 verOf.records = (await out.json(path.join(DATA, 'records.json'), records)).v;
 S.lastHeavy = NOW;
 }
