@@ -867,3 +867,7 @@ html.vt-same .days{view-transition-name:daybar}
 .act-n{font-size:12.5px;margin:6px 16px 14px}
 .st-types{padding:0 16px 10px;gap:6px}
 .st-types .chip{height:28px;padding:0 11px;font-size:12.5px}
+.ar-r{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) 40px auto;align-items:center;gap:10px;font-size:13px;font-weight:700}
+.ar-r .nm{display:flex;flex-direction:column;min-width:0}.ar-r .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ar-r .nm small{font-weight:500;color:var(--muted);font-size:11px}
+.ar-r .bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}.ar-r .bar i{display:block;height:100%;border-radius:4px;background:var(--win);transform-origin:left;animation:grow .7s var(--ease) both}
+.ar-r .v{text-align:right;font-family:var(--font-num);font-size:14px}

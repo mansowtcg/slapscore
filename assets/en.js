@@ -151,6 +151,7 @@ export default {
   'Juega en la EUSL': 'Plays in the EUSL',
   'Actualizado {x} · se actualiza solo': 'Updated {x} · refreshes automatically',
   'Datos actualizados · 1 partido nuevo': 'Data updated · 1 new match',
+  'Rivales habituales': 'Frequent opponents', 'victorias contra ellos': 'wins against them', '{n} en contra': '{n} against', 'Por arena': 'By arena', '% de victorias y nota media': 'win rate and avg rating',
   'Reparto de rangos': 'Rank distribution', '{n} jugadores con rango': '{n} ranked players',
   'Actividad': 'Activity', 'hora de Madrid': 'Madrid time', 'Partidos por hora': 'Matches per hour', 'Hora punta: {h}:00 · {n}': 'Peak hour: {h}:00 · {n}',
   'Toda su carrera': 'Whole career', '{n} de sus últimos partidos guardados': '{n} of their latest saved matches', 'Mejores partidos': 'Best matches', 'por nota': 'by rating',

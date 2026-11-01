@@ -1202,12 +1202,14 @@ async function viewPlayer(pid, tok) {
         <div class="card in"><div class="card-h"><h3>${esc(t('Notas por partido'))}</h3><small>${esc(t('la línea es su media'))}</small></div><div class="chart">${ratingChart(games.slice(0, 30).reverse(), avgR)}</div></div>
         ${meta.rh && meta.rh.length > 1 ? `<div class="card in"><div class="card-h"><h3>${esc(t('Evolución del MMR'))}</h3><small>${esc(pl(meta.rh.length, 'registro', 'registros'))}</small></div><div class="chart">${mmrChart(meta.rh)}</div>${rankMoves(meta.rh)}</div>` : ''}
         ${attr ? `<div class="card in"><div class="card-h"><h3>${esc(t('Atributos'))}</h3><small>${esc(t('frente a {n} jugadores', { n: int(AT.n) }))}</small></div>${radar(attr)}</div>` : ''}
+        ${arenaCard(games)}
       </div>
       <div class="col">
         <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><div class="seg" role="group" aria-label="${esc(t('Modo'))}"><button type="button" data-sm="pg" aria-pressed="${PV.statMode === 'pg'}">${esc(t('Por partido'))}</button><button type="button" data-sm="tot" aria-pressed="${PV.statMode === 'tot'}">${esc(t('Totales'))}</button></div></div>
           ${types.length > 1 ? `<div class="chips st-types" role="group" aria-label="${esc(t('Tipo de partida'))}"><button type="button" class="chip" data-sty="" aria-pressed="${!PV.type}">${esc(t('Toda su carrera'))}</button>${types.map(([y, n]) => `<button type="button" class="chip" data-sty="${esc(y)}" aria-pressed="${PV.type === y}">${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}</div>` : ''}<div id="pstats"></div></div>
         ${bestGamesCard(P, games)}
         ${matesCard(P, games)}
+        ${rivalsCard(P, games)}
         <div class="card in"><div class="card-h"><h3>${esc(t('Partidos'))}</h3><div class="seg" role="group" aria-label="${esc(t('Filtrar'))}">${[['all', 'Todos'], ['W', 'Victorias'], ['L', 'Derrotas']].map(([k, l]) => `<button type="button" data-hf="${k}" aria-pressed="${PV.hist === k}">${esc(t(l))}</button>`).join('')}</div></div><div id="phist"></div></div>
       </div>
     </div>`;
@@ -1303,6 +1305,24 @@ function matesCard(P, games) {
     const n = (P.names && P.names[r.id]) || r.id;
     return `<a class="lrow" href="#j-${esc(r.id)}"><span class="i">${i + 1}</span>${avatar(n, r.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(n)}</span><span class="sub">${esc(t('{n} juntos', { n: pl(r.n, 'partido', 'partidos') }))}</span></span><span class="v">${pct(r.w / r.n)}</span></a>`;
   }).join('')}</div></div>`;
+}
+// Rivales con los que más se ha cruzado: su % de victorias contra ellos y enlace al cara a cara
+function rivalsCard(P, games) {
+  const list = mates(P, games, 'op').filter((r) => r.n >= 2).slice(0, 5);
+  if (list.length < 2) return '';
+  return `<div class="card in"><div class="card-h"><h3>${esc(t('Rivales habituales'))}</h3><small>${esc(t('victorias contra ellos'))}</small></div><div style="padding-bottom:8px">${list.map((r, i) => {
+    const n = (P.names && P.names[r.id]) || r.id;
+    return `<a class="lrow" href="#cmp-${esc(P.id)}-${esc(r.id)}" title="${esc(t('Comparar'))}"><span class="i">${i + 1}</span>${avatar(n, r.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(n)}</span><span class="sub">${esc(t('{n} en contra', { n: pl(r.n, 'partido', 'partidos') }))}</span></span><span class="v">${pct(r.w / r.n)}</span></a>`;
+  }).join('')}</div></div>`;
+}
+// Cómo le va en cada arena (solo si ha jugado en varias)
+function arenaCard(games) {
+  const m = new Map();
+  for (const g of games) { if (!g.ar) continue; const x = m.get(g.ar) || { n: 0, w: 0, rs: 0 }; x.n++; if (g.r === 'W') x.w++; x.rs += g.rt; m.set(g.ar, x); }
+  const list = [...m.entries()].filter(([, x]) => x.n >= 3).sort((a, b) => b[1].n - a[1].n).slice(0, 6);
+  if (list.length < 2) return '';
+  return `<div class="card in"><div class="card-h"><h3>${esc(t('Por arena'))}</h3><small>${esc(t('% de victorias y nota media'))}</small></div><div class="dist-b">${list.map(([ar, x]) =>
+    `<div class="ar-r" title="${esc(ar)}: ${esc(pl(x.n, 'partido', 'partidos'))} · ${x.w}-${x.n - x.w}"><span class="nm"><span>${esc(ar)}</span><small>${esc(pl(x.n, 'partido', 'partidos'))}</small></span><span class="bar"><i style="width:${Math.round(x.w / x.n * 100)}%"></i></span><span class="v">${pct(x.w / x.n)}</span>${badge(x.rs / x.n)}</div>`).join('')}</div></div>`;
 }
 function drawHist(P, games) {
   const el = $('#phist'); if (!el) return;
