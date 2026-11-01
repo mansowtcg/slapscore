@@ -694,8 +694,18 @@ function drawLeft(st) {
       <button type="button" data-f="${key}" data-v="" aria-pressed="${!MF[key]}">${esc(t('Todas'))} <span class="n">${int(c.reduce((a, x) => a + x[1], 0))}</span></button>
       ${c.map(([v, n]) => `<button type="button" data-f="${key}" data-v="${esc(v)}" aria-pressed="${MF[key] === v}">${fmt(v)} <span class="n">${int(n)}</span></button>`).join('')}</div></div>`;
   };
-  el.innerHTML = block(t('Regiones'), 1, 'region', (v) => `<span class="region">${esc(regionShort(v))}</span>${esc(regionLabel(v))}`) + block(t('Arenas'), 2, 'arena', (v) => esc(v || t('Sin arena')));
+  el.innerHTML = block(t('Regiones'), 1, 'region', (v) => `<span class="region">${esc(regionShort(v))}</span>${esc(regionLabel(v))}`) + block(t('Arenas'), 2, 'arena', (v) => esc(v || t('Sin arena'))) + activityCard(st);
   $$('[data-f]', el).forEach((b) => b.addEventListener('click', () => { MF[b.getAttribute('data-f')] = b.getAttribute('data-v'); MF.limit = 120; drawLeft(st); drawSelects(st); refreshList(st); }));
+}
+// Partidos por hora del día (hora de Madrid), de los trozos por hora del resumen del día
+function activityCard(st) {
+  const ch = (st.meta.chunks || []).filter((c) => /^\d\d$/.test(c.c)); if (!ch.length) return '';
+  const per = new Array(24).fill(0); for (const c of ch) per[Number(c.c)] += c.n;
+  const max = Math.max(1, ...per), peak = per.indexOf(Math.max(...per)), nowH = st.day === today() ? Number(C.madrid(Date.now()).hour) : -1;
+  return `<div class="card in act"><div class="card-h"><h3>${esc(t('Actividad'))}</h3><small>${esc(t('hora de Madrid'))}</small></div>
+    <div class="act-b" role="img" aria-label="${esc(t('Partidos por hora'))}">${per.map((n, h) => `<span class="${h === peak ? 'pk' : ''}${h === nowH ? ' now' : ''}" style="height:${Math.max(n ? 6 : 2, Math.round(n / max * 100))}%" title="${String(h).padStart(2, '0')}:00 · ${esc(pl(n, 'partido', 'partidos'))}"></span>`).join('')}</div>
+    <div class="act-x"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+    <p class="muted act-n">${esc(t('Hora punta: {h}:00 · {n}', { h: String(peak).padStart(2, '0'), n: pl(per[peak], 'partido', 'partidos') }))}</p></div>`;
 }
 function drawList(st) {
   const el = $('#m-list'); if (!el) return;

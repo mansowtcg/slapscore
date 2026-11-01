@@ -845,7 +845,7 @@ html.vt-same .days{view-transition-name:daybar}
 .mv .tx small{color:var(--muted);font-size:12px}
 
 /* accesibilidad: enlaces dentro de texto subrayados; títulos solo para lectores de pantalla */
-.foot a,.lead a,.card-b p a,.empty p a{text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+.foot a,p.lead a,.card-b p a,.empty p a{text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* reparto de rangos */
 .dist-b{padding:0 16px 14px;display:flex;flex-direction:column;gap:6px}
@@ -853,3 +853,10 @@ html.vt-same .days{view-transition-name:daybar}
 .dist-r .bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}
 .dist-r .bar i{display:block;height:100%;border-radius:4px;background:var(--primary);transform-origin:left;animation:grow .7s var(--ease) both}
 .dist-r .v{text-align:right;font-family:var(--font-num);font-size:14px}
+/* actividad por horas */
+.act-b{display:flex;align-items:flex-end;gap:2px;height:84px;padding:0 16px}
+.act-b span{flex:1;border-radius:3px 3px 1px 1px;background:color-mix(in srgb,var(--primary) 35%,var(--surface-3));transform-origin:bottom;animation:rise .5s var(--ease) both}
+.act-b span.pk{background:var(--primary)}
+.act-b span.now{outline:2px solid var(--r-meh);outline-offset:1px}
+.act-x{display:flex;justify-content:space-between;padding:4px 16px 0;font-size:10.5px;font-weight:700;color:var(--faint)}
+.act-n{font-size:12.5px;margin:6px 16px 14px}

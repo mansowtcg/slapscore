@@ -148,6 +148,7 @@ export default {
   'Ascenso a {r}': 'Promoted to {r}', 'Descenso a {r}': 'Dropped to {r}',
   'Menú inferior': 'Bottom menu', 'Filtros': 'Filters',
   'Reparto de rangos': 'Rank distribution', '{n} jugadores con rango': '{n} ranked players',
+  'Actividad': 'Activity', 'hora de Madrid': 'Madrid time', 'Partidos por hora': 'Matches per hour', 'Hora punta: {h}:00 · {n}': 'Peak hour: {h}:00 · {n}',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',
