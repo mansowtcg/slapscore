@@ -13,6 +13,16 @@ Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://m
 - **Rangos**: mientras haya jugadores de los últimos 60 días sin rango consultado, el 70 % del resto de peticiones son de rango. Al conocer el rango de un jugador se pone también en sus partidos de las dos últimas semanas (atenuado si el partido es anterior a la primera consulta).
 - Las tablas, rankings, récords y el resto de perfiles se recalculan cada 20 minutos.
 
+## Qué hay en la web
+
+- **Partidos** por día (tira de días y calendario), filtros por tipo, región, arena, jugador, **destacados** y **favoritos**; estadísticas de todos los jugadores desplegables en cada fila; actualización automática de la lista de hoy.
+- **Portada**: jugando ahora (destacados que acaban de jugar), favoritos, líderes del día, partido destacado, mejores actuaciones, equipo de la semana, top MMR, más activos y actividad por horas.
+- **Partido**: resumen, alineaciones, estadísticas, JSON original e **imagen para compartir** (1080×1350).
+- **Jugador**: rango actual y mejor rango con logos oficiales, racha, forma, forma semanal, notas, MMR con ascensos y descensos, atributos, estadísticas (de toda la carrera o por tipo de partida), mejores partidos, compañeros, historial, comparar e imagen para compartir.
+- **Comparar jugadores**, **tabla de jugadores** (periodo, mínimo de partidos, rango, favoritos), **rankings** (con reparto de rangos), **récords** (siempre o 7 días), **EUSL** (eusl.gg) y **cómo puntuamos**.
+- **Favoritos** guardados en el navegador de cada uno; buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
+- Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
+
 ## Datos (rama `data`)
 
 La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivos grandes van comprimidos con gzip (`.json.gz`) y el navegador los descomprime solo.
@@ -22,7 +32,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `days/AAAA-MM-DD/HH.json.gz`: resúmenes de los partidos de esa hora (en días archivados, bloques de varias horas).
 - `full/AAAA-MM-DD/HH.json.gz`: partidos tal cual los da slapshot.gg, solo de los últimos 60 días.
 - `p/<grupo>.json.gz`: perfiles de jugadores agrupados en 4096 archivos (últimos 400 partidos de cada uno).
-- `search.json.gz`, `players-{a,m,k}.json.gz`, `rankings.json`, `top.json`, `attr.json`: buscador, tabla de jugadores (siempre, 30 días, 7 días), rankings, portada y atributos.
+- `search.json.gz`, `players-{a,m,k}.json.gz`, `rankings.json`, `top.json`, `attr.json`, `records.json`, `eusl.json`: buscador, tabla de jugadores (siempre, 30 días, 7 días), rankings, portada (con equipo de la semana), atributos, récords y liga EUSL. `index.json` lleva además los destacados (`featured`) y los que acaban de jugar (`live`).
 - `_int/` (no se publica): estado del robot, totales de cada jugador por día y por mes, y partidos pendientes de archivar.
 
 ### Archivo y estadísticas de carrera
@@ -67,7 +77,11 @@ La web sale en inglés por defecto; el botón ES/EN de la cabecera (o el enlace 
 ## Código
 
 - `assets/core.js`: nota de los jugadores, normalización de partidos, rangos y formato de datos (lo comparten la web y el robot).
-- `assets/app.js`, `assets/style.css`, `assets/emblems.js`: la web. Los emblemas de rango son un diseño propio de SlapScore.
+- `assets/app.js`, `assets/style.css`, `assets/emblems.js`: la web (los emblemas propios solo se usan si falta algún logo oficial).
+- `assets/i18n.js`, `assets/en.js`: idioma (inglés por defecto).
+- `assets/share.js`: imágenes para compartir (se carga solo al usarlas).
+- `crawler/eusl.js`: datos de la liga EUSL (API pública de eusl.gg).
+- `tools/cut-ranks.py`: recorta los logos de rango de la captura oficial.
 - `assets/admin.js`: panel de administrador.
 - `assets/vendor/gunzip.js`: descompresor para navegadores antiguos ([fflate](https://github.com/101arrowz/fflate), MIT).
 - `crawler/`: el robot.
