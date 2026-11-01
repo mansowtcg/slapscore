@@ -300,9 +300,15 @@ function srow(r, on, pick) {
   }
   async function draw() {
     const raw = inp.value.trim(), q = fold(raw);
-    if (!q) { box.hidden = true; return; }
+    if (!q && !FAVS.size) { box.hidden = true; return; }
     let I; try { I = await getIdx(); } catch { box.innerHTML = `<div class="none">${esc(t('No se pudo cargar la lista de jugadores.'))}</div>`; box.hidden = false; return; }
     if (fold(inp.value.trim()) !== q) return;
+    if (!q) {   // campo vacío: atajo a los favoritos
+      list = [...FAVS.keys()].map((id) => byId.get(id)).filter(Boolean).slice(0, 8);
+      if (!list.length) { box.hidden = true; return; }
+      box.innerHTML = `<div class="sres-h">${ICON.star}${esc(t('Tus favoritos'))}</div>` + list.map((r, i) => srow(r, i === sel)).join('');
+      box.hidden = false; return;
+    }
     const idq = parseIdQuery(raw);
     if (idq && idq.mid) {
       list = [];
@@ -326,7 +332,9 @@ function srow(r, on, pick) {
   }
   const hrefOf = (it) => it.href || '#j-' + (it.id || it[0]);
   const close = () => { box.hidden = true; inp.value = ''; sel = -1; inp.blur(); };
-  inp.addEventListener('focus', () => { getIdx().catch(() => {}); });
+  inp.addEventListener('focus', () => { getIdx().catch(() => {}); if (!inp.value.trim() && FAVS.size) draw(); });
+  // «/» lleva al buscador desde cualquier parte
+  document.addEventListener('keydown', (e) => { if (e.key === '/' && !e.ctrlKey && !e.metaKey && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) { e.preventDefault(); inp.focus(); } });
   let ti; inp.addEventListener('input', () => { sel = -1; clearTimeout(ti); ti = setTimeout(draw, 60); });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { sel = Math.min(list.length - 1, sel + 1); draw(); e.preventDefault(); }
@@ -1148,7 +1156,7 @@ async function viewPlayer(pid, tok) {
         <div class="card in"><div class="card-h"><h3>${esc(t('Forma'))}</h3><small>${esc(t('últimos {n} partidos', { n: last10.length }))}</small></div><div class="form">${last10.map((g) => `<a href="${matchHref(g.k, g.i)}" title="${esc(shortDate(g.t) + ' · ' + g.gf + '-' + g.ga)}">${badge(g.rt)}<span class="res ${g.r}">${resLetter(g.r)}</span></a>`).join('')}</div></div>
         ${weekCard(games)}
         <div class="card in"><div class="card-h"><h3>${esc(t('Notas por partido'))}</h3><small>${esc(t('la línea es su media'))}</small></div><div class="chart">${ratingChart(games.slice(0, 30).reverse(), avgR)}</div></div>
-        ${meta.rh && meta.rh.length > 1 ? `<div class="card in"><div class="card-h"><h3>${esc(t('Evolución del MMR'))}</h3><small>${esc(pl(meta.rh.length, 'registro', 'registros'))}</small></div><div class="chart">${mmrChart(meta.rh)}</div></div>` : ''}
+        ${meta.rh && meta.rh.length > 1 ? `<div class="card in"><div class="card-h"><h3>${esc(t('Evolución del MMR'))}</h3><small>${esc(pl(meta.rh.length, 'registro', 'registros'))}</small></div><div class="chart">${mmrChart(meta.rh)}</div>${rankMoves(meta.rh)}</div>` : ''}
         ${attr ? `<div class="card in"><div class="card-h"><h3>${esc(t('Atributos'))}</h3><small>${esc(t('frente a {n} jugadores', { n: int(AT.n) }))}</small></div>${radar(attr)}</div>` : ''}
       </div>
       <div class="col">
@@ -1240,6 +1248,16 @@ function ratingChart(gs, avgR) {
   const bars = gs.map((x, i) => { const cx = L + slot * i + slot / 2, top = y(x.rt); return `<rect class="bar f-${rcls(x.rt)}" style="animation-delay:${i * 18}ms" x="${(cx - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${(y(lo) - top).toFixed(1)}" rx="3"><title>${esc(shortDate(x.t))} · ${fmtR(x.rt)}</title></rect>`; }).join('');
   const last = gs[n - 1], lx = L + slot * (n - 1) + slot / 2;
   return `<svg viewBox="0 0 ${Wd} ${H}" role="img" aria-label="${esc(t('Notas de los últimos {n} partidos', { n }))}">${g}${bars}<line class="avgl" x1="${L}" x2="${Wd - R}" y1="${y(avgR).toFixed(1)}" y2="${y(avgR).toFixed(1)}"/><text x="${lx.toFixed(1)}" y="${(y(last.rt) - 5).toFixed(1)}" text-anchor="middle" style="fill:var(--fg);font-weight:800">${fmtR(last.rt)}</text></svg>`;
+}
+// Cambios de rango (ascensos y descensos) a partir del historial [[t, mmr, rango], ...]
+function rankMoves(rh) {
+  const moves = [];
+  for (let i = 1; i < rh.length; i++) {
+    const a = C.parseRank(rh[i - 1][2]), b = C.parseRank(rh[i][2]);
+    if (a && b && a.key !== b.key) moves.push({ t: rh[i][0], from: a, to: b, up: b.order > a.order, mmr: rh[i][1] });
+  }
+  if (!moves.length) return '';
+  return `<div class="moves">${moves.slice(-4).reverse().map((x) => `<div class="mv ${x.up ? 'up' : 'down'}">${rank(x.from.key, 22)}<span class="ar">${x.up ? '▲' : '▼'}</span>${rank(x.to.key, 26)}<span class="tx"><b>${esc(x.up ? t('Ascenso a {r}', { r: x.to.name }) : t('Descenso a {r}', { r: x.to.name }))}</b><small>${esc(ago(x.t))} · ${int(x.mmr)} MMR</small></span></div>`).join('')}</div>`;
 }
 function mmrChart(rh) {
   const pts = rh.slice(-40), Wd = 600, H = 170, L = 40, R = 12, T = 14, B = 22;
