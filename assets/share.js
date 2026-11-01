@@ -1,8 +1,8 @@
 // Imágenes para compartir (partido o perfil), dibujadas en un canvas de 1080×1350.
 // Se carga solo cuando alguien pulsa «Compartir imagen».
 const W = 1080, H = 1350;
-const COL = { bg: '#0F1320', bg2: '#171C2E', line: 'rgba(255,255,255,.08)', fg: '#FFFFFF', muted: '#9AA3B8', primary: '#374DF5', home: '#1E88E5', away: '#F2761B', win: '#1DA93C', loss: '#D7261B' };
-const RT = [[9, '#374DF5', '#fff'], [8, '#00A3BB', '#fff'], [7, '#1DA93C', '#fff'], [6.5, '#D3A600', '#251D00'], [6, '#EA7A09', '#fff'], [-1, '#D7261B', '#fff']];
+const COL = { bg: '#0F1320', bg2: '#171C2E', line: 'rgba(255,255,255,.08)', fg: '#FFFFFF', muted: '#9AA3B8', primary: '#374DF5', home: '#1E88E5', away: '#F2761B', win: '#189335', loss: '#D7261B' };
+const RT = [[9, '#374DF5', '#fff'], [8, '#008EA3', '#fff'], [7, '#189335', '#fff'], [6.5, '#D3A600', '#251D00'], [6, '#D86A00', '#fff'], [-1, '#D7261B', '#fff']];
 const rtCol = (r) => RT.find(([m]) => r >= m) || RT[RT.length - 1];
 const F = (w, s, cond) => `${w} ${s}px ${cond ? '"Sofia Sans Condensed", ' : ''}"Sofia Sans", system-ui, sans-serif`;
 

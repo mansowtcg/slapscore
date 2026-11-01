@@ -212,7 +212,7 @@ APP.innerHTML = `
 <div class="wrap newbar" id="newbar" hidden><button type="button" id="btn-new">${esc(t('Hay partidos nuevos · Actualizar'))}</button></div>
 <main class="wrap" id="main" tabindex="-1"></main>
 <footer class="wrap foot" id="foot"></footer>
-<nav class="bnav" aria-label="${esc(t('Secciones'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#notas" data-nav="notas">${ICON.info}${esc(t('Info'))}</a></nav>
+<nav class="bnav" aria-label="${esc(t('Menú inferior'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#notas" data-nav="notas">${ICON.info}${esc(t('Info'))}</a></nav>
 <div id="itip"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
@@ -602,7 +602,8 @@ async function viewMatches(dayArg, tok) {
   const day = pickDay(dayArg);
   const idx = days.findIndex((d) => d.d === day);
   MAIN.innerHTML = `<div class="layout">
-    <aside class="col col-left" id="m-left">${skeletonList(4)}</aside>
+    <h1 class="sr-only">${esc(t('Partidos'))} · ${esc(dayLong(day))}</h1>
+    <aside class="col col-left" id="m-left" aria-label="${esc(t('Filtros'))}">${skeletonList(4)}</aside>
     <section class="col" aria-label="${esc(t('Partidos'))}">
       <div class="card">
         ${dayBar(day)}
@@ -613,7 +614,7 @@ async function viewMatches(dayArg, tok) {
       <div id="m-lead" class="only-mobile"></div>
       <div id="m-list" class="col">${skeletonList(8)}</div>
     </section>
-    <aside class="col" id="m-right">${skeletonList(5)}</aside>
+    <aside class="col" id="m-right" aria-label="${esc(t('Destacados'))}">${skeletonList(5)}</aside>
   </div>`;
   wireDayBar(day);
   let meta, top;
@@ -1303,7 +1304,7 @@ async function viewCompare(r, tok) {
     (id) => { location.hash = side === 'b' ? `cmp-${A.id}-${id}` : `cmp-${id}-${B.id}`; });
   const head = (P, side) => {
     const m = P.meta || {}, a = P._a;
-    return `<div class="cmp-p ${side}"><a href="#j-${esc(P.id)}">${avatar(P.n, P.id, 'lg')}</a><a class="nm" href="#j-${esc(P.id)}"><span>${esc(P.n)}</span>${rank(m.rk, 24)}</a>
+    return `<div class="cmp-p ${side}"><a href="#j-${esc(P.id)}" aria-label="${esc(P.n)}">${avatar(P.n, P.id, 'lg')}</a><a class="nm" href="#j-${esc(P.id)}"><span>${esc(P.n)}</span>${rank(m.rk, 24)}</a>
       <span class="sub">${m.rk ? `${esc(m.rank || C.parseRank(m.rk)?.name || '')} · ${int(m.mmr)} MMR` : esc(t('Sin rango'))}</span>${badge(a.gp ? a.rs / a.gp : 0, 'lg')}
       <button class="btn sm" type="button" data-chg="${side}">${esc(t('Cambiar'))}</button></div>`;
   };
@@ -1337,6 +1338,7 @@ async function viewCompare(r, tok) {
   const rk = (ma.mmr != null || mb.mmr != null) ? [['MMR', ma.mmr || 0, mb.mmr || 0, int], ['MMR máximo', ma.peak || 0, mb.peak || 0, int]] : [];
   const atA = attrOf(a, AT), atB = attrOf(b, AT);
   MAIN.innerHTML = `<nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(t('Comparar'))}</span></nav>
+    <h1 class="sr-only">${esc(A.n)} vs ${esc(B.n)}</h1>
     <div class="card in cmp-head">${head(A, 'h')}<div class="cmp-vs">VS<button class="ibtn" type="button" id="cmp-swap" title="${esc(t('Intercambiar'))}" aria-label="${esc(t('Intercambiar'))}">${ICON.vs}</button></div>${head(B, 'a')}</div>
     <div style="height:16px"></div>
     <div class="layout two">
