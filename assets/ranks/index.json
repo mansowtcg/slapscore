@@ -1,1 +1,32 @@
-{}
+{
+  "BRONZE_I": "BRONZE_I.png",
+  "BRONZE_II": "BRONZE_II.png",
+  "BRONZE_III": "BRONZE_III.png",
+  "SILVER_I": "SILVER_I.png",
+  "SILVER_II": "SILVER_II.png",
+  "SILVER_III": "SILVER_III.png",
+  "GOLD_I": "GOLD_I.png",
+  "GOLD_II": "GOLD_II.png",
+  "GOLD_III": "GOLD_III.png",
+  "PLAT_I": "PLAT_I.png",
+  "PLAT_II": "PLAT_II.png",
+  "PLAT_III": "PLAT_III.png",
+  "DIAMOND": "DIAMOND.png",
+  "LEGEND": "LEGEND.png",
+  "_small": {
+    "BRONZE_I": "BRONZE_I-64.png",
+    "BRONZE_II": "BRONZE_II-64.png",
+    "BRONZE_III": "BRONZE_III-64.png",
+    "SILVER_I": "SILVER_I-64.png",
+    "SILVER_II": "SILVER_II-64.png",
+    "SILVER_III": "SILVER_III-64.png",
+    "GOLD_I": "GOLD_I-64.png",
+    "GOLD_II": "GOLD_II-64.png",
+    "GOLD_III": "GOLD_III-64.png",
+    "PLAT_I": "PLAT_I-64.png",
+    "PLAT_II": "PLAT_II-64.png",
+    "PLAT_III": "PLAT_III-64.png",
+    "DIAMOND": "DIAMOND-64.png",
+    "LEGEND": "LEGEND-64.png"
+  }
+}

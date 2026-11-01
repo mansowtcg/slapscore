@@ -32,6 +32,13 @@ async function cacheFirst(req, cacheName) {
   const hit = await c.match(req); if (hit) return hit;
   const r = await fetch(req); if (r.ok || r.type === 'opaque') { c.put(req, r.clone()); if (cacheName === DATA) trimData(); } return r;
 }
+async function staleWhileRevalidate(req, e) {
+  const c = await caches.open(SHELL);
+  const hit = await c.match(req);
+  const net = fetch(req).then((r) => { if (r.ok) c.put(req, r.clone()); return r; });
+  if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
+  return net;
+}
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -48,6 +55,8 @@ self.addEventListener('fetch', (e) => {
   if (path.includes('/data/')) { e.respondWith(cacheFirst(req, DATA)); return; }
   // Código y estilos marcados con la versión publicada (?b=...): tampoco cambian
   if (url.searchParams.has('b')) { e.respondWith(cacheFirst(req, SHELL)); return; }
-  // Todo lo demás (iconos, logos de rango...): red primero, copia para usar sin conexión
+  // Logos de rango: al momento desde la copia y se renuevan por detrás
+  if (path.includes('/assets/ranks/') && path.endsWith('.png')) { e.respondWith(staleWhileRevalidate(req, e)); return; }
+  // Todo lo demás (iconos...): red primero, copia para usar sin conexión
   e.respondWith(networkFirst(req, SHELL));
 });

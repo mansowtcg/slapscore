@@ -1,10 +1,10 @@
-// Idioma de la web: español o inglés. Los textos se escriben en español y se traducen con t().
+// Idioma de la web: inglés (por defecto) o español. Los textos se escriben en español y se traducen con t().
 // El diccionario inglés (en.js) solo se descarga si hace falta.
 const KEY = 'slapscore-lang';
 function detect() {
+  // inglés por defecto; el español, si el visitante lo elige (se recuerda en su navegador)
   try { const s = localStorage.getItem(KEY); if (s === 'es' || s === 'en') return s; } catch {}
-  const n = (navigator.languages && navigator.languages[0]) || navigator.language || 'es';
-  return /^es\b/i.test(n) ? 'es' : 'en';
+  return 'en';
 }
 export const LANG = detect();
 export const LOC = LANG === 'en' ? 'en-GB' : 'es-ES';

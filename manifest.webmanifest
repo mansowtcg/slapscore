@@ -1,8 +1,8 @@
 {
   "name": "SlapScore",
   "short_name": "SlapScore",
-  "description": "Resultados, estadísticas y notas de los partidos de Slapshot: Rebound.",
-  "lang": "es",
+  "description": "Slapshot: Rebound results, full stats and player ratings.",
+  "lang": "en",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -16,7 +16,7 @@
     { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Jugadores", "url": "./#jugadores", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Players", "url": "./#jugadores", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Rankings", "url": "./#rankings", "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

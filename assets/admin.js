@@ -448,8 +448,9 @@ async function drawRanks() {
     $$('[data-rm]', el).forEach((b) => b.addEventListener('click', async () => {
       const k = b.getAttribute('data-rm'); b.disabled = true;
       const next = { ...manifest }; const file = next[k]; delete next[k];
+      const small = next._small && next._small[k]; if (small) { next._small = { ...next._small }; delete next._small[k]; }
       try {
-        await commitFiles([{ path: `assets/ranks/${file}`, remove: true }, { path: 'assets/ranks/index.json', b64: btoa(JSON.stringify(next, null, 2) + '\n') }], `Quitar logo de rango ${k}`);
+        await commitFiles([{ path: `assets/ranks/${file}`, remove: true }, ...(small ? [{ path: `assets/ranks/${small}`, remove: true }] : []), { path: 'assets/ranks/index.json', b64: btoa(JSON.stringify(next, null, 2) + '\n') }], `Quitar logo de rango ${k}`);
         manifest = next; X.toast('Logo quitado. La web se actualiza en unos 2 minutos.'); startTracking({ since: Date.now() - 5000, minutes: 1, kind: 'push', label: 'Aplicando los cambios' }); draw();
       } catch (ex) { X.toast(ex.message); b.disabled = false; }
     }));
@@ -460,6 +461,8 @@ async function drawRanks() {
       for (const [k, f] of Object.entries(pending)) {
         const file = `${k}.${f.ext}`;
         if (next[k] && next[k] !== file) changes.push({ path: `assets/ranks/${next[k]}`, remove: true });
+        // la versión pequeña anterior ya no vale para el logo nuevo
+        if (next._small && next._small[k]) { changes.push({ path: `assets/ranks/${next._small[k]}`, remove: true }); next._small = { ...next._small }; delete next._small[k]; }
         changes.push({ path: `assets/ranks/${file}`, b64: f.b64 }); next[k] = file;
       }
       changes.push({ path: 'assets/ranks/index.json', b64: btoa(JSON.stringify(next, null, 2) + '\n') });

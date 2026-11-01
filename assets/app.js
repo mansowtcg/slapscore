@@ -747,7 +747,7 @@ function evRow(m, q) {
 const MINI = [['Nota', 3], ['G', 4, 'Goles'], ['A', 5, 'Asistencias'], ['TIR', 8, 'Tiros'], ['PAR', 9, 'Paradas'], ['PAS', 10, 'Pases'], ['ROB', 12, 'Robos'], ['BLQ', 13, 'Bloqueos'], ['PTS', 11, 'Puntos de juego']];
 function evBox(m) {
   const best = MINI.map(([, i]) => i === 3 ? null : Math.max(0, ...m.p.map((p) => typeof p[i] === 'number' ? p[i] : 0)));
-  const row = (p) => `<tr><td><a class="pc" href="#j-${esc(p[0])}">${rank(p[6], 16, { approx: p[7] })}<span class="nm">${pname(p)}</span></a></td>${MINI.map(([, i], k) => i === 3 ? `<td>${badge(p[3])}</td>`
+  const row = (p) => `<tr><td><a class="pc" href="#j-${esc(p[0])}">${rank(p[6], 20, { approx: p[7] })}<span class="nm">${pname(p)}</span></a></td>${MINI.map(([, i], k) => i === 3 ? `<td>${badge(p[3])}</td>`
     : `<td class="${typeof p[i] === 'number' && p[i] > 0 && p[i] === best[k] ? 'best' : ''}">${typeof p[i] === 'number' ? int(p[i]) : '–'}</td>`).join('')}</tr>`;
   return `<div class="tscroll"><table class="tbl evt"><thead><tr><th>${esc(t('Jugador'))}</th>${MINI.map(([l, , ti]) => `<th${ti ? ` title="${esc(t(ti))}"` : ''}>${esc(t(l))}</th>`).join('')}</tr></thead><tbody>
     ${[0, 1].map((tm) => `<tr class="tg"><td colspan="${MINI.length + 1}"><span class="pc">${crest(tm, 16)}${esc(teamName(tm))} · ${m.s[tm]}</span></td></tr>` + m.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map(row).join('')).join('')}
@@ -756,7 +756,7 @@ function evBox(m) {
 function leadersCard(meta, day, cls = '') {
   const L = (meta && meta.lead) || []; if (!L.length) return '';
   return `<div class="card in ${cls}"><div class="card-h"><h3>${esc(t('Líderes del día'))}</h3><small>${esc(dayLong(day))}</small></div><div class="tscroll"><table class="tbl lead"><thead><tr><th>${esc(t('Jugador'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">G</th><th title="${esc(t('Asistencias'))}">A</th><th title="${esc(t('Goles más asistencias'))}">G+A</th><th>${esc(t('Nota'))}</th></tr></thead><tbody>
-    ${L.map((x, i) => `<tr class="${i >= 5 ? 'xtra' : ''}"><td><a class="pc" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${rank(x.rk, 16)}<span class="nm">${pname([x.id, x.n])}</span></a></td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${badge(x.rs / x.gp)}</td></tr>`).join('')}
+    ${L.map((x, i) => `<tr class="${i >= 5 ? 'xtra' : ''}"><td><a class="pc" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${rank(x.rk, 20)}<span class="nm">${pname([x.id, x.n])}</span></a></td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${badge(x.rs / x.gp)}</td></tr>`).join('')}
   </tbody></table></div></div>`;
 }
 function supportCard(cls = '') {
@@ -781,7 +781,7 @@ function drawFavs(st) {
   const paint = (list) => {
     if (!live(st.tok)) return;
     if (right) right.innerHTML = `<div class="card-h"><h3>${esc(t('Tus favoritos'))}</h3><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div><div style="padding-bottom:8px">${list.map((x) =>
-      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.star}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 16)}</span><span class="sub">${esc(x.sub)}</span></span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
+      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.star}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(x.sub)}</span></span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
     if (strip) strip.innerHTML = `<div class="favs-h"><b>${ICON.star}${esc(t('Tus favoritos'))}</b><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div>
       <div class="favs" role="list">${list.map((x) => `<a role="listitem" href="#j-${esc(x.id)}" class="fav-i">${avatar(x.n, x.id, 'sm')}<span class="t">${esc(x.n)}</span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
     $$('[data-favf]').forEach((b) => b.addEventListener('click', () => { MF.fav = !MF.fav; MF.limit = 120; const c = $('[data-x="fav"]'); if (c) c.setAttribute('aria-pressed', String(MF.fav)); drawFavs(st); refreshList(st); }));
@@ -799,16 +799,16 @@ function drawRight(st, top) {
     const mv = best.p[best.v];
     html += `<div class="card in"><div class="card-h"><h3>${esc(t('Partido destacado'))}</h3><small>${esc(typeLabel(best.y))} · ${esc(regionLabel(best.r))}</small></div>
       <a class="mini" href="${matchHref(best.k, best.i)}"><div class="side">${crest(0, 34)}${esc(HOME())}</div><div class="sc">${best.s[0]}<i>-</i>${best.s[1]}</div><div class="side">${crest(1, 34)}${esc(AWAY())}</div></a>
-      <a class="lrow" href="${matchHref(best.k, best.i)}" style="border-top:1px solid var(--line)"><span class="i"></span>${avatar(mv[1], mv[0], 'sm')}<span class="nm"><span>${esc(mv[1])}</span>${rank(mv[6], 16, { approx: mv[7] })}</span><span>${badge(mv[3])}</span></a></div>`;
+      <a class="lrow" href="${matchHref(best.k, best.i)}" style="border-top:1px solid var(--line)"><span class="i"></span>${avatar(mv[1], mv[0], 'sm')}<span class="nm"><span>${esc(mv[1])}</span>${rank(mv[6], 20, { approx: mv[7] })}</span><span>${badge(mv[3])}</span></a></div>`;
   }
   const perf = (meta.perf || []).filter((p) => !S.hidden.has(p.i)).slice(0, 6);
   if (perf.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores actuaciones'))}</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.map((p, i) =>
-    `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 16, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
   html += supportCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
   if (top && top.active && top.active.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Más activos'))}</h3><small>${esc(t('7 días'))}</small></div><div style="padding-bottom:8px">${top.active.slice(0, 5).map((p, i) =>
-    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}</span>${rank(p.rk, 16)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}</span>${rank(p.rk, 20)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
   html += `<div class="card in links"><a href="#records">${ICON.trophy}<span><b>${esc(t('Récords'))}</b><small>${esc(t('Las mejores marcas y rachas'))}</small></span>${ICON.right}</a><a href="#eusl">${ICON.league}<span><b>EUSL</b><small>${esc(t('Clasificación y resultados de la liga'))}</small></span>${ICON.right}</a></div>`;
   el.innerHTML = html;
 }
@@ -965,7 +965,7 @@ function boxScore(m) {
     const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
     return `<div class="bx-team"><div class="bx-h">${crest(tm, 22)}<b>${esc(teamName(tm))}</b><span class="sc">${m.score[tm]}</span>${m.winner === tm ? `<span class="pill live">${esc(t('Ganador'))}</span>` : ''}<span class="avg">${esc(t('Nota media'))} ${badge(avg(m, tm))}</span></div>
       <div class="tscroll"><table class="tbl bx"><thead><tr><th>${esc(t('Jugador'))}</th>${cols.map(([, s, l]) => `<th title="${esc(t(l))}">${esc(t(s))}</th>`).join('')}</tr></thead><tbody>
-      ${ps.map(([p, i]) => `<tr><td><button type="button" class="linkish" data-perf="${i}">${avatar(p.name, p.pid, 'sm')}<span class="nm">${pname([p.pid, p.name])}</span>${rank(p.rk, 16, { approx: p.rkApprox })}${i === m.mvp ? '<span class="mvp-tag">MVP</span>' : ''}</button></td>${cols.map(([k]) => k === 'rating' ? `<td>${badge(p.rating)}</td>`
+      ${ps.map(([p, i]) => `<tr><td><button type="button" class="linkish" data-perf="${i}">${avatar(p.name, p.pid, 'sm')}<span class="nm">${pname([p.pid, p.name])}</span>${rank(p.rk, 20, { approx: p.rkApprox })}${i === m.mvp ? '<span class="mvp-tag">MVP</span>' : ''}</button></td>${cols.map(([k]) => k === 'rating' ? `<td>${badge(p.rating)}</td>`
         : `<td class="${best[k] && (p.st[k] || 0) === best[k] ? 'best' : ''}">${cell(k, p.st[k])}</td>`).join('')}</tr>`).join('')}
       <tr class="tot"><td>${esc(t('Total'))}</td>${cols.map(([k]) => k === 'rating' ? '<td></td>' : `<td>${cell(k, m.tot[tm][k])}</td>`).join('')}</tr></tbody></table></div></div>`;
   };
@@ -986,7 +986,7 @@ function rink(m) {
     return ps.map(([p, i], k) => { const [x, y] = slots[k]; return { p, i, x: tm === 'home' ? x : 100 - x, y }; });
   };
   const marks = [...place('home'), ...place('away')].map(({ p, i, x, y }) =>
-    `<button type="button" class="rink-p ${p.team}" data-perf="${i}" style="left:${x}%;top:${y}%">${avatar(p.name, p.pid)}${badge(p.rating)}<span class="nm">${rank(p.rk, 14, { approx: p.rkApprox })}${esc(p.name)}</span></button>`).join('');
+    `<button type="button" class="rink-p ${p.team}" data-perf="${i}" style="left:${x}%;top:${y}%">${avatar(p.name, p.pid)}${badge(p.rating)}<span class="nm">${rank(p.rk, 16, { approx: p.rkApprox })}${esc(p.name)}</span></button>`).join('');
   return `<div class="rink-wrap"><svg class="rink" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true">
     <rect x="2" y="2" width="196" height="96" rx="16" fill="none" stroke="var(--ice-line)" stroke-width="1.4"/>
     <line x1="100" y1="2" x2="100" y2="98" stroke="var(--ice-red)" stroke-width="1.6" opacity=".7"/>
@@ -1007,7 +1007,7 @@ function statsTable(m) {
   for (const tm of ['home', 'away']) {
     const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
     body += `<tr class="tg"><td colspan="${keys.length + 2}">${esc(teamName(tm))} · ${m.score[tm]}</td></tr>`;
-    body += ps.map(([p]) => `<tr><td><a class="pc" href="#j-${esc(p.pid)}">${rank(p.rk, 16, { approx: p.rkApprox })}${esc(p.name)}</a></td><td>${badge(p.rating)}</td>${keys.map((k) => `<td>${val(k, p.st[k])}</td>`).join('')}</tr>`).join('');
+    body += ps.map(([p]) => `<tr><td><a class="pc" href="#j-${esc(p.pid)}">${rank(p.rk, 20, { approx: p.rkApprox })}${esc(p.name)}</a></td><td>${badge(p.rating)}</td>${keys.map((k) => `<td>${val(k, p.st[k])}</td>`).join('')}</tr>`).join('');
     body += `<tr class="tot"><td>${esc(t('Total'))}</td><td></td>${keys.map((k) => `<td>${val(k, m.tot[tm][k])}</td>`).join('')}</tr>`;
   }
   return `<table class="tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Nota'))}</th>${keys.map((k) => `<th title="${esc(statName(k))}">${esc(statAbbr(k))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
@@ -1356,7 +1356,7 @@ function drawRankings(R) {
   const card = (title, note, list, fmt) => {
     if (!list || !list.length) return '';
     return `<div class="card in"><div class="card-h"><h3>${esc(t(title))}</h3><small>${esc(note)}</small></div><div style="padding-bottom:8px">${list.map((x, i) =>
-      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${pname([x.id, x.n])}</span>${rank(x.rk, 16)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))}</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
+      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${pname([x.id, x.n])}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))}</span></span>${fmt(x.v)}</a>`).join('')}</div></div>`;
   };
   const v = (x) => `<span class="v">${int(x)}</span>`;
   const mmr = R.mmr || [];
@@ -1387,7 +1387,7 @@ async function viewRecords(tok) {
   let R; try { R = await loadRecords(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#rec').innerHTML = `<div class="card empty">${esc(t('Los récords aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
   if (!live(tok)) return;
   const when = (x) => `${shortDate(x.t || Date.parse(x.d + 'T12:00:00Z'))}`;
-  const mrow = (x, i, val, sub) => `<a class="lrow" href="${x.i ? matchHref(x.k, x.i) : '#j-' + esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${pname([x.id, x.n])}</span>${rank(x.rk, 16, { approx: x.ap })}</span><span class="sub">${esc(sub)}</span></span>${val}</a>`;
+  const mrow = (x, i, val, sub) => `<a class="lrow" href="${x.i ? matchHref(x.k, x.i) : '#j-' + esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${pname([x.id, x.n])}</span>${rank(x.rk, 20, { approx: x.ap })}</span><span class="sub">${esc(sub)}</span></span>${val}</a>`;
   const card = (title, note, list, fn) => list && list.length ? `<div class="card in"><div class="card-h"><h3>${esc(t(title))}</h3>${note ? `<small>${esc(t(note))}</small>` : ''}</div><div style="padding-bottom:8px">${list.map(fn).join('')}</div></div>` : '';
   const v = (n) => `<span class="v">${int(n)}</span>`;
   const sc = (x) => x.s ? ` · ${x.s[0]}-${x.s[1]}` : '';

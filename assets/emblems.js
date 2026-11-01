@@ -1,4 +1,4 @@
-// Emblemas de rango de SlapScore (diseño propio, no son los del juego).
+// Emblemas de rango: los logos oficiales del juego (assets/ranks) y, si falta alguno, un diseño propio de SlapScore.
 import { parseRank } from './core.js';
 
 const TIER = {
@@ -49,14 +49,21 @@ export function emblemSVG(rk, size = 20) {
   return `<svg class="emb" width="${size}" height="${size}" viewBox="0 0 40 40" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
-// Logos oficiales subidos desde el panel (assets/ranks/index.json: { "PLAT_III": "PLAT_III.png", "GOLD": "GOLD.png", ... })
-let OFFICIAL = {};
-export function setOfficial(map) { OFFICIAL = map && typeof map === 'object' ? map : {}; }
+// Logos oficiales (assets/ranks/index.json: { "PLAT_III": "PLAT_III.png", ..., "_small": { "PLAT_III": "PLAT_III-64.png" } })
+// Para tamaños pequeños se usa la versión de 64 px si existe.
+let OFFICIAL = {}, SMALL = {};
+export function setOfficial(map) {
+  const m = map && typeof map === 'object' ? map : {};
+  SMALL = m._small && typeof m._small === 'object' ? m._small : {};
+  OFFICIAL = {}; for (const [k, v] of Object.entries(m)) if (k !== '_small' && typeof v === 'string') OFFICIAL[k] = v;
+}
 export const hasOfficial = () => Object.keys(OFFICIAL).length > 0;
-export function officialSrc(rk) {
+export function officialSrc(rk, size = 128) {
   const r = parseRank(rk); if (!r) return null;
-  const f = OFFICIAL[r.key] || OFFICIAL[r.tier];
-  return f ? 'assets/ranks/' + encodeURI(f) : null;
+  const big = OFFICIAL[r.key] || OFFICIAL[r.tier];
+  if (!big) return null;
+  const sm = size <= 32 && (SMALL[r.key] || SMALL[r.tier]);
+  return 'assets/ranks/' + encodeURI(sm || big);
 }
 
 // Emblema con título accesible (nombre del rango)
@@ -64,7 +71,7 @@ export function emblem(rk, size = 20, opts = {}) {
   const r = parseRank(rk);
   if (!r) return '';
   const label = r.name + (opts.mmr != null ? ` · ${opts.mmr} MMR` : '') + (opts.approx ? ` (${opts.approxLabel || 'aproximado'})` : '');
-  const src = officialSrc(rk);
+  const src = officialSrc(rk, size);
   const inner = src ? `<img class="emb-img" src="${src}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async">` : emblemSVG(rk, size);
   return `<span class="emb-wrap${opts.approx ? ' approx' : ''}" role="img" aria-label="${label}" title="${label}">${inner}</span>`;
 }

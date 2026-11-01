@@ -58,7 +58,11 @@ SlapScore se puede instalar en la pantalla de inicio (Android: botón «Instalar
 
 ## Logos de rango
 
-La web usa los logos que haya en `assets/ranks/` según `assets/ranks/index.json` (por ejemplo `{"PLAT_III": "PLAT_III.png"}`). Se suben desde el panel de administrador. Si falta alguno, se usa el emblema de SlapScore.
+`assets/ranks/` tiene los logos oficiales de los 14 rangos (Bronze I a Legend, también Diamond), recortados de la captura «ALL RANKS» del juego (`tools/rangos-slapshot.png`) con `tools/cut-ranks.py`: 128 px y una versión de 64 px para los tamaños pequeños (`_small` en `assets/ranks/index.json`). Se pueden cambiar desde el panel de administrador; si falta alguno, se usa el emblema de SlapScore.
+
+## Idioma
+
+La web sale en inglés por defecto; el botón ES/EN de la cabecera (o el enlace del pie) cambia a español y se recuerda en ese navegador. Los textos se escriben en español en el código y se traducen con `t()` (`assets/i18n.js`, diccionario en `assets/en.js`).
 
 ## Código
 
