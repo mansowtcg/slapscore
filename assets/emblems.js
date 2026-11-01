@@ -63,7 +63,7 @@ export function officialSrc(rk) {
 export function emblem(rk, size = 20, opts = {}) {
   const r = parseRank(rk);
   if (!r) return '';
-  const label = r.name + (opts.mmr != null ? ` · ${opts.mmr} MMR` : '') + (opts.approx ? ' (aproximado)' : '');
+  const label = r.name + (opts.mmr != null ? ` · ${opts.mmr} MMR` : '') + (opts.approx ? ` (${opts.approxLabel || 'aproximado'})` : '');
   const src = officialSrc(rk);
   const inner = src ? `<img class="emb-img" src="${src}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async">` : emblemSVG(rk, size);
   return `<span class="emb-wrap${opts.approx ? ' approx' : ''}" role="img" aria-label="${label}" title="${label}">${inner}</span>`;

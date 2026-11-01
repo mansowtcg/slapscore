@@ -68,6 +68,14 @@ export async function toggleHidden(id, hide, ctx, key) {
   X.go({ keepScroll: true, instant: true });
 }
 
+// Seguir / dejar de seguir a un jugador desde su perfil (los seguidos son destacados: van los primeros)
+export async function followPlayer(id, follow, ctx) {
+  X = ctx;
+  await writeSettings((s) => { const cur = (s.seeds || []).map(String).filter((x) => x !== id); s.seeds = follow ? [...cur, id] : cur; return s; }, `${follow ? 'Seguir' : 'Dejar de seguir'} jugador ${id}`);
+  X.toast(follow ? 'Jugador seguido: se revisará en cada pasada mientras juegue' : 'Ya no se sigue a este jugador');
+  X.go({ keepScroll: true, instant: true });
+}
+
 // ---------- montar ----------
 export async function mount(root, ctx) {
   X = ctx;
