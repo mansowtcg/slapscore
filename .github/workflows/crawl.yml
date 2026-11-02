@@ -59,7 +59,8 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.go == 'true'
         with:
-          node-version: 20
+          # Wrangler (Publicar en Cloudflare) necesita Node 22 o superior
+          node-version: 22
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:
@@ -150,9 +151,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Si esta pasada ha fallado, se espera un poco para no repetir el fallo en bucle
-          if [ "${{ job.status }}" != "success" ]; then echo "Esta pasada no ha ido bien: la siguiente, en 5 minutos."; sleep 300; fi
+          # Si esta pasada ha fallado antes de publicar la web, se espera un poco para no repetir el fallo en bucle.
+          # Si la web sí se ha publicado (p. ej. solo ha fallado Cloudflare), se sigue al ritmo normal.
+          if [ "${{ job.status }}" != "success" ] && [ "${{ steps.deploy.outcome }}" != "success" ]; then
+            echo "Esta pasada no ha ido bien: la siguiente, en 5 minutos."; sleep 300
+          fi
           others=$(gh run list -R "$GITHUB_REPOSITORY" --workflow crawl.yml --limit 20 --json databaseId,status \
             --jq "[.[] | select(.databaseId != ${{ github.run_id }}) | select(.status != \"completed\")] | length" || echo 0)
           if [ "${others:-0}" -gt 0 ]; then echo "Ya hay otra pasada en cola: ella programará la siguiente."; exit 0; fi
-          gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=3 && echo "Siguiente pasada en cola."
+          # GitHub a veces responde con un error pasajero (500): se reintenta antes de dar la cadena por cortada
+          for i in 1 2 3 4 5; do
+            if gh workflow run crawl.yml -R "$GITHUB_REPOSITORY" --ref main -f chain=1 -f minutes=3; then echo "Siguiente pasada en cola."; exit 0; fi
+            echo "No se pudo poner en cola (intento $i). Reintento en $(( i * 20 )) s."; sleep $(( i * 20 ))
+          done
+          exit 1
