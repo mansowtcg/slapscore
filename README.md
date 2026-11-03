@@ -16,11 +16,13 @@ Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://m
 ## Qué hay en la web
 
 - **Partidos** por día (tira de días y calendario), filtros por tipo, región, arena, jugador, **destacados** y **favoritos**; estadísticas de todos los jugadores desplegables en cada fila; la lista de hoy se actualiza sola y dice cuándo fue la última vez.
+- **Públicas y custom por separado**: cada jugador tiene una nota media y unas estadísticas para cada tipo, y en su perfil (y en el comparador) se elige cuáles ver. Las tablas, rankings, récords, líderes y rachas cuentan solo las públicas. En la portada las custom llevan color y etiqueta propios.
 - **Portada**: jugando ahora (destacados que acaban de jugar), favoritos, líderes del día, partido destacado, mejores actuaciones, equipo de la semana, top MMR, más activos y actividad por horas.
 - **Partido**: resumen, alineaciones, estadísticas, JSON original e **imagen para compartir** (1080×1350).
-- **Jugador**: rango actual y mejor rango con logos oficiales, racha, forma, forma semanal, notas, MMR con ascensos y descensos, atributos, estadísticas (de toda la carrera o por tipo de partida), mejores partidos, compañeros y rivales habituales (con su cara a cara), rendimiento por arena, historial, comparar, imagen para compartir y su equipo de la EUSL si juega en la liga.
+- **Jugador**: rango actual y mejor rango con logos oficiales, racha, forma, forma semanal, notas, MMR con ascensos y descensos, atributos, estadísticas de toda la carrera, mejores partidos, compañeros y rivales habituales (con su cara a cara), rendimiento por arena, historial, comparar, imagen para compartir y su equipo de la EUSL si juega en la liga.
 - **Comparar jugadores**, **tabla de jugadores** (periodo, mínimo de partidos, rango, favoritos), **rankings** (con reparto de rangos), **récords** (siempre o 7 días), **EUSL** (eusl.gg, con enlace a cada equipo) y **cómo puntuamos**.
 - **Favoritos** guardados en el navegador de cada uno (con la lista de hoy abierta, sale un aviso cuando un favorito termina un partido); buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
+- **Buzón de sugerencias** (icono de bocadillo en la cabecera, enlace en el pie y recuadro en la portada): ideas, errores u otros, con contacto opcional. Los mensajes se guardan en Cloudflare y se leen y borran desde el panel de administrador.
 - Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
 
 ## Datos (rama `data`)
@@ -31,9 +33,9 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `days/AAAA-MM-DD.json`: resumen del día (recuentos, líderes, mejores actuaciones, partido destacado).
 - `days/AAAA-MM-DD/HH.json.gz`: resúmenes de los partidos de esa hora (en días archivados, bloques de varias horas).
 - `full/AAAA-MM-DD/HH.json.gz`: partidos tal cual los da slapshot.gg, solo de los últimos 60 días.
-- `p/<grupo>.json.gz`: perfiles de jugadores agrupados en 4096 archivos (últimos 400 partidos de cada uno).
+- `p/<grupo>.json.gz`: perfiles de jugadores agrupados en 4096 archivos (últimos 400 partidos de cada uno; `a` son los totales en públicas y `ac` en custom).
 - `search.json.gz`, `players-{a,m,k}.json.gz`, `rankings.json`, `top.json`, `attr.json`, `records.json`, `eusl.json`: buscador, tabla de jugadores (siempre, 30 días, 7 días), rankings, portada (con equipo de la semana), atributos, récords y liga EUSL. `index.json` lleva además los destacados (`featured`) y los que acaban de jugar (`live`).
-- `_int/` (no se publica): estado del robot, totales de cada jugador por día y por mes, y partidos pendientes de archivar.
+- `_int/` (no se publica): estado del robot, totales de cada jugador por día y por mes (públicas y custom por separado: `{ v: 2, p: {…}, c: {…} }`) y partidos pendientes de archivar.
 
 ### Archivo y estadísticas de carrera
 
@@ -49,6 +51,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `retainDays`: días con el detalle completo en la web (por defecto 60).
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
+- `api`: dirección del Worker de Cloudflare para el buzón de sugerencias (por defecto, la de workers.dev).
 
 Se pueden cambiar desde el panel de administrador, que usa un token de GitHub de grano fino con permisos de **Actions** y **Contents** en lectura y escritura sobre este repositorio. El token solo se guarda en el navegador de quien lo usa.
 
@@ -61,6 +64,8 @@ El flujo publica siempre en GitHub Pages. Si el repositorio tiene estos secretos
 - `DISPATCH_TOKEN` (opcional): token de GitHub de grano fino con **Actions: lectura y escritura** sobre este repositorio. Con él, el Worker (`cloudflare/worker.js`) comprueba cada 30 minutos que la cadena de pasadas sigue viva y, si se ha cortado, la relanza.
 
 En Cloudflare la web queda en `https://slapscore.<tu-subdominio>.workers.dev`, sin límite de tráfico, y solo se suben los archivos que cambian.
+
+**Buzón de sugerencias.** El Worker recibe los mensajes en `/api/feedback` y los guarda en un almacén KV `slapscore-feedback`, que el flujo crea solo la primera vez (el token de Cloudflare necesita **Workers KV Storage: Edit**, incluido en la plantilla «Edit Cloudflare Workers»). Desde GitHub Pages la web envía los mensajes a la dirección de workers.dev (se puede cambiar con `api` en los ajustes). No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle, y como mucho 200 mensajes al día. Para leer o borrar mensajes el Worker pide el token de GitHub del panel y comprueba con GitHub que puede escribir en el repositorio.
 
 ## App en el móvil
 

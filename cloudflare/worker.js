@@ -1,10 +1,127 @@
 // SlapScore en Cloudflare Workers.
 // La web son archivos estáticos (los sirve Cloudflare sin pasar por aquí). Este Worker solo:
-//  1) responde a las rutas que no son un archivo (404), y
-//  2) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
+//  1) responde a las rutas que no son un archivo (404),
+//  2) recibe el buzón de sugerencias (/api/feedback) y se lo enseña al administrador, y
+//  3) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
 //     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar.
+//
+// Buzón: los mensajes se guardan en el KV "FEEDBACK" (lo crea el flujo de GitHub al publicar).
+// No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle.
+// Para leerlos o borrarlos hace falta el token de GitHub del administrador, que se comprueba con GitHub
+// (tiene que poder escribir en el repositorio).
+
+const TYPES = new Set(['idea', 'bug', 'other']);
+const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, DAY_LIMIT = 200, LIST_LIMIT = 300;
+const DEFAULT_ORIGINS = ['https://mansowtcg.github.io'];
+const adminCache = new Map();   // resumen del token -> caduca (ms), para no preguntar a GitHub en cada petición
+
+function allowedOrigin(request, env) {
+  const o = request.headers.get('origin');
+  if (!o) return null;
+  const self = new URL(request.url).origin;
+  const list = String(env.ORIGINS || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return o === self || DEFAULT_ORIGINS.includes(o) || list.includes(o) ? o : null;
+}
+function json(data, status, request, env, extra = {}) {
+  const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra };
+  const o = allowedOrigin(request, env);
+  if (o) { h['access-control-allow-origin'] = o; h.vary = 'Origin'; }
+  return new Response(JSON.stringify(data), { status, headers: h });
+}
+async function sha(s) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+
+// ¿Es este token de GitHub de alguien que puede escribir en el repositorio?
+async function isAdmin(request, env) {
+  const m = /^Bearer\s+(\S{20,300})$/.exec(request.headers.get('authorization') || '');
+  if (!m || !env.GH_REPO) return false;
+  const key = await sha(m[1]);
+  const until = adminCache.get(key);
+  if (until && until > Date.now()) return true;
+  const r = await fetch(`https://api.github.com/repos/${env.GH_REPO}`, {
+    headers: { authorization: `Bearer ${m[1]}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'slapscore-feedback' },
+  }).catch(() => null);
+  if (!r || !r.ok) return false;
+  const j = await r.json().catch(() => null);
+  const ok = !!(j && j.permissions && (j.permissions.push || j.permissions.admin));
+  if (ok) adminCache.set(key, Date.now() + 10 * 60_000);
+  if (adminCache.size > 50) adminCache.delete(adminCache.keys().next().value);
+  return ok;
+}
+
+async function feedback(request, env, path) {
+  const cors = {
+    'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+    'access-control-allow-headers': 'content-type, authorization',
+    'access-control-max-age': '86400',
+  };
+  if (request.method === 'OPTIONS') {
+    const o = allowedOrigin(request, env);
+    return new Response(null, { status: 204, headers: o ? { 'access-control-allow-origin': o, vary: 'Origin', ...cors } : {} });
+  }
+  const KV = env.FEEDBACK;
+  if (!KV) return json({ error: 'unavailable' }, 503, request, env);
+
+  // enviar una sugerencia (cualquiera)
+  if (request.method === 'POST' && path === '/api/feedback') {
+    if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403, request, env);
+    let b;
+    try { b = await request.json(); } catch { return json({ error: 'bad' }, 400, request, env); }
+    if (!b || typeof b !== 'object') return json({ error: 'bad' }, 400, request, env);
+    if (b.website) return json({ ok: true }, 200, request, env);   // campo trampa: solo lo rellenan los robots
+    const type = TYPES.has(b.type) ? b.type : 'other';
+    const text = clean(b.text, MAX_TEXT);
+    if (text.length < 5) return json({ error: 'short' }, 400, request, env);
+    const ip = request.headers.get('cf-connecting-ip') || '';
+    const rl = 'rl:' + await sha(ip + '|' + new Date().toISOString().slice(0, 13));
+    if (await KV.get(rl)) return json({ error: 'wait' }, 429, request, env);
+    const day = 'n:' + new Date().toISOString().slice(0, 10);
+    const n = Number(await KV.get(day)) || 0;
+    if (n >= DAY_LIMIT) return json({ error: 'full' }, 429, request, env);
+    const t = Date.now();
+    const id = `fb:${String(9999999999999 - t).padStart(13, '0')}-${crypto.randomUUID().slice(0, 8)}`;
+    const item = {
+      t, type, text,
+      contact: clean(b.contact, MAX_CONTACT),
+      page: clean(b.page, MAX_PAGE),
+      lang: b.lang === 'en' ? 'en' : 'es',
+    };
+    await KV.put(id, JSON.stringify(item));
+    await KV.put(rl, '1', { expirationTtl: 60 });
+    await KV.put(day, String(n + 1), { expirationTtl: 3 * 86400 });
+    return json({ ok: true }, 200, request, env);
+  }
+
+  // leer y borrar: solo el administrador
+  if (request.method === 'GET' && path === '/api/feedback') {
+    if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
+    const keys = []; let cursor;
+    do {
+      const page = await KV.list({ prefix: 'fb:', cursor, limit: 1000 });
+      keys.push(...page.keys.map((k) => k.name)); cursor = page.list_complete ? null : page.cursor;
+    } while (cursor && keys.length < LIST_LIMIT);
+    const items = (await Promise.all(keys.slice(0, LIST_LIMIT).map(async (k) => {
+      const v = await KV.get(k); if (!v) return null;
+      try { return { id: k, ...JSON.parse(v) }; } catch { return null; }
+    }))).filter(Boolean);
+    return json({ items, total: keys.length }, 200, request, env);
+  }
+  const del = /^\/api\/feedback\/(fb:[0-9]{13}-[0-9a-f]{8})$/.exec(path);
+  if (request.method === 'DELETE' && del) {
+    if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
+    await KV.delete(del[1]);
+    return json({ ok: true }, 200, request, env);
+  }
+  return json({ error: 'not found' }, 404, request, env);
+}
+
 export default {
   async fetch(request, env) {
+    const path = decodeURIComponent(new URL(request.url).pathname).replace(/\/+$/, '');
+    if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env) {

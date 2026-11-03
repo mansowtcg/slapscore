@@ -34,7 +34,7 @@ export const LABELS = {
   possession_time_sec: ['Posesión', 'POS'], contributed_goals: ['Goles en los que participa', 'GPA'],
   conceded_goals: ['Goles encajados', 'GE'], shutouts: ['Porterías a cero', 'P0'], score: ['Puntos de juego', 'PTS'],
 };
-export const TYPE_LABEL = { casual: 'Casual', ranked: 'Clasificatoria', custom: 'Personalizada', private: 'Privada', tournament: 'Torneo', league: 'Liga' };
+export const TYPE_LABEL = { casual: 'Pública', ranked: 'Clasificatoria', custom: 'Custom', private: 'Privada', tournament: 'Torneo', league: 'Liga' };
 export const END_LABEL = {
   EndOfRegulation: 'Final', Overtime: 'Final en prórroga', MercyRule: 'Regla de piedad', Forfeit: 'Rendición',
   Tie: 'Empate', AwayTeamLeft: 'Abandono visitante', HomeTeamLeft: 'Abandono local',

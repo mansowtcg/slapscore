@@ -9,6 +9,7 @@
   --home:#1E88E5; --away:#F2761B;
   --r-elite:#374DF5; --r-great:#008EA3; --r-good:#189335; --r-ok:#D3A600; --r-meh:#D86A00; --r-bad:#D7261B; --r-ink:#FFFFFF; --r-ok-ink:#251D00;
   --win:#189335; --loss:#D7261B; --draw:#99A1AE;
+  --cu:#7B2FC9; --cu-ink:#FFFFFF; --cu-soft:#F3EAFD;
   --av-s:55%; --av-l:42%;
   --ice:#F3F8FC; --ice-line:#C9DBEA; --ice-red:#E25563; --ice-blue:#5C8DE0;
   --shadow-1:0 1px 2px rgba(20,28,45,.05);
@@ -27,6 +28,7 @@
   --home:#4EA3F1; --away:#FF9446;
   --r-elite:#4F5EF5; --r-great:#0A93A8; --r-good:#1E9B3E; --r-ok:#E2B81E; --r-meh:#D86A00; --r-bad:#D7261B; --r-ink:#FFFFFF; --r-ok-ink:#251D00;
   --win:#1E9B3E; --loss:#E8473A; --draw:#6E7385;
+  --cu:#C29BFF; --cu-ink:#1B0F2E; --cu-soft:rgba(194,155,255,.13);
   --av-s:42%; --av-l:40%;
   --ice:#1E2633; --ice-line:#34465C; --ice-red:#C94B58; --ice-blue:#4A74C0;
   --shadow-1:none; --shadow-2:0 12px 36px rgba(0,0,0,.5);
@@ -40,6 +42,7 @@
   --home:#4EA3F1; --away:#FF9446;
   --r-elite:#4F5EF5; --r-great:#0A93A8; --r-good:#1E9B3E; --r-ok:#E2B81E; --r-meh:#D86A00; --r-bad:#D7261B; --r-ink:#FFFFFF; --r-ok-ink:#251D00;
   --win:#1E9B3E; --loss:#E8473A; --draw:#6E7385;
+  --cu:#C29BFF; --cu-ink:#1B0F2E; --cu-soft:rgba(194,155,255,.13);
   --av-s:42%; --av-l:40%;
   --ice:#1E2633; --ice-line:#34465C; --ice-red:#C94B58; --ice-blue:#4A74C0;
   --shadow-1:none; --shadow-2:0 12px 36px rgba(0,0,0,.5);
@@ -871,3 +874,42 @@ html.vt-same .days{view-transition-name:daybar}
 .ar-r .nm{display:flex;flex-direction:column;min-width:0}.ar-r .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ar-r .nm small{font-weight:500;color:var(--muted);font-size:11px}
 .ar-r .bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}.ar-r .bar i{display:block;height:100%;border-radius:4px;background:var(--win);transform-origin:left;animation:grow .7s var(--ease) both}
 .ar-r .v{text-align:right;font-family:var(--font-num);font-size:14px}
+
+/* ---------- partidas custom: color propio ---------- */
+.cu-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cu);flex:none}
+.ty-cu{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:5px;background:var(--cu);color:var(--cu-ink);font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.grp.cu{box-shadow:inset 3px 0 0 var(--cu),var(--shadow-1)}
+.grp.cu .grp-h{background:var(--cu-soft)}
+.chip.cu[aria-pressed="true"]{background:var(--cu);border-color:var(--cu);color:var(--cu-ink)}
+.chip.cu[aria-pressed="true"] .cu-dot{background:var(--cu-ink)}
+.pill.cu-pill{background:var(--cu-soft);color:var(--cu)}
+.mode-bar{display:flex;justify-content:center;padding:12px 16px;border-top:1px solid var(--line)}
+.mode-sw button{display:inline-flex;align-items:center;gap:6px}
+.mode-sw .n{font-weight:600}
+.mode-sw button[data-pm="cus"][aria-pressed="true"]{color:var(--cu)}
+.cmp-mode{display:flex;justify-content:center;margin-top:12px}
+.ph .avg .avg-l{display:flex;flex-direction:column;align-items:center;gap:1px}
+.avg-m{font-size:11px;font-weight:700;color:var(--muted);text-transform:lowercase}
+.avg-m.cu{color:var(--cu)}
+@media (max-width:600px){.ph .avg .avg-l{align-items:flex-start}.mode-bar{padding:10px 12px}.mode-sw{width:100%}.mode-sw button{flex:1;justify-content:center;padding:0 8px}}
+/* ---------- buzón de sugerencias ---------- */
+.fb-card .card-b{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.fb-card b{display:flex;align-items:center;gap:8px;font-size:15px}
+.fb-card b svg{width:18px;height:18px;color:var(--primary)}
+.fb-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.fb-form{display:flex;flex-direction:column;gap:14px;padding:0 18px 18px}
+.fb-ta{height:auto;min-height:120px;padding:10px 12px;line-height:1.45;resize:vertical}
+.fb-n{align-self:flex-end;font-size:11.5px;min-height:0}
+.fb-n:empty{display:none}
+.fb-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.fb-note{margin:0;font-size:12px}
+.fb-acts{display:flex;justify-content:flex-end}
+.fb-form .err{margin:0}
+#btn-fb svg{width:20px;height:20px}
+.fb-list{display:flex;flex-direction:column}
+.fb-it{padding:12px 16px;border-top:1px solid var(--line)}
+.fb-it-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-it-h .muted{font-size:12.5px}
+.fb-it-h .btn{margin-left:auto}
+.fb-tx{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
+.fb-meta{margin:6px 0 0;font-size:12.5px;overflow-wrap:anywhere}

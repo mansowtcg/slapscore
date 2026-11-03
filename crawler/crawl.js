@@ -12,8 +12,9 @@
 //   p/<bucket>.json.gz              perfiles de jugadores (2048 grupos)
 //   search.json.gz, players-{a,m,k}.json.gz, rankings.json, top.json, attr.json
 //   _int/state.json.gz              estado del robot
-//   _int/agg/d/<día>.json.gz        totales de cada jugador ese día (base de las estadísticas de carrera)
-//   _int/agg/m/<AAAA-MM>.json.gz    totales de un mes ya cerrado
+//   _int/agg/d/<día>.json.gz        totales de cada jugador ese día (base de las estadísticas de carrera):
+//                                   { v: 2, p: {públicas}, c: {personalizadas} }, cada una { id: [totales en orden AGG_KEYS] }
+//   _int/agg/m/<AAAA-MM>.json.gz    totales de un mes ya cerrado (mismo formato)
 //   _int/outbox/<día>.json.gz       partidos en bruto pendientes de subir al archivo
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -387,11 +388,15 @@ S.wHash = wHash;
 // Pasada completa (tablas, rankings, récords y todos los perfiles) como mucho cada 20 minutos;
 // en las pasadas ligeras solo se publican los partidos, los días y los perfiles de los destacados.
 const HEAVY_MS = Number(process.env.HEAVY_EVERY_MS ?? 20 * 60_000);
-const META_V = 4, PROF_V = 3;
+const META_V = 5, PROF_V = 4, AGG_V = 2;
 const upgradeMeta = S.metaV !== META_V, upgradeProf = S.profV !== PROF_V;
+// totales v2: las partidas personalizadas (custom) van aparte y no cuentan en la nota ni en las tablas.
+// Al cambiar de formato se rehacen todos los totales desde los resúmenes de cada día (que se guardan siempre).
+const upgradeAgg = S.aggV !== AGG_V;
 const hiddenChanged = Object.keys(S.hid).length !== (S._hidN || 0);
-const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || hiddenChanged;
-if (upgradeMeta) for (const d of Object.keys(S.days)) dirtyDays.add(d);
+const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || upgradeAgg || hiddenChanged;
+if (upgradeMeta || upgradeAgg) for (const d of Object.keys(S.days)) dirtyDays.add(d);
+if (upgradeAgg) for (const f of await list(path.join(INT, 'agg', 'm'))) await out.rm(path.join(INT, 'agg', 'm', f));
 
 lap('rerate');
 // ---------- rangos de los partidos de hoy y ayer ----------
@@ -494,16 +499,25 @@ function leaders(entries) {
   return [...map.values()].sort((x, y) => (y.g + y.a) - (x.g + x.a) || y.g - x.g || y.rs / y.gp - x.rs / x.gp).slice(0, 8)
     .map(({ id, n, rk, gp, g, a, rs }) => ({ id, n, rk, gp, g, a, rs: Math.round(rs * 10) / 10 }));
 }
+const isCustom = (y) => y === 'custom';
+const round5 = (o) => { for (const a of Object.values(o)) a[5] = Math.round(a[5] * 10) / 10; return o; };
+// Totales del día: públicas (p) y personalizadas (c) por separado
 function dayAggOf(entries) {
-  const o = {};
-  for (const e of entries) e.p.forEach((p, i) => {
-    if (!p[0]) return;
-    const c = C.contrib(e, i), a = o[p[0]] || (o[p[0]] = new Array(c.length).fill(0));
-    for (let k = 0; k < c.length; k++) a[k] += c[k];
-  });
-  for (const a of Object.values(o)) a[5] = Math.round(a[5] * 10) / 10;
+  const o = { v: AGG_V, p: {}, c: {} };
+  for (const e of entries) {
+    const dst = isCustom(e.y) ? o.c : o.p;
+    e.p.forEach((p, i) => {
+      if (!p[0]) return;
+      const c = C.contrib(e, i), a = dst[p[0]] || (dst[p[0]] = new Array(c.length).fill(0));
+      for (let k = 0; k < c.length; k++) a[k] += c[k];
+    });
+  }
+  round5(o.p); round5(o.c);
   return o;
 }
+// Lee un archivo de totales (formato v2; uno antiguo, sin separar, cuenta como públicas)
+const aggSplit = (o) => (o && o.v === AGG_V ? { p: o.p || {}, c: o.c || {} } : { p: o || {}, c: {} });
+const addInto = (dst, src) => { for (const [pid, a] of Object.entries(src)) { const s = dst[pid] || (dst[pid] = new Array(a.length).fill(0)); a.forEach((x, k) => { s[k] += x; }); } };
 for (const day of [...dirtyDays].sort()) {
   const ddir = path.join(DATA, 'days', day);
   const ids = new Set((await list(ddir)).map((f) => f.replace('.json.gz', '')));
@@ -526,14 +540,14 @@ for (const day of [...dirtyDays].sort()) {
   for (const e of all) e.p.forEach((p) => perf.push({ e, p }));
   perf.sort((a, b) => b.p[3] - a.p[3] || (b.p[4] + b.p[5]) - (a.p[4] + a.p[5]));
   // marcas del día para la página de récords (sin partidas personalizadas, que pueden ser de modos especiales)
-  const pubPerf = perf.filter((x) => x.e.y !== 'custom'), pubAll = all.filter((e) => e.y !== 'custom');
+  const pubPerf = perf.filter((x) => !isCustom(x.e.y)), pubAll = all.filter((e) => !isCustom(e.y));
   // partido destacado y mejores actuaciones: mejor de partidas públicas (si apenas hay, de todas)
   const bestPool = pubAll.length ? pubAll : all, perfPool = pubPerf.length >= 3 ? pubPerf : perf;
   let best = null;
   for (const e of bestPool) { const mv = e.p[e.v]; if (mv && (!best || mv[3] > best.p[best.v][3])) best = e; }
   const topBy = (idx) => pubPerf.filter((x) => (x.p[idx] || 0) > 0).sort((a, b) => b.p[idx] - a.p[idx] || b.p[3] - a.p[3]).slice(0, 5)
     .map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], v: p[idx], rt: p[3], s: e.s }));
-  const gpd = new Map(); for (const { p } of perf) { const x = gpd.get(p[0]) || { id: p[0], n: p[1], rk: p[6], gp: 0 }; x.gp++; gpd.set(p[0], x); }
+  const gpd = new Map(); for (const { p } of pubPerf) { const x = gpd.get(p[0]) || { id: p[0], n: p[1], rk: p[6], gp: 0 }; x.gp++; gpd.set(p[0], x); }
   const rec = {
     rt: pubPerf.slice(0, 5).map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], ap: p[7], rt: p[3], g: p[4], as: p[5], s: e.s, tm: p[2] })),
     g: topBy(4), as: topBy(5), sv: topBy(9), pts: topBy(11),
@@ -544,7 +558,7 @@ for (const day of [...dirtyDays].sort()) {
   const meta = {
     d: day, n: all.length, x: archived ? 1 : 0, chunks: parts,
     counts: [...counts.entries()].map(([k, n]) => [...k.split('\u0001'), n]).sort((a, b) => b[3] - a[3]),
-    lead: leaders(all),
+    lead: leaders(pubAll.length ? pubAll : all),
     perf: perfPool.slice(0, 10).map(({ e, p }) => ({ i: e.i, k: e.k, t: e.t, id: p[0], n: p[1], rk: p[6], ap: p[7], rt: p[3], g: p[4], as: p[5], s: e.s, tm: p[2] })),
     best, rec,
   };
@@ -560,25 +574,22 @@ const lastDayOf = (ym) => { const [y, m] = ym.split('-').map(Number); return new
 const aggDays = (await list(path.join(INT, 'agg', 'd'))).map((f) => f.slice(0, 10));
 for (const ym of new Set(aggDays.map((d) => d.slice(0, 7)))) {
   if (lastDayOf(ym) >= CUTOFF) continue;
-  const sum = await readJSON(P.aggM(ym), {});
-  for (const d of aggDays.filter((x) => x.startsWith(ym))) {
-    for (const [pid, a] of Object.entries(await readJSON(P.aggD(d), {}))) { const s = sum[pid] || (sum[pid] = new Array(a.length).fill(0)); a.forEach((x, k) => { s[k] += x; }); }
-  }
-  for (const a of Object.values(sum)) a[5] = Math.round(a[5] * 10) / 10;
-  await out.json(P.aggM(ym), sum);
+  const sum = aggSplit(await readJSON(P.aggM(ym), null));
+  for (const d of aggDays.filter((x) => x.startsWith(ym))) { const x = aggSplit(await readJSON(P.aggD(d), {})); addInto(sum.p, x.p); addInto(sum.c, x.c); }
+  await out.json(P.aggM(ym), { v: AGG_V, p: round5(sum.p), c: round5(sum.c) });
   for (const d of aggDays.filter((x) => x.startsWith(ym))) await out.rm(P.aggD(d));
 }
 
 lap('months');
-// ---------- totales de carrera, 30 días y 7 días ----------
-const TA = new Map(), TM = new Map(), TK = new Map();
+// ---------- totales de carrera, 30 días y 7 días (públicas) y de carrera en personalizadas ----------
+const TA = new Map(), TM = new Map(), TK = new Map(), CA = new Map();
 const addTo = (map, obj) => { for (const [pid, a] of Object.entries(obj)) { const s = map.get(pid); if (!s) map.set(pid, a.slice()); else for (let k = 0; k < a.length; k++) s[k] += a[k]; } };
-for (const f of await list(path.join(INT, 'agg', 'm'))) addTo(TA, await readJSON(path.join(INT, 'agg', 'm', f), {}));
+for (const f of await list(path.join(INT, 'agg', 'm'))) { const x = aggSplit(await readJSON(path.join(INT, 'agg', 'm', f), {})); addTo(TA, x.p); addTo(CA, x.c); }
 for (const f of await list(path.join(INT, 'agg', 'd'))) {
-  const day = f.slice(0, 10), obj = await readJSON(path.join(INT, 'agg', 'd', f), {});
-  addTo(TA, obj); if (day >= M30 && day <= TODAY) addTo(TM, obj); if (day >= K7 && day <= TODAY) addTo(TK, obj);
+  const day = f.slice(0, 10), x = aggSplit(await readJSON(path.join(INT, 'agg', 'd', f), {}));
+  addTo(TA, x.p); addTo(CA, x.c); if (day >= M30 && day <= TODAY) addTo(TM, x.p); if (day >= K7 && day <= TODAY) addTo(TK, x.p);
 }
-for (const m of [TA, TM, TK]) for (const a of m.values()) a[5] = Math.round(a[5] * 10) / 10;
+for (const m of [TA, TM, TK, CA]) for (const a of m.values()) a[5] = Math.round(a[5] * 10) / 10;
 
 lap('totals');
 // ---------- perfiles ----------
@@ -621,17 +632,19 @@ for (const [b, pids] of byBucket) {
     if (rerate) for (const g of games) { const r = rerate.get(g[1]); const v = r && r.get(pid); if (v) { g[7] = v[0]; g[8] = v[1]; } }
     if ((x.rh || sweep) && players[pid] && players[pid].rh) for (const g of games) if (g[2] >= recentT || !g[9]) { const ra = C.rankAt(players[pid].rh, g[2]); g[9] = ra ? ra.rk : ''; }
     games.sort((a, b) => b[2] - a[2]); games = games.slice(0, CAP);
-    const a = TA.get(pid);
-    if (!a || !games.length) { delete obj[pid]; continue; }
+    const a = TA.get(pid), ac = CA.get(pid);
+    if ((!a && !ac) || !games.length) { delete obj[pid]; continue; }
     const names = {};
     for (const g of games) for (const o of g[13].concat(g[14])) if (!(o in names)) names[o] = (players[o] && players[o].n) || seenNames.get(o) || (prof.names && prof.names[o]) || o;
-    // racha actual (+ victorias / − derrotas) y mejor racha de victorias entre sus partidos guardados
-    let cs = 0; const r0 = games[0][6];
-    if (r0 === 'W' || r0 === 'L') for (const g of games) { if (g[6] === r0) cs++; else break; }
-    let bs = 0, run = 0; for (let i = games.length - 1; i >= 0; i--) { if (games[i][6] === 'W') { run++; if (run > bs) bs = run; } else run = 0; }
+    // racha actual (+ victorias / − derrotas) y mejor racha de victorias entre sus partidos públicos guardados
+    const pg = games.filter((g) => !isCustom(g[10]));
+    let cs = 0; const r0 = pg[0] && pg[0][6];
+    if (r0 === 'W' || r0 === 'L') for (const g of pg) { if (g[6] === r0) cs++; else break; }
+    let bs = 0, run = 0; for (let i = pg.length - 1; i >= 0; i--) { if (pg[i][6] === 'W') { run++; if (run > bs) bs = run; } else run = 0; }
     if (bs >= 3) S.streak[pid] = bs; else delete S.streak[pid];
-    if (r0 === 'W' && cs >= 3) S.cur[pid] = [cs, games[0][2]]; else delete S.cur[pid];
-    obj[pid] = { id: pid, n: displayName(pid), meta: meta(pid), a, names, cs: r0 === 'L' ? -cs : cs, bs, games };
+    if (r0 === 'W' && cs >= 3) S.cur[pid] = [cs, pg[0][2]]; else delete S.cur[pid];
+    // a: totales de partidas públicas; ac: de personalizadas (custom). Cada una puede faltar.
+    obj[pid] = { id: pid, n: displayName(pid), meta: meta(pid), ...(a ? { a } : {}), ...(ac ? { ac } : {}), names, cs: r0 === 'L' ? -cs : cs, bs, games };
     profiles++;
   }
   if (Object.keys(obj).length) await out.json(P.bucket(b), obj, oldText); else await out.rm(P.bucket(b));
@@ -640,11 +653,14 @@ for (const [b, pids] of byBucket) {
 lap('profiles');
 // ---------- tablas, buscador, rankings, récords (solo en las pasadas completas) ----------
 const pubIds = [...TA.keys()].filter((pid) => TA.get(pid)[0] > 0);
+// en el buscador están también los que solo juegan personalizadas (con el total de partidos de los dos tipos)
+const gpAll = (pid) => ((TA.get(pid) || [0])[0] || 0) + ((CA.get(pid) || [0])[0] || 0);
+const searchIds = [...new Set([...TA.keys(), ...CA.keys()])].filter((pid) => gpAll(pid) > 0);
 const rowOf = (pid, a) => { const s = players[pid] || {}; return [pid, displayName(pid), s.rk || '', s.mmr ?? null, ...a]; };
 const prevIdx = await readJSON(path.join(DATA, 'index.json'), {});
 const verOf = { ...(prevIdx.files || {}) };
 if (heavy) {
-verOf.search = (await out.json(path.join(DATA, 'search.json.gz'), pubIds.map((pid) => { const s = players[pid] || {}; return [pid, displayName(pid), s.rk || '', s.mmr ?? null, TA.get(pid)[0]]; })
+verOf.search = (await out.json(path.join(DATA, 'search.json.gz'), searchIds.map((pid) => { const s = players[pid] || {}; return [pid, displayName(pid), s.rk || '', s.mmr ?? null, gpAll(pid)]; })
   .sort((a, b) => b[4] - a[4]))).v;
 const minA = pubIds.length > 15000 ? 2 : 1;
 for (const [w, map, min] of [['a', TA, minA], ['m', TM, 1], ['k', TK, 1]]) {
@@ -735,7 +751,7 @@ for (const list of [records.rt, records.g, records.as, records.sv, records.pts, 
 verOf.records = (await out.json(path.join(DATA, 'records.json'), records)).v;
 S.lastHeavy = NOW;
 }
-S.metaV = META_V; S.profV = PROF_V; S._hidN = Object.keys(S.hid).length;
+S.metaV = META_V; S.profV = PROF_V; S.aggV = AGG_V; S._hidN = Object.keys(S.hid).length;
 
 lap('top/attr');
 // ---------- índice y estado ----------
@@ -760,7 +776,7 @@ await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
     .sort((a, b) => (players[b].mmr || 0) - (players[a].mmr || 0)).slice(0, 12)
     .map((id) => ({ id, n: displayName(id), rk: players[id].rk || '', t: players[id].seen })),
   totals: {
-    matches: totalMatches, stored, hidden: hiddenNow.size, players: pubIds.length, known: Object.keys(players).length,
+    matches: totalMatches, stored, hidden: hiddenNow.size, players: searchIds.length, known: Object.keys(players).length,
     tracked: Object.values(players).filter((p) => p.chk && !p.gone).length, ranked: Object.values(players).filter((p) => p.mmr != null).length,
     rankChecked: Object.values(players).filter((p) => p.rchk).length, rankBacklog: backlog,
   },
@@ -768,7 +784,7 @@ await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
 }));
 
 console.log(`Peticiones: ${reqs} (${ok} correctas) · perfiles: ${checked} · rangos: ${rankedChecked}`);
-console.log(`Partidos nuevos: ${newMatches}${migrated ? ` · migrados: ${migrated}` : ''} · total: ${totalMatches} (${stored} en bruto) · jugadores: ${pubIds.length} con partidos, ${Object.keys(players).length} conocidos (${discovered} nuevos)`);
+console.log(`Partidos nuevos: ${newMatches}${migrated ? ` · migrados: ${migrated}` : ''} · total: ${totalMatches} (${stored} en bruto) · jugadores: ${searchIds.length} con partidos (${pubIds.length} en públicas), ${Object.keys(players).length} conocidos (${discovered} nuevos)`);
 console.log(`Archivos escritos: ${out.files} (${Math.round(out.bytes / 1024)} KB) · borrados: ${out.removed} · perfiles: ${profiles} · días archivados: ${archivedNow.join(', ') || 'ninguno'}`);
 console.log(`Tiempo: ${Math.round(crawlMs / 1000)} s rastreando, ${Math.round((Date.now() - started - crawlMs) / 1000)} s procesando`);
 if (blocked) { console.log(`Parado: ${blocked}`); if (ok === 0) process.exit(1); }

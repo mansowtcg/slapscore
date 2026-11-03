@@ -142,9 +142,16 @@ jobs:
             Cache-Control: no-cache
           EOF
           rm -f _site/.nojekyll
+          WR="npx -y wrangler@4.146.0"
+          # Buzón de sugerencias: almacén KV "slapscore-feedback" (se crea solo la primera vez)
+          kv_id() { $WR kv namespace list 2>/dev/null | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{try{const j=JSON.parse(s.slice(s.search(/^\[/m)));const x=j.find((n)=>n.title==="slapscore-feedback");if(x)process.stdout.write(x.id)}catch{}})'; }
+          KV=$(kv_id)
+          if [ -z "$KV" ]; then $WR kv namespace create slapscore-feedback || true; KV=$(kv_id); fi
+          if [ -n "$KV" ]; then printf '\n[[kv_namespaces]]\nbinding = "FEEDBACK"\nid = "%s"\n' "$KV" >> wrangler.toml; echo "Buzón: KV $KV"
+          else echo "::warning::No se pudo preparar el almacén del buzón: el token de Cloudflare necesita el permiso Workers KV Storage (Edit)."; fi
           SEC=""
           if [ -n "$DISPATCH_TOKEN" ]; then SEC="$RUNNER_TEMP/cf.env"; printf 'GH_DISPATCH_TOKEN=%s\n' "$DISPATCH_TOKEN" > "$SEC"; fi
-          npx -y wrangler@4.146.0 deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
+          $WR deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
           rm -f "$RUNNER_TEMP/cf.env"
       - name: Programar la siguiente pasada
         if: always()

@@ -99,7 +99,7 @@ export async function profileImage(P, X) {
   await Promise.all([document.fonts.load(F(800, 40)), document.fonts.load(F(800, 40, true)), document.fonts.load(F(600, 30))]).catch(() => {});
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   const meta = P.meta || {}, a = P._a, games = P._g || [];
-  frame(c, X, X.t('Perfil de jugador'));
+  frame(c, X, X.t('Perfil de jugador') + (P._mode === 'cus' ? ' · Custom' : ''));
   avatar(c, P.n, P.id, 60, 190, 200);
   fit(c, P.n, 290, 278, 560, 800, 84);
   const [cur, peak] = await Promise.all([loadImg(X.rankSrc(meta.rk)), loadImg(X.rankSrc(meta.prk))]);

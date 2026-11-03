@@ -1,5 +1,6 @@
 // Panel de administración de SlapScore.
 // Usa un token de GitHub (solo en este navegador) para lanzar el robot y cambiar config/settings.json.
+// El buzón de sugerencias vive en el Worker de Cloudflare: el mismo token sirve para leerlo (el Worker lo comprueba con GitHub).
 const API = 'https://api.github.com';
 const WF = 'crawl.yml';
 const RUN_KEY = 'slapscore-run';
@@ -93,6 +94,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Últimas pasadas</h3><a href="https://github.com/${esc(REPO)}/actions" target="_blank" rel="noopener">Ver en GitHub</a></div><div class="runs" id="runs"><div class="card-b"><div class="sk" style="height:120px"></div></div></div></div>
     </div>
     <div class="col">
+      <div class="card in" id="inbox-card"><div class="card-h"><h3>Buzón de sugerencias</h3><button class="btn sm" type="button" id="inbox-reload">Actualizar</button></div><div id="inbox"><div class="card-b"><div class="sk" style="height:90px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan en cada pasada</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
@@ -105,7 +107,8 @@ export async function mount(root, ctx) {
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
-  loadWorkflow(); loadRuns(); drawRanks();
+  loadWorkflow(); loadRuns(); drawRanks(); loadInbox();
+  $('#inbox-reload').addEventListener('click', () => loadInbox());
   try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawExtra(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
@@ -116,7 +119,7 @@ function login(root) {
   root.innerHTML = `<h1 class="h1 in">Administrador</h1><p class="lead">Trae partidos al momento, pausa el robot y cambia los ajustes de SlapScore.</p>
   <div class="adm-grid">
     <div class="card in"><div class="card-h"><h3>Entrar</h3></div><div class="card-b">
-      <p style="margin-top:0">El panel funciona con un token de GitHub con permiso sobre <b>${esc(REPO)}</b>. Se guarda solo en este navegador y solo se envía a GitHub.</p>
+      <p style="margin-top:0">El panel funciona con un token de GitHub con permiso sobre <b>${esc(REPO)}</b>. Se guarda solo en este navegador. Se envía a GitHub y, para leer el buzón de sugerencias, al servidor de SlapScore en Cloudflare, que solo lo usa para comprobar con GitHub que eres administrador.</p>
       <form id="login" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="tk">Token de GitHub</label><input class="input" id="tk" type="password" autocomplete="off" placeholder="github_pat_…" required></div>
       <p class="err" id="lerr" hidden></p><div><button class="btn primary" type="submit" id="lbtn">Entrar</button></div></form>
     </div></div>
@@ -139,6 +142,48 @@ function login(root) {
       setToken(t); X.renderChrome(); X.toast('Sesión de administrador iniciada'); mount(root, X);
     } catch (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar'; }
   });
+}
+
+// ---------- buzón de sugerencias ----------
+const FB_LABEL = { idea: 'Idea', bug: 'Error', other: 'Otro' };
+let inboxFilter = '';
+async function inboxApi(path = '', opts = {}) {
+  let r;
+  try { r = await fetch(X.apiBase() + '/api/feedback' + path, { ...opts, cache: 'no-store', headers: { Authorization: `Bearer ${token()}` } }); }
+  catch { throw new Error('No se pudo conectar con el buzón (servidor de Cloudflare).'); }
+  let j = null; try { j = await r.json(); } catch {}
+  if (r.status === 401) throw new Error('El buzón no ha aceptado tu token: tiene que ser de una cuenta con permiso de escritura en el repositorio.');
+  if (r.status === 503) throw new Error('El buzón aún no está activo en Cloudflare. Se activa solo con la siguiente pasada del robot.');
+  if (!r.ok) throw new Error(`El buzón respondió con un error ${r.status}.`);
+  return j;
+}
+async function loadInbox() {
+  const el = $('#inbox'); if (!el) return;
+  const { esc, ago } = X;
+  el.innerHTML = '<div class="card-b"><div class="sk" style="height:90px"></div></div>';
+  let items;
+  try { items = (await inboxApi()).items || []; }
+  catch (e) { el.innerHTML = `<div class="card-b err">${esc(e.message)}</div>`; return; }
+  const draw = () => {
+    const n = (k) => items.filter((x) => !k || x.type === k).length;
+    const list = items.filter((x) => !inboxFilter || x.type === inboxFilter);
+    el.innerHTML = `<div class="card-b" style="padding-bottom:6px"><div class="chips">${[['', 'Todos'], ['idea', 'Ideas'], ['bug', 'Errores'], ['other', 'Otros']].map(([k, l]) => `<button type="button" class="chip" data-ibf="${k}" aria-pressed="${inboxFilter === k}">${l} <span class="n">${n(k)}</span></button>`).join('')}</div></div>
+      ${list.length ? `<div class="fb-list">${list.map((x) => `<div class="fb-it" data-id="${esc(x.id)}">
+        <div class="fb-it-h"><span class="pill ${x.type === 'bug' ? 'ot' : x.type === 'idea' ? 'live' : ''}">${esc(FB_LABEL[x.type] || x.type)}</span><span class="muted">${esc(ago(x.t))} · ${new Date(x.t).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${x.lang === 'en' ? ' · EN' : ''}</span>
+          <button class="btn sm" type="button" data-del="${esc(x.id)}">Borrar</button></div>
+        <p class="fb-tx">${esc(x.text)}</p>
+        ${x.contact || x.page ? `<p class="muted fb-meta">${x.contact ? `Contacto: <b>${esc(x.contact)}</b>` : ''}${x.contact && x.page ? ' · ' : ''}${x.page ? `Página: ${/^#[\w\-:.%/]*$/.test(x.page) ? `<a href="${esc(x.page)}">${esc(x.page)}</a>` : esc(x.page)}` : ''}</p>` : ''}
+      </div>`).join('')}</div>` : `<div class="empty">${items.length ? 'Ningún mensaje de este tipo.' : 'Todavía no ha llegado ningún mensaje.'}</div>`}`;
+    $$('[data-ibf]', el).forEach((b) => b.addEventListener('click', () => { inboxFilter = b.getAttribute('data-ibf'); draw(); }));
+    $$('[data-del]', el).forEach((b) => b.addEventListener('click', async () => {
+      // dos pasos: el primer clic pide confirmación en el propio botón
+      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = '¿Seguro? Borrar'; b.classList.add('danger'); setTimeout(() => { if (b.isConnected) { b.dataset.sure = ''; b.textContent = 'Borrar'; b.classList.remove('danger'); } }, 4000); return; }
+      b.disabled = true;
+      try { await inboxApi('/' + b.getAttribute('data-del'), { method: 'DELETE' }); items = items.filter((x) => x.id !== b.getAttribute('data-del')); draw(); X.toast('Mensaje borrado'); }
+      catch (e) { X.toast(e.message); b.disabled = false; }
+    }));
+  };
+  draw();
 }
 
 // ---------- robot ----------

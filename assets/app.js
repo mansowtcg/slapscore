@@ -75,7 +75,7 @@ const loadBucket = (pid) => { const b = C.bucketOf(pid); return remember('p:' + 
 async function loadP(pid) {
   const P = (await loadBucket(pid))[pid];
   if (!P) throw notFoundErr();
-  if (!P._g) { P._g = P.games.map(C.gameObj); P._a = C.aggObj(P.a); }
+  if (!P._g) { P._g = P.games.map(C.gameObj); P._a = C.aggObj(P.a); P._ac = C.aggObj(P.ac); }
   return P;
 }
 const loadSearch = () => remember('s:' + fileVer('search'), () => getJSON('data/search.json.gz', fileVer('search')));
@@ -178,6 +178,7 @@ const ICON = {
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12.5a7.5 7.5 0 0 1-10.9 6.7L4 20.5l1.4-4.3A7.5 7.5 0 1 1 20 12.5Z"/><path d="M9 11h6M9 14.5h3.5"/></svg>',
   coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c0 1 .8 1.2.8 2.2M12 3.5c0 1 .8 1.2.8 2.2"/><path d="M5 21h10"/></svg>',
   ext: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.2 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z"/></svg>',
@@ -198,6 +199,7 @@ APP.innerHTML = `
     <div class="search" role="search">${ICON.search}<input id="q" type="search" placeholder="${esc(t('Buscar jugador, ID o enlace'))}" autocomplete="off" aria-label="${esc(t('Buscar jugador'))}" aria-controls="sres"><div class="sres" id="sres" role="listbox" hidden></div></div>
     <div class="hdr-actions">
       <button class="ibtn" id="btn-install" type="button" aria-label="${esc(t('Instalar SlapScore'))}" title="${esc(t('Instalar la app'))}" hidden>${ICON.install}</button>
+      <button class="ibtn" id="btn-fb" type="button" data-fb aria-label="${esc(t('Enviar una sugerencia'))}" title="${esc(t('Sugerencias y errores'))}">${ICON.chat}</button>
       <button class="ibtn" id="btn-refresh" type="button" aria-label="${esc(t('Actualizar datos'))}" title="${esc(t('Actualizar datos'))}">${ICON.refresh}</button>
       <button class="ibtn lang" id="btn-lang" type="button" aria-label="${LANG === 'en' ? 'Ver en español' : 'View in English'}" title="${LANG === 'en' ? 'Español' : 'English'}">${LANG === 'en' ? 'ES' : 'EN'}</button>
       <button class="ibtn" id="btn-theme" type="button" aria-label="${esc(t('Cambiar tema claro u oscuro'))}" title="${esc(t('Tema claro / oscuro'))}">${ICON.theme}</button>
@@ -233,7 +235,7 @@ function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
   const sup = supportUrl();
-  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r">${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button><a href="#admin">${esc(t('Administrador'))}</a></span>`;
+  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button><a href="#admin">${esc(t('Administrador'))}</a></span>`;
 }
 // Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
 function quiet(tr) { if (tr) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (tr[k]) tr[k].catch(() => {}); return tr; }
@@ -673,7 +675,7 @@ function drawFilters(st) {
   const el = $('#m-filters'); if (!el) return;
   const types = countBy(st, 0);
   if (MF.fav && !FAVS.size) MF.fav = false;
-  el.innerHTML = `<div class="chips" role="group" aria-label="${esc(t('Tipo de partida'))}"><button type="button" class="chip" data-t="" aria-pressed="${!MF.type}">${esc(t('Todos'))} <span class="n">${int(st.meta.n)}</span></button>${types.map(([y, n]) => `<button type="button" class="chip" data-t="${esc(y)}" aria-pressed="${MF.type === y}">${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}
+  el.innerHTML = `<div class="chips" role="group" aria-label="${esc(t('Tipo de partida'))}"><button type="button" class="chip" data-t="" aria-pressed="${!MF.type}">${esc(t('Todos'))} <span class="n">${int(st.meta.n)}</span></button>${types.sort((x, y) => (x[0] === 'custom') - (y[0] === 'custom')).map(([y, n]) => `<button type="button" class="chip${y === 'custom' ? ' cu' : ''}" data-t="${esc(y)}" aria-pressed="${MF.type === y}">${y === 'custom' ? '<span class="cu-dot" aria-hidden="true"></span>' : ''}${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}
       ${S.featured.size ? `<button type="button" class="chip tg" data-x="top" aria-pressed="${MF.top}" title="${esc(t('Partidos con jugadores destacados: los seguidos y los de más MMR'))}">${ICON.bolt}${esc(t('Destacados'))}</button>` : ''}
       ${FAVS.size ? `<button type="button" class="chip tg" data-x="fav" aria-pressed="${MF.fav}" title="${esc(t('Partidos de tus favoritos'))}">${ICON.star}${esc(t('Favoritos'))}</button>` : ''}</div>
     <input class="input" id="m-q" type="search" placeholder="${esc(t('Filtrar por jugador'))}" value="${esc(MF.q)}" autocomplete="off" aria-label="${esc(t('Filtrar partidos por jugador'))}">
@@ -757,8 +759,8 @@ function drawList(st) {
   for (const [k, ms] of [...groups.entries()].sort((a, b) => (tot.get(b[0]) || b[1].length) - (tot.get(a[0]) || a[1].length))) {
     if (budget <= 0) break;
     const [y, r] = k.split('|'); const part = ms.slice(0, budget); budget -= part.length; shown += part.length;
-    const open = !MF.closed.has(k);
-    html += `<div class="card grp in" data-open="${open}" data-k="${esc(k)}"><button class="grp-h" type="button" aria-expanded="${open}"><span class="region">${esc(regionShort(r))}</span>${esc(typeLabel(y))}<span class="sub">${esc(regionLabel(r))}</span><span class="n">${int(Math.max(tot.get(k) || 0, ms.length))}</span>${ICON.down}</button>
+    const open = !MF.closed.has(k), cu = isCustom(y);
+    html += `<div class="card grp${cu ? ' cu' : ''} in" data-open="${open}" data-k="${esc(k)}"><button class="grp-h" type="button" aria-expanded="${open}"><span class="region">${esc(regionShort(r))}</span>${cu ? `<span class="ty-cu">${esc(t('Custom'))}</span>` : esc(typeLabel(y))}<span class="sub">${esc(regionLabel(r))}</span><span class="n">${int(Math.max(tot.get(k) || 0, ms.length))}</span>${ICON.down}</button>
       <div class="grp-b"><div>${part.map((m) => evRow(m, q)).join('')}</div></div></div>`;
   }
   const total = Math.max(rows.length, [...tot.values()].reduce((a, b) => a + b, 0));
@@ -815,6 +817,61 @@ function supportCard(cls = '') {
   const url = supportUrl(); if (!url) return '';
   return `<div class="card in support ${cls}"><div class="card-b"><b>${esc(t('SlapScore es gratis y sin anuncios'))}</b><p>${esc(t('Lo hace un jugador de la comunidad. Si te resulta útil, puedes ayudar a mantenerlo.'))}</p><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a></div></div>`;
 }
+// ---------- buzón de sugerencias ----------
+// Los mensajes van al Worker de Cloudflare (mismo sitio si la web se sirve desde allí; si no, su dirección de workers.dev)
+function apiBase() {
+  const u = String((S.settings && S.settings.api) || '').trim().replace(/\/+$/, '');
+  if (/^https:\/\/[^\s"'<>]+$/.test(u)) return u;
+  return location.hostname.endsWith('github.io') ? 'https://slapscore.misalud.workers.dev' : '';
+}
+function feedbackCard(cls = '') {
+  return `<div class="card in fb-card ${cls}"><div class="card-b"><b>${ICON.chat}${esc(t('¿Ideas o errores?'))}</b><p>${esc(t('Cuéntanos qué mejorarías, qué falta o qué no funciona. Lo leemos todo.'))}</p><button class="btn" type="button" data-fb>${esc(t('Enviar sugerencia'))}</button></div></div>`;
+}
+const FB = { type: 'idea', text: '', contact: '' };   // borrador mientras no se envía
+const FB_TYPES = [['idea', 'Idea'], ['bug', 'Error'], ['other', 'Otro']];
+function openFeedback() {
+  const ovl = openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Buzón de sugerencias'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <form class="fb-form" id="fb-form" novalidate>
+      <p class="muted" style="margin:0">${esc(t('Propuestas, errores de la web, ideas… lo que quieras. Lo lee quien hace SlapScore.'))}</p>
+      <div class="chips" role="radiogroup" aria-label="${esc(t('Tipo de mensaje'))}">${FB_TYPES.map(([k, l]) => `<button type="button" class="chip" role="radio" data-fbt="${k}" aria-checked="${FB.type === k}" aria-pressed="${FB.type === k}">${esc(t(l))}</button>`).join('')}</div>
+      <div class="field"><label for="fb-text">${esc(t('Tu mensaje'))}</label><textarea class="input fb-ta" id="fb-text" maxlength="2000" rows="5" required autofocus placeholder="${esc(t('Por ejemplo: estaría bien poder filtrar por arena en los rankings'))}">${esc(FB.text)}</textarea><small class="muted fb-n" id="fb-n"></small></div>
+      <div class="field"><label for="fb-contact">${esc(t('Discord o email (opcional)'))}</label><input class="input" id="fb-contact" maxlength="120" autocomplete="off" value="${esc(FB.contact)}" placeholder="${esc(t('Solo si quieres que te respondamos'))}"></div>
+      <input class="fb-hp" name="website" id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <p class="muted fb-note">${esc(t('Junto al mensaje se envía la página en la que estás, para poder ver el error.'))}</p>
+      <p class="err" id="fb-err" role="alert" hidden></p>
+      <div class="fb-acts"><button class="btn primary" type="submit" id="fb-send">${esc(t('Enviar'))}</button></div>
+    </form>`, 'fb-sheet');
+  const form = $('#fb-form', ovl), ta = $('#fb-text', ovl), ct = $('#fb-contact', ovl), err = $('#fb-err', ovl), send = $('#fb-send', ovl), cnt = $('#fb-n', ovl);
+  const count = () => { cnt.textContent = ta.value.length > 1500 ? `${ta.value.length} / 2000` : ''; };
+  count();
+  ta.addEventListener('input', () => { FB.text = ta.value; count(); });
+  ct.addEventListener('input', () => { FB.contact = ct.value; });
+  $$('[data-fbt]', ovl).forEach((b) => b.addEventListener('click', () => { FB.type = b.getAttribute('data-fbt'); $$('[data-fbt]', ovl).forEach((x) => { const on = x === b; x.setAttribute('aria-checked', String(on)); x.setAttribute('aria-pressed', String(on)); }); }));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = ta.value.trim();
+    const fail = (msg) => { err.textContent = msg; err.hidden = false; send.disabled = false; send.textContent = t('Enviar'); };
+    if (text.length < 5) { fail(t('Escribe un poco más (al menos 5 letras).')); ta.focus(); return; }
+    err.hidden = true; send.disabled = true; send.textContent = t('Enviando…');
+    let r;
+    try {
+      r = await fetch(apiBase() + '/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: FB.type, text, contact: ct.value.trim(), page: location.hash || '#', lang: LANG, website: $('#fb-hp', ovl).value }) });
+    } catch { return fail(t('No se pudo enviar. Comprueba tu conexión e inténtalo otra vez.')); }
+    if (!r.ok) {
+      let code = ''; try { code = (await r.json()).error || ''; } catch {}
+      return fail(code === 'wait' ? t('Acabas de enviar un mensaje: espera un minuto para mandar otro.') : code === 'full' ? t('Hoy hemos recibido muchísimos mensajes. Prueba mañana, por favor.')
+        : code === 'short' ? t('Escribe un poco más (al menos 5 letras).') : t('El buzón no está disponible ahora mismo. Prueba más tarde.'));
+    }
+    FB.text = ''; FB.contact = '';
+    const sh = $('.sheet', ovl);
+    sh.innerHTML = `<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('¡Gracias!'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+      <div class="fb-form"><p style="margin:0">${esc(t('Hemos recibido tu mensaje. Cada sugerencia se lee y ayuda a decidir qué mejorar.'))}</p><div class="fb-acts"><button class="btn primary" type="button" data-close>${esc(t('Cerrar'))}</button></div></div>`;
+    const c = $('[data-close]', sh); if (c) c.focus({ preventScroll: true });
+  });
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-fb]')) { e.preventDefault(); openFeedback(); } });
+
 // Favoritos: tarjeta en la columna derecha (escritorio) y tira deslizable encima de la lista (móvil)
 function drawFavs(st) {
   const right = $('#fav-card'), strip = $('#m-favs');
@@ -877,6 +934,7 @@ function drawRight(st, top) {
     `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
   html += teamWeekCard(top);
   html += supportCard();
+  html += feedbackCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
   if (top && top.active && top.active.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Más activos'))}</h3><small>${esc(t('7 días'))}</small></div><div style="padding-bottom:8px">${top.active.slice(0, 5).map((p, i) =>
@@ -915,7 +973,7 @@ async function viewMatch(r, tok) {
       <div class="evh-main">
         <div class="evh-team">${crest('home', 56)}<b>${esc(HOME())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'home'))}</span></div>
         <div class="evh-score"><div class="sc" aria-label="${esc(HOME())} ${m.score.home}, ${esc(AWAY())} ${m.score.away}"><span class="${lose('home')}">${m.score.home}</span><i>-</i><span class="${lose('away')}">${m.score.away}</span></div>
-          <span class="pill ${m.ot ? 'ot' : ''}">${esc(endLabel(m.endReason, m.ot))}</span></div>
+          <span class="pill ${m.ot ? 'ot' : ''}">${esc(endLabel(m.endReason, m.ot))}</span>${isCustom(m.type) ? `<span class="pill cu-pill" title="${esc(t('No cuenta para la nota media en públicas'))}">${esc(t('Custom'))}</span>` : ''}</div>
         <div class="evh-team">${crest('away', 56)}<b>${esc(AWAY())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'away'))}</span></div>
       </div>
     </section>
@@ -1130,7 +1188,23 @@ async function shareImage(kind, obj, fname) {
 // =====================================================================
 // JUGADOR
 // =====================================================================
-const PV = { hist: 'all', histN: 15, statMode: 'pg', type: '' };
+const PV = { hist: 'all', histN: 15, statMode: 'pg', mode: 'pub' };
+// Partidas públicas y personalizadas (custom) van por separado: cada perfil se ve en uno de los dos modos
+const isCustom = (y) => y === 'custom';
+const MODES = [['pub', 'Partidas públicas'], ['cus', 'Partidas custom']];
+// modo con el que se ve a un jugador: el elegido, salvo que no tenga partidos de ese tipo
+const modeFor = (P) => (PV.mode === 'cus' ? (P._ac.gp || !P._a.gp ? 'cus' : 'pub') : (P._a.gp || !P._ac.gp ? 'pub' : 'cus'));
+const modeGames = (games, mode) => games.filter((g) => (mode === 'cus') === isCustom(g.y));
+const modeAgg = (P, mode) => (mode === 'cus' ? P._ac : P._a);
+function modeSwitch(P, mode, id = 'pmode') {
+  if (!P._a.gp || !P._ac.gp) return '';
+  return `<div class="mode-bar"><div class="seg mode-sw" id="${id}" role="group" aria-label="${esc(t('Tipo de partida'))}">${MODES.map(([k, l]) => `<button type="button" data-pm="${k}" aria-pressed="${mode === k}">${k === 'cus' ? '<span class="cu-dot" aria-hidden="true"></span>' : ''}${esc(t(l))} <span class="n">${int(modeAgg(P, k).gp)}</span></button>`).join('')}</div></div>`;
+}
+function wireModeSwitch(root = MAIN) {
+  $$('[data-pm]', root).forEach((b) => b.addEventListener('click', () => { if (b.getAttribute('aria-pressed') === 'true') return; PV.mode = b.getAttribute('data-pm'); go({ keepScroll: true, silent: true }); }));
+}
+// Mejor racha de victorias entre unos partidos (del más reciente al más antiguo)
+function bestStreak(games) { let bs = 0, run = 0; for (let i = games.length - 1; i >= 0; i--) { if (games[i].r === 'W') { run++; if (run > bs) bs = run; } else run = 0; } return bs; }
 const favBtn = (id, name) => `<button type="button" class="fav-btn" data-fav="${esc(id)}" data-n="${esc(name)}" aria-pressed="${isFav(id)}" aria-label="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}" title="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}">${ICON.star}</button>`;
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-fav]'); if (!b) return;
@@ -1165,13 +1239,15 @@ async function viewPlayer(pid, tok) {
     return errorBox(e);
   }
   if (!live(tok)) return;
-  PV.hist = 'all'; PV.histN = 15; PV.type = '';
+  PV.hist = 'all'; PV.histN = 15;
   document.title = `${P.n} · SlapScore`;
-  const games = P._g.filter((g) => !S.hidden.has(g.i));
-  const meta = P.meta || {}, a = P._a;
-  // atributos: percentil frente al resto de jugadores con 5 partidos o más
+  const allGames = P._g.filter((g) => !S.hidden.has(g.i));
+  const mode = modeFor(P), cus = mode === 'cus';
+  const games = modeGames(allGames, mode);
+  const meta = P.meta || {}, a = modeAgg(P, mode);
+  // atributos (solo en públicas): percentil frente al resto de jugadores con 5 partidos o más
   let attr = null;
-  if (AT && AT.n > 1 && a.gp >= 5) { const raw = C.attrRaw(a); attr = {}; for (const [k] of C.ATTRS) attr[k] = C.percentile(AT.q[k], raw[k]); }
+  if (!cus && AT && AT.n > 1 && a.gp >= 5) { const raw = C.attrRaw(a); attr = {}; for (const [k] of C.ATTRS) attr[k] = C.percentile(AT.q[k], raw[k]); }
   const avgR = a.gp ? a.rs / a.gp : 0;
   const season = meta.season ? ' · ' + esc(String(meta.season).replace(/^season/i, t('Temporada') + ' ')) : '';
   const curRank = meta.rk ? `<div class="rank-c">${rank(meta.rk, 56)}<div><div class="k">${esc(t('Rango actual'))}</div><div class="nm">${esc(meta.rank || C.parseRank(meta.rk)?.name || '')}</div><div class="pts"><b>${int(meta.mmr)}</b> MMR${season}${meta.rmp != null ? ' · ' + esc(pl(meta.rmp, 'partida', 'partidas')) : ''}</div></div></div>`
@@ -1179,19 +1255,19 @@ async function viewPlayer(pid, tok) {
   const peakRank = meta.prk ? `<div class="rank-c">${rank(meta.prk, 56)}<div><div class="k">${esc(t('Mejor rango'))}</div><div class="nm">${esc(meta.prank || C.parseRank(meta.prk)?.name || '')}</div><div class="pts">${meta.peak != null ? `<b>${int(meta.peak)}</b> ${esc(t('MMR máximo'))}` : ''}</div></div></div>`
     : `<div class="rank-c"><div style="width:56px"></div><div><div class="k">${esc(t('Mejor rango'))}</div><div class="nm">—</div><div class="pts">${esc(t('Sin datos todavía'))}</div></div></div>`;
   const last10 = games.slice(0, 10).reverse();
-  const cs = streakOf(games), feat = S.featured.has(String(P.id));
-  const tcount = new Map(); for (const g of games) tcount.set(g.y, (tcount.get(g.y) || 0) + 1);
-  const types = [...tcount.entries()].filter(([y]) => y).sort((x, y) => y[1] - x[1]);
+  const cs = streakOf(games), bs = bestStreak(games), feat = S.featured.has(String(P.id));
+  const onlyCus = !P._a.gp && P._ac.gp;
   const seed = (S.settings.seeds || []).map(String).includes(String(P.id));
   MAIN.innerHTML = `
     <nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(P.n)}</span></nav>
     <section class="card in">
       <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${favBtn(P.id, P.n)}</h1>
-        <div class="meta"><span>ID ${esc(P.id)}</span>${games[0] ? `<span>${esc(t('Último partido {x}', { x: ago(games[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
-        <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${P.bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: P.bs }))}</span>` : ''}</div></div>
-        <div class="avg">${badge(avgR, 'xl')}${esc(t('Nota media'))}</div></div>
+        <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
+        <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
+        <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
       <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
       <div class="ranks">${curRank}${peakRank}</div>
+      ${modeSwitch(P, mode)}
       <div class="strip"><div><b>${int(a.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${a.w}-${a.l}${a.d ? '-' + a.d : ''}</b><span>${esc(a.d ? t('V-D-E') : t('V-D'))}</span></div><div><b>${pct(a.gp ? a.w / a.gp : 0)}</b><span>${esc(t('Victorias'))}</span></div><div><b>${int(a.mvp)}</b><span>MVP</span></div><div><b>${int(a.g)}</b><span>${esc(t('Goles'))}</span></div><div><b>${int(a.as)}</b><span>${esc(t('Asistencias'))}</span></div></div>
     </section>
     <div style="height:16px"></div>
@@ -1206,25 +1282,22 @@ async function viewPlayer(pid, tok) {
       </div>
       <div class="col">
         <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><div class="seg" role="group" aria-label="${esc(t('Modo'))}"><button type="button" data-sm="pg" aria-pressed="${PV.statMode === 'pg'}">${esc(t('Por partido'))}</button><button type="button" data-sm="tot" aria-pressed="${PV.statMode === 'tot'}">${esc(t('Totales'))}</button></div></div>
-          ${types.length > 1 ? `<div class="chips st-types" role="group" aria-label="${esc(t('Tipo de partida'))}"><button type="button" class="chip" data-sty="" aria-pressed="${!PV.type}">${esc(t('Toda su carrera'))}</button>${types.map(([y, n]) => `<button type="button" class="chip" data-sty="${esc(y)}" aria-pressed="${PV.type === y}">${esc(typeLabel(y))} <span class="n">${int(n)}</span></button>`).join('')}</div>` : ''}<div id="pstats"></div></div>
+          <div id="pstats"></div></div>
         ${bestGamesCard(P, games)}
         ${matesCard(P, games)}
         ${rivalsCard(P, games)}
         <div class="card in"><div class="card-h"><h3>${esc(t('Partidos'))}</h3><div class="seg" role="group" aria-label="${esc(t('Filtrar'))}">${[['all', 'Todos'], ['W', 'Victorias'], ['L', 'Derrotas']].map(([k, l]) => `<button type="button" data-hf="${k}" aria-pressed="${PV.hist === k}">${esc(t(l))}</button>`).join('')}</div></div><div id="phist"></div></div>
       </div>
     </div>`;
-  // estadísticas de toda la carrera o, por tipo de partida, de sus últimos partidos guardados
-  const drawStats = () => {
-    const sub = PV.type ? aggOf(games.filter((g) => g.y === PV.type)) : a;
-    $('#pstats').innerHTML = (PV.type ? `<p class="muted hnote" style="padding-top:0">${esc(t('{n} de sus últimos partidos guardados', { n: int(sub.gp) }))}</p>` : '') + playerStats(sub, PV.statMode);
-  };
-  $$('[data-sty]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.type = b.getAttribute('data-sty'); $$('[data-sty]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawStats(); }));
+  // estadísticas de toda su carrera en el modo elegido (públicas o custom)
+  const drawStats = () => { $('#pstats').innerHTML = playerStats(a, PV.statMode); };
+  wireModeSwitch();
   $$('[data-sm]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.statMode = b.getAttribute('data-sm'); $$('[data-sm]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawStats(); }));
-  $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games); }));
+  $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games, a); }));
   const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(location.href.split('#')[0] + '#j-' + P.id, sh));
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
-  $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
-  drawStats(); drawHist(P, games);
+  $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games, _a: a, _mode: mode }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
+  drawStats(); drawHist(P, games, a);
   // su equipo de la EUSL, si su nombre en la liga coincide con este jugador
   if (S.index && S.index.files && S.index.files.eusl) loadEusl().then((E) => {
     const r = E && E.roster && E.roster[String(P.id)], tg = $('.ph-tags', MAIN);
@@ -1261,16 +1334,6 @@ function weekCard(games) {
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Forma semanal'))}</h3><small>${esc(t('últimos 7 días'))}</small></div>
     <div class="wk">${cols}</div>
     <div class="wk-sum"><div><b>${int(cur.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${cur.gp ? pct(cur.w / cur.gp) : '–'}</b><span>${esc(t('Victorias'))}</span></div><div><b>${cur.gp ? fmtR(ca) : '–'} ${trend}</b><span>${esc(prev.gp ? t('Nota media (vs semana anterior)') : t('Nota media'))}</span></div></div></div>`;
-}
-// Totales (mismo formato que los de carrera) a partir de una lista de partidos del perfil
-function aggOf(gs) {
-  const a = C.aggObj([]);
-  for (const g of gs) {
-    const s = g.st; a.gp++; if (g.r === 'W') a.w++; else if (g.r === 'L') a.l++; else a.d++;
-    if (g.mv) a.mvp++; a.rs += g.rt; a.g += s.goals || 0; a.as += s.assists || 0; a.sh += s.shots || 0; a.sv += s.saves || 0; a.ps += s.passes || 0;
-    a.tk += s.takeaways || 0; a.bl += s.blocks || 0; a.to += s.turnovers || 0; a.po += s.possession_time_sec || 0; a.fw += s.faceoffs_won || 0; a.fl += s.faceoffs_lost || 0; a.ph += s.post_hits || 0; a.pt += s.score || 0;
-  }
-  return a;
 }
 // Sus mejores partidos (por nota) entre los guardados
 function bestGamesCard(P, games) {
@@ -1324,7 +1387,7 @@ function arenaCard(games) {
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Por arena'))}</h3><small>${esc(t('% de victorias y nota media'))}</small></div><div class="dist-b">${list.map(([ar, x]) =>
     `<div class="ar-r" title="${esc(ar)}: ${esc(pl(x.n, 'partido', 'partidos'))} · ${x.w}-${x.n - x.w}"><span class="nm"><span>${esc(ar)}</span><small>${esc(pl(x.n, 'partido', 'partidos'))}</small></span><span class="bar"><i style="width:${Math.round(x.w / x.n * 100)}%"></i></span><span class="v">${pct(x.w / x.n)}</span>${badge(x.rs / x.n)}</div>`).join('')}</div></div>`;
 }
-function drawHist(P, games) {
+function drawHist(P, games, a) {
   const el = $('#phist'); if (!el) return;
   const list = games.filter((g) => PV.hist === 'all' || g.r === PV.hist);
   if (!list.length) { el.innerHTML = `<div class="empty">${esc(t('No hay partidos con este filtro.'))}</div>`; return; }
@@ -1332,8 +1395,8 @@ function drawHist(P, games) {
     const opp = g.op.map((id) => (P.names && P.names[id]) || id).join(', ');
     return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} G · ${g.st.assists || 0} A</span>${badge(g.rt)}</a>`;
   }).join('') + (list.length > PV.histN ? `<div class="more"><button class="btn" type="button" id="h-more">${esc(t('Ver más ({n})', { n: list.length - PV.histN }))}</button></div>`
-    : P._a.gp > P._g.length && PV.hist === 'all' ? `<p class="muted hnote">${esc(t('Aquí salen sus últimos {a} partidos. Las estadísticas cuentan los {b} de su carrera.', { a: int(P._g.length), b: int(P._a.gp) }))}</p>` : '');
-  const b = $('#h-more'); if (b) b.addEventListener('click', () => { PV.histN += 20; drawHist(P, games); });
+    : a.gp > games.length && PV.hist === 'all' ? `<p class="muted hnote">${esc(t('Aquí salen sus últimos {a} partidos. Las estadísticas cuentan los {b} de su carrera.', { a: int(games.length), b: int(a.gp) }))}</p>` : '');
+  const b = $('#h-more'); if (b) b.addEventListener('click', () => { PV.histN += 20; drawHist(P, games, a); });
 }
 function ratingChart(gs, avgR) {
   if (!gs.length) return `<div class="empty">${esc(t('Sin partidos'))}</div>`;
@@ -1394,12 +1457,15 @@ async function viewCompare(r, tok) {
   try { [A, B, AT] = await Promise.all([loadP(r.a), r.b ? loadP(r.b).catch((e) => (e.status === 404 ? null : Promise.reject(e))) : null, loadAttr().catch(() => null)]); }
   catch (e) { if (!live(tok)) return; if (e.status === 404) return notFound(t('Este jugador no tiene partidos guardados todavía.')); return errorBox(e); }
   if (!live(tok)) return;
-  const ga = A._g.filter((g) => !S.hidden.has(g.i));
-  const sug = [...new Set([...mates(A, ga, 'op').slice(0, 6), ...mates(A, ga, 'mt').slice(0, 6)].map((x) => x.id))];
+  const allA = A._g.filter((g) => !S.hidden.has(g.i));
+  const sug = [...new Set([...mates(A, allA, 'op').slice(0, 6), ...mates(A, allA, 'mt').slice(0, 6)].map((x) => x.id))];
+  // públicas o custom: el mismo modo para los dos jugadores
+  const mode = PV.mode === 'cus' && (A._ac.gp || (B && B._ac.gp)) ? 'cus' : 'pub', cus = mode === 'cus';
+  const ga = modeGames(allA, mode);
   const choose = (side) => pickPlayer(side === 'b' ? t('Comparar a {n} con…', { n: A.n }) : t('Cambiar jugador'), { id: side === 'b' ? String(A.id) : String(B && B.id), sug: side === 'b' ? sug : [] },
     (id) => { location.hash = side === 'b' ? `cmp-${A.id}-${id}` : `cmp-${id}-${B.id}`; });
   const head = (P, side) => {
-    const m = P.meta || {}, a = P._a;
+    const m = P.meta || {}, a = modeAgg(P, mode);
     return `<div class="cmp-p ${side}"><a href="#j-${esc(P.id)}" aria-label="${esc(P.n)}">${avatar(P.n, P.id, 'lg')}</a><a class="nm" href="#j-${esc(P.id)}"><span>${esc(P.n)}</span>${rank(m.rk, 24)}</a>
       <span class="sub">${m.rk ? `${esc(m.rank || C.parseRank(m.rk)?.name || '')} · ${int(m.mmr)} MMR` : esc(t('Sin rango'))}</span>${badge(a.gp ? a.rs / a.gp : 0, 'lg')}
       <button class="btn sm" type="button" data-chg="${side}">${esc(t('Cambiar'))}</button></div>`;
@@ -1413,8 +1479,9 @@ async function viewCompare(r, tok) {
     if (r.b) toast(t('Ese jugador no tiene partidos guardados todavía.'));
     return;
   }
-  const gb = B._g.filter((g) => !S.hidden.has(g.i));
-  const a = A._a, b = B._a, ma = A.meta || {}, mb = B.meta || {};
+  const gb = modeGames(B._g.filter((g) => !S.hidden.has(g.i)), mode);
+  const a = modeAgg(A, mode), b = modeAgg(B, mode), ma = A.meta || {}, mb = B.meta || {};
+  const anyCus = A._ac.gp || B._ac.gp;
   // cara a cara: partidos de los dos (de los últimos guardados de cada uno)
   const both = new Map();
   for (const g of ga) { const ida = String(B.id); if (g.op.includes(ida)) both.set(g.i, { g, vs: true, r: g.r }); else if (g.mt.includes(ida)) both.set(g.i, { g, vs: false, r: g.r }); }
@@ -1432,14 +1499,15 @@ async function viewCompare(r, tok) {
     ['Posesión por partido', per(a.po, a.gp), per(b.po, b.gp), (v) => C.fmtPoss(v)], ['Faceoffs ganados', fo(a), fo(b), pct],
   ];
   const rk = (ma.mmr != null || mb.mmr != null) ? [['MMR', ma.mmr || 0, mb.mmr || 0, int], ['MMR máximo', ma.peak || 0, mb.peak || 0, int]] : [];
-  const atA = attrOf(a, AT), atB = attrOf(b, AT);
+  const atA = cus ? null : attrOf(a, AT), atB = cus ? null : attrOf(b, AT);
   MAIN.innerHTML = `<nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(t('Comparar'))}</span></nav>
     <h1 class="sr-only">${esc(A.n)} vs ${esc(B.n)}</h1>
     <div class="card in cmp-head">${head(A, 'h')}<div class="cmp-vs">VS<button class="ibtn" type="button" id="cmp-swap" title="${esc(t('Intercambiar'))}" aria-label="${esc(t('Intercambiar'))}">${ICON.vs}</button></div>${head(B, 'a')}</div>
+    ${anyCus ? `<div class="cmp-mode in"><div class="seg mode-sw" role="group" aria-label="${esc(t('Tipo de partida'))}">${MODES.map(([k, l]) => `<button type="button" data-pm="${k}" aria-pressed="${mode === k}">${k === 'cus' ? '<span class="cu-dot" aria-hidden="true"></span>' : ''}${esc(t(l))}</button>`).join('')}</div></div>` : ''}
     <div style="height:16px"></div>
     <div class="layout two">
       <div class="col">
-        <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><small>${esc(t('toda su carrera en SlapScore'))}</small></div><div class="card-b">
+        <div class="card in"><div class="card-h"><h3>${esc(t('Estadísticas'))}</h3><small>${esc(t(cus ? 'toda su carrera en custom' : 'toda su carrera en públicas'))}</small></div><div class="card-b">
           ${rk.length ? `<div class="sgrp-h">${esc(t('Clasificatoria'))}</div>${rk.map(([l, x, y, f]) => cmpLine(t(l), x, y, f)).join('')}` : ''}
           <div class="sgrp-h">${esc(t('General'))}</div>${rows.slice(0, 4).map(([l, x, y, f, inv]) => cmpLine(t(l), x, y, f, inv)).join('')}
           <div class="sgrp-h">${esc(t('Por partido'))}</div>${rows.slice(4).map(([l, x, y, f, inv]) => cmpLine(t(l), x, y, f, inv)).join('')}
@@ -1454,6 +1522,7 @@ async function viewCompare(r, tok) {
       </aside>
     </div>`;
   MAIN.onclick = (e) => { const c = e.target.closest('[data-chg]'); if (c) choose(c.getAttribute('data-chg')); };
+  wireModeSwitch();
   $('#cmp-swap').addEventListener('click', () => { location.hash = `cmp-${B.id}-${A.id}`; });
 }
 
@@ -1464,7 +1533,7 @@ const PF = { q: '', win: 'a', min: 3, sort: 'avg', dir: -1, limit: 50, fav: fals
 const TIER_OPTS = [['', 'Todos los rangos'], ['LEGEND', 'Legend'], ['DIAMOND', 'Diamond'], ['PLAT', 'Platinum'], ['GOLD', 'Gold'], ['SILVER', 'Silver'], ['BRONZE', 'Bronze'], ['-', 'Sin rango']];
 const PCOLS = [['mmr', 'Rango'], ['gp', 'PJ'], ['w', 'V'], ['wp', '% V'], ['avg', 'Nota'], ['mvp', 'MVP'], ['g', 'G'], ['as', 'A'], ['ga', 'G+A'], ['ppg', 'PTS/PJ'], ['sh', 'Tiros'], ['shp', '% tiro'], ['sv', 'Paradas'], ['ps', 'Pases'], ['tk', 'Robos'], ['to', 'Pérd.'], ['po', 'Posesión/PJ']];
 async function viewPlayers(tok) {
-  MAIN.innerHTML = `<h1 class="h1 in">${esc(t('Jugadores'))}</h1><p class="lead">${esc(t('Todos los jugadores con partidos guardados. Pulsa una columna para ordenar.'))}</p>
+  MAIN.innerHTML = `<h1 class="h1 in">${esc(t('Jugadores'))}</h1><p class="lead">${esc(t('Todos los jugadores con partidas públicas guardadas. Las custom van aparte, en el perfil de cada uno. Pulsa una columna para ordenar.'))}</p>
     <div class="card in"><div class="card-h" style="flex-wrap:wrap"><div class="toolbar" style="width:100%">
       <input class="input grow" id="p-q" type="search" placeholder="${esc(t('Buscar jugador'))}" value="${esc(PF.q)}" autocomplete="off" aria-label="${esc(t('Buscar jugador'))}">
       <div class="seg" role="group" aria-label="${esc(t('Periodo'))}">${[['a', 'Siempre'], ['m', '30 días'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-w="${k}" aria-pressed="${PF.win === k}">${esc(t(l))}</button>`).join('')}</div>
@@ -1515,7 +1584,7 @@ function drawPlayers(all) {
 const rkTabs = (on) => `<div class="seg seg-links in" role="navigation" aria-label="${esc(t('Secciones'))}"><a href="#rankings" aria-current="${on === 'rankings' ? 'page' : 'false'}">${esc(t('Rankings'))}</a><a href="#records" aria-current="${on === 'records' ? 'page' : 'false'}">${esc(t('Récords'))}</a></div>`;
 const RK = { win: 'a' };
 async function viewRankings(tok) {
-  MAIN.innerHTML = `${rkTabs('rankings')}<h1 class="h1 in">${esc(t('Rankings'))}</h1><p class="lead">${esc(t('Los mejores de la comunidad. Las medias piden un mínimo de partidos para contar.'))}</p>
+  MAIN.innerHTML = `${rkTabs('rankings')}<h1 class="h1 in">${esc(t('Rankings'))}</h1><p class="lead">${esc(t('Los mejores de la comunidad en partidas públicas. Las medias piden un mínimo de partidos para contar.'))}</p>
     <div class="toolbar" style="margin-bottom:16px"><div class="seg" role="group" aria-label="${esc(t('Periodo'))}">${[['a', 'Siempre'], ['m', '30 días'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-w="${k}" aria-pressed="${RK.win === k}">${esc(t(l))}</button>`).join('')}</div></div>
     <div class="rk-grid" id="rk">${Array.from({ length: 6 }, () => skeletonList(5)).join('')}</div>`;
   let R; try { R = await loadRankings(); } catch (e) { if (live(tok)) errorBox(e); return; }
@@ -1570,7 +1639,7 @@ function drawRankings(R) {
 // =====================================================================
 const REC = { win: 'a' };
 async function viewRecords(tok) {
-  MAIN.innerHTML = `${rkTabs('records')}<h1 class="h1 in">${esc(t('Récords'))}</h1><p class="lead">${esc(t('Las mejores marcas desde que SlapScore guarda partidos. Sin contar las partidas personalizadas, que pueden ser de modos especiales.'))}</p>
+  MAIN.innerHTML = `${rkTabs('records')}<h1 class="h1 in">${esc(t('Récords'))}</h1><p class="lead">${esc(t('Las mejores marcas desde que SlapScore guarda partidos. Solo partidas públicas: las custom pueden ser de modos especiales.'))}</p>
     <div class="toolbar" style="margin-bottom:16px"><div class="seg" role="group" aria-label="${esc(t('Periodo'))}">${[['a', 'Siempre'], ['k', '7 días']].map(([k, l]) => `<button type="button" data-rw="${k}" aria-pressed="${REC.win === k}">${esc(t(l))}</button>`).join('')}</div></div>
     <div class="rk-grid" id="rec">${Array.from({ length: 6 }, () => skeletonList(5)).join('')}</div>`;
   let R; try { R = await loadRecords(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#rec').innerHTML = `<div class="card empty">${esc(t('Los récords aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
@@ -1659,6 +1728,7 @@ function viewMethod() {
       <div class="card in"><div class="card-h"><h3>${esc(t('La nota'))}</h3></div><div class="card-b">
         <p>${t('Todos empiezan en {b}. Cada acción suma o resta según su peso; después se añade el resultado y se resta un poco por cada gol que encaja su equipo, porque en Slapshot defienden todos.', { b: `<b>${dec(W.base)}</b>` })}</p>
         <p>${esc(t('En 2v2 y 1v1 cada jugador acumula más acciones, así que ahí pesan menos para que las notas se puedan comparar entre formatos. Por encima de 8,5 y por debajo de 4,5 la escala se comprime, así que un 10 o un 3 solo salen en partidos excepcionales. El jugador con la nota más alta es el MVP.'))}</p>
+        <p>${esc(t('Las partidas públicas y las custom van por separado: cada jugador tiene una nota media y unas estadísticas para cada tipo, y en su perfil eliges cuáles ver. Las tablas, los rankings y los récords cuentan solo las públicas.'))}</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px">${[[9.2, '9 o más'], [8.4, '8 – 8,9'], [7.4, '7 – 7,9'], [6.7, '6,5 – 6,9'], [6.2, '6 – 6,4'], [5.5, 'menos de 6']].map(([r, l]) => `<span style="display:flex;gap:8px;align-items:center">${badge(r)}<span class="muted">${esc(t(l))}</span></span>`).join('')}</div>
       </div></div>
       <div class="card in"><div class="card-h"><h3>${esc(t('Rangos'))}</h3><small>${esc(hasOfficial() ? t('logos oficiales') : t('emblemas de SlapScore'))}</small></div><div class="card-b"><div class="rk-legend">
@@ -1681,7 +1751,7 @@ function viewMethod() {
 // ADMIN
 // =====================================================================
 function ctx() {
-  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl };
+  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl, apiBase };
 }
 async function viewAdmin(tok) {
   MAIN.innerHTML = skeletonList(4);
