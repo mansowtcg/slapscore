@@ -177,6 +177,10 @@ export default {
   'Hoy hemos recibido muchísimos mensajes. Prueba mañana, por favor.': "We've had loads of messages today. Please try again tomorrow.",
   'El buzón no está disponible ahora mismo. Prueba más tarde.': "Feedback isn't available right now. Please try again later.",
   '¡Gracias!': 'Thanks!', 'Hemos recibido tu mensaje. Cada sugerencia se lee y ayuda a decidir qué mejorar.': 'We got your message. Every suggestion is read and helps decide what to improve next.',
+  // privacidad
+  'Privacidad': 'Privacy',
+  'SlapScore no usa cookies ni publicidad. Para saber cuánta gente usa la web contamos las visitas de forma anónima: qué páginas se ven, desde qué web se llega, el país y el tipo de dispositivo.': 'SlapScore uses no cookies and no ads. To know how many people use the site we count visits anonymously: which pages are viewed, which site people come from, their country and type of device.',
+  'No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.': "We don't store your IP or put identifiers in your browser. Your favourites and settings stay in it only.",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

@@ -35,7 +35,7 @@ const isFav = (id) => FAVS.has(String(id));
 function toggleFav(id, name) {
   id = String(id);
   if (FAVS.has(id)) FAVS.delete(id);
-  else { if (FAVS.size >= FAV_MAX) { toast(t('Como mucho {n} favoritos', { n: FAV_MAX })); return false; } FAVS.set(id, name || id); }
+  else { if (FAVS.size >= FAV_MAX) { toast(t('Como mucho {n} favoritos', { n: FAV_MAX })); return false; } FAVS.set(id, name || id); trackEvent('fav'); }
   try { localStorage.setItem(FAV_KEY, JSON.stringify([...FAVS])); } catch {}
   return FAVS.has(id);
 }
@@ -424,6 +424,7 @@ async function go(opts = {}) {
   const tok = ++TOK;
   const r = route(); setNav(r.view);
   const path = r.view + (r.day || r.id || r.pid || (r.a ? r.a + '-' + r.b : ''));
+  if (S.booted && path !== lastPath) trackView(r);
   const scroll = !opts.keepScroll && path !== lastPath; lastPath = path;
   const y = opts.restore ? SCROLL.get(location.hash || '#') : null;
   // Con la página anterior aún visible esperamos un momento a los datos: la nueva aparece ya completa, sin esqueletos
@@ -824,6 +825,56 @@ function apiBase() {
   if (/^https:\/\/[^\s"'<>]+$/.test(u)) return u;
   return location.hostname.endsWith('github.io') ? 'https://slapscore.misalud.workers.dev' : '';
 }
+
+// ---------- visitas (estadísticas anónimas del panel de administrador) ----------
+// Sin cookies ni identificadores: la web solo avisa de qué página se ve (y, en la primera, de qué dominio viene),
+// el tipo de dispositivo, el idioma y si es la app instalada. El servidor cuenta personas con un resumen cifrado que
+// cambia cada mes y no guarda la IP. No se cuenta al administrador ni a los navegadores automáticos.
+const NOTRACK_KEY = 'slapscore-notrack';
+const TRK = { started: false, vis: 0, acc: 0 };
+function trackable() {
+  if (!S.booted || navigator.webdriver || location.protocol !== 'https:' || isAdmin()) return false;
+  try { if (localStorage.getItem(NOTRACK_KEY)) return false; } catch {}
+  return true;
+}
+function beacon(o) {
+  const url = apiBase() + '/api/v', body = JSON.stringify(o);
+  try { if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return; } catch {}
+  fetch(url, { method: 'POST', body, keepalive: true, mode: 'no-cors', credentials: 'omit' }).catch(() => {});
+}
+function pageKey(r) {
+  switch (r.view) {
+    case 'player': { const id = String(r.pid || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40); return id ? 'j:' + id : null; }
+    case 'match': return 'partido';
+    case 'compare': return 'cmp';
+    case 'jugadores': return 'tabla';
+    case 'rankings': case 'records': case 'eusl': case 'notas': return r.view;
+    case 'admin': return null;
+    default: return r.day && r.day !== today() ? 'dia' : 'home';
+  }
+}
+const devKind = () => { const m = Math.min(screen.width || 0, screen.height || 0); return !matchMedia('(pointer: coarse)').matches ? 'd' : m >= 600 ? 't' : 'm'; };
+function trackView(r) {
+  const p = pageKey(r);
+  if (!p || !trackable()) return;
+  const o = { k: 0, p, d: devKind(), l: String(navigator.language || '').slice(0, 2).toLowerCase(), s: LANG, a: standalone() ? 1 : 0 };
+  if (!TRK.started) {
+    TRK.started = true; engOn();
+    try { const q = new URLSearchParams(location.search); const v = q.get('ref') || q.get('utm_source'); if (v) o.q = v.slice(0, 40); } catch {}
+    try { const h = document.referrer ? new URL(document.referrer).hostname : ''; if (h && h !== location.hostname) o.r = h; } catch {}
+  }
+  beacon(o);
+}
+function trackEvent(name) { if (TRK.started && trackable()) beacon({ k: 2, p: name }); }
+// tiempo con la página a la vista: se manda al ocultarla (cambiar de pestaña, bloquear el móvil, cerrar)
+function engOn() { if (!document.hidden && !TRK.vis) TRK.vis = Date.now(); }
+function engFlush() {
+  if (TRK.vis) { TRK.acc += Date.now() - TRK.vis; TRK.vis = 0; }
+  const n = Math.round(TRK.acc / 1000); TRK.acc = 0;
+  if (n >= 1 && TRK.started && trackable()) beacon({ k: 1, n: Math.min(n, 1800) });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) engFlush(); else if (TRK.started) engOn(); });
+addEventListener('pagehide', engFlush);
 function feedbackCard(cls = '') {
   return `<div class="card in fb-card ${cls}"><div class="card-b"><b>${ICON.chat}${esc(t('¿Ideas o errores?'))}</b><p>${esc(t('Cuéntanos qué mejorarías, qué falta o qué no funciona. Lo leemos todo.'))}</p><button class="btn" type="button" data-fb>${esc(t('Enviar sugerencia'))}</button></div></div>`;
 }
@@ -863,7 +914,7 @@ function openFeedback() {
       return fail(code === 'wait' ? t('Acabas de enviar un mensaje: espera un minuto para mandar otro.') : code === 'full' ? t('Hoy hemos recibido muchísimos mensajes. Prueba mañana, por favor.')
         : code === 'short' ? t('Escribe un poco más (al menos 5 letras).') : t('El buzón no está disponible ahora mismo. Prueba más tarde.'));
     }
-    FB.text = ''; FB.contact = '';
+    FB.text = ''; FB.contact = ''; trackEvent('feedback');
     const sh = $('.sheet', ovl);
     sh.innerHTML = `<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('¡Gracias!'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
       <div class="fb-form"><p style="margin:0">${esc(t('Hemos recibido tu mensaje. Cada sugerencia se lee y ayuda a decidir qué mejorar.'))}</p><div class="fb-acts"><button class="btn primary" type="button" data-close>${esc(t('Cerrar'))}</button></div></div>`;
@@ -1182,6 +1233,7 @@ async function shareImage(kind, obj, fname) {
     $('#sh-pv').innerHTML = `<img src="${url}" alt="">`;
     $('#sh-f').innerHTML = `<a class="btn" href="${url}" download="${esc(fname)}">${ICON.install}${esc(t('Descargar'))}</a>${canShare ? `<button class="btn primary" type="button" id="sh-go">${ICON.share}${esc(t('Compartir'))}</button>` : ''}`;
     const go = $('#sh-go'); if (go) go.addEventListener('click', () => navigator.share({ files: [file], title: 'SlapScore' }).catch(() => {}));
+    let counted = false; $('#sh-f').addEventListener('click', (e) => { if (!counted && e.target.closest('a, button')) { counted = true; trackEvent('share'); } });
   } catch (e) { const pv = $('#sh-pv'); if (pv) pv.innerHTML = `<div class="empty">${esc(t('No se pudo crear la imagen.'))}</div>`; }
 }
 
@@ -1744,6 +1796,10 @@ function viewMethod() {
       <div class="card in"><div class="card-h"><h3>${esc(t('Pesos de cada acción'))}</h3>${JSON.stringify(W) !== JSON.stringify(D) ? `<small>${esc(t('personalizados'))}</small>` : ''}</div><div class="tscroll"><table class="tbl"><thead><tr><th>${esc(t('Acción'))}</th><th>${esc(t('Peso'))}</th></tr></thead><tbody>
         ${C.WEIGHT_FIELDS.map(([k, l]) => `<tr><td>${esc(t(l))}</td><td>${k === 'base' ? dec(W[k]) : k.startsWith('fmt') ? '×' + dec(W[k], 2) : sign(W[k])}</td></tr>`).join('')}
       </tbody></table></div></div>
+      <div class="card in"><div class="card-h"><h3>${esc(t('Privacidad'))}</h3></div><div class="card-b">
+        <p style="margin-top:0">${esc(t('SlapScore no usa cookies ni publicidad. Para saber cuánta gente usa la web contamos las visitas de forma anónima: qué páginas se ven, desde qué web se llega, el país y el tipo de dispositivo.'))}</p>
+        <p style="margin-bottom:0">${esc(t('No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.'))}</p>
+      </div></div>
     </div></div>`;
 }
 
@@ -1751,7 +1807,7 @@ function viewMethod() {
 // ADMIN
 // =====================================================================
 function ctx() {
-  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl, apiBase };
+  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl, apiBase, NOTRACK_KEY, loadP };
 }
 async function viewAdmin(tok) {
   MAIN.innerHTML = skeletonList(4);
@@ -1850,6 +1906,7 @@ function moved() {
     return;
   }
   renderChrome(); go({ instant: true }); S.booted = true;
+  trackView(route());
 })();
 
 // ---------- app instalable ----------
@@ -1872,6 +1929,6 @@ async function install() {
 }
 $('#btn-install').addEventListener('click', install);
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('#btn-install').hidden = false; setTimeout(showTip, 2500); });
-addEventListener('appinstalled', () => { installEvt = null; $('#btn-install').hidden = true; hideTip(true); toast(t('SlapScore instalada en tu dispositivo')); });
+addEventListener('appinstalled', () => { trackEvent('install'); installEvt = null; $('#btn-install').hidden = true; hideTip(true); toast(t('SlapScore instalada en tu dispositivo')); });
 if (isIOS() && !standalone()) { $('#btn-install').hidden = false; setTimeout(showTip, 3500); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });

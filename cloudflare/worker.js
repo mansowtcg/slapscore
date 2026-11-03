@@ -1,14 +1,20 @@
 // SlapScore en Cloudflare Workers.
 // La web son archivos estáticos (los sirve Cloudflare sin pasar por aquí). Este Worker solo:
 //  1) responde a las rutas que no son un archivo (404),
-//  2) recibe el buzón de sugerencias (/api/feedback) y se lo enseña al administrador, y
-//  3) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
+//  2) recibe el buzón de sugerencias (/api/feedback) y se lo enseña al administrador,
+//  3) cuenta las visitas (/api/v) y le enseña las estadísticas al administrador (/api/stats), y
+//  4) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
 //     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar.
 //
 // Buzón: los mensajes se guardan en el KV "FEEDBACK" (lo crea el flujo de GitHub al publicar).
 // No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle.
 // Para leerlos o borrarlos hace falta el token de GitHub del administrador, que se comprueba con GitHub
 // (tiene que poder escribir en el repositorio).
+//
+// Visitas: se guardan en el Durable Object "Stats" (stats.js), sin cookies ni IP. Ver la explicación allí.
+
+import { Stats, cleanHit, BOT } from './stats.js';
+export { Stats };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
 const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, DAY_LIMIT = 200, LIST_LIMIT = 300;
@@ -118,9 +124,47 @@ async function feedback(request, env, path) {
   return json({ error: 'not found' }, 404, request, env);
 }
 
+// ---------- visitas ----------
+const statsStub = (env) => env.STATS.get(env.STATS.idFromName('main'));
+function preflight(request, env, methods, headers) {
+  const o = allowedOrigin(request, env);
+  return new Response(null, { status: 204, headers: o ? { 'access-control-allow-origin': o, vary: 'Origin', 'access-control-allow-methods': methods, 'access-control-allow-headers': headers, 'access-control-max-age': '86400' } : {} });
+}
+// La web manda cada página vista con sendBeacon (texto JSON, sin cookies). Se responde enseguida y se guarda por detrás.
+async function visit(request, env, ctx) {
+  if (request.method === 'OPTIONS') return preflight(request, env, 'POST, OPTIONS', 'content-type');
+  if (request.method !== 'POST') return new Response(null, { status: 405 });
+  const o = allowedOrigin(request, env);
+  if (!o) return new Response(null, { status: 403 });
+  const h = { 'access-control-allow-origin': o, vary: 'Origin', 'cache-control': 'no-store' };
+  const ua = request.headers.get('user-agent') || '';
+  if (!env.STATS || !ua || BOT.test(ua)) return new Response(null, { status: 204, headers: h });
+  let b = null;
+  try { b = JSON.parse((await request.text()).slice(0, 2000)); } catch {}
+  const d = cleanHit(b, { ip: request.headers.get('cf-connecting-ip') || '', ua, cc: request.cf && request.cf.country });
+  if (d) {
+    const p = statsStub(env).fetch('https://stats/hit', { method: 'POST', body: JSON.stringify(d) }).catch(() => {});
+    if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
+  }
+  return new Response(null, { status: 204, headers: h });
+}
+async function stats(request, env) {
+  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, OPTIONS', 'authorization');
+  if (request.method !== 'GET') return json({ error: 'method' }, 405, request, env);
+  if (!env.STATS) return json({ error: 'unavailable' }, 503, request, env);
+  if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
+  const range = new URL(request.url).searchParams.get('range') || '7d';
+  const r = await statsStub(env).fetch('https://stats/stats?range=' + encodeURIComponent(range));
+  const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+  const o = allowedOrigin(request, env); if (o) { h['access-control-allow-origin'] = o; h.vary = 'Origin'; }
+  return new Response(await r.text(), { status: r.status, headers: h });
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const path = decodeURIComponent(new URL(request.url).pathname).replace(/\/+$/, '');
+    if (path === '/api/v') return visit(request, env, ctx);
+    if (path === '/api/stats') return stats(request, env);
     if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);
     return env.ASSETS.fetch(request);
   },

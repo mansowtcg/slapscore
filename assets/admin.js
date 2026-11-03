@@ -4,6 +4,7 @@
 const API = 'https://api.github.com';
 const WF = 'crawl.yml';
 const RUN_KEY = 'slapscore-run';
+const TAB_KEY = 'slapscore-admtab';
 const REPO = (() => {
   const h = location.hostname, seg = location.pathname.split('/').filter(Boolean);
   return h.endsWith('.github.io') && seg[0] ? `${h.split('.')[0]}/${seg[0]}` : 'mansowtcg/slapscore';
@@ -82,7 +83,11 @@ export async function mount(root, ctx) {
   X = ctx;
   if (!token()) return login(root);
   const { esc } = X;
+  let tab = 'traffic'; try { if (localStorage.getItem(TAB_KEY) === 'robot') tab = 'robot'; } catch {}
   root.innerHTML = `<h1 class="h1 in">Administrador</h1><p class="lead">Repositorio <b>${esc(REPO)}</b>. Los cambios los hace GitHub con tu token, que solo está guardado en este navegador. <button class="btn sm" type="button" id="logout" style="margin-left:6px">Cerrar sesión</button></p>
+  <div class="seg adm-tabs" role="tablist" aria-label="Secciones del panel">${[['traffic', 'Tráfico'], ['robot', 'Robot y ajustes']].map(([k, l]) => `<button type="button" role="tab" id="tab-${k}" aria-controls="pane-${k}" aria-selected="${tab === k}" tabindex="${tab === k ? 0 : -1}" data-tab="${k}">${l}</button>`).join('')}</div>
+  <section id="pane-traffic" role="tabpanel" aria-labelledby="tab-traffic"${tab === 'traffic' ? '' : ' hidden'}></section>
+  <section id="pane-robot" role="tabpanel" aria-labelledby="tab-robot"${tab === 'robot' ? '' : ' hidden'}>
   <div class="adm-grid">
     <div class="col">
       <div class="card in"><div class="card-h"><h3>Traer partidos ahora</h3></div><div class="card-b">
@@ -101,7 +106,23 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Web, archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Partidos ocultos</h3></div><div id="hidden"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
     </div>
-  </div>`;
+  </div></section>`;
+  // pestañas: Tráfico (se carga al abrirla por primera vez) y Robot y ajustes
+  let trafficOn = false;
+  const showTab = (k, focus) => {
+    $$('[data-tab]', root).forEach((b) => { const on = b.getAttribute('data-tab') === k; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
+    $('#pane-traffic', root).hidden = k !== 'traffic'; $('#pane-robot', root).hidden = k !== 'robot';
+    try { localStorage.setItem(TAB_KEY, k); } catch {}
+    if (k === 'traffic' && !trafficOn) {
+      trafficOn = true;
+      import('./traffic.js').then((T) => T.mount($('#pane-traffic', root), X, token)).catch((e) => { trafficOn = false; $('#pane-traffic', root).innerHTML = `<div class="card"><div class="card-b err" style="padding-top:16px">${X.esc(e.message || 'No se pudo cargar el panel de tráfico.')}</div></div>`; });
+    }
+  };
+  $$('[data-tab]', root).forEach((b) => {
+    b.addEventListener('click', () => showTab(b.getAttribute('data-tab')));
+    b.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); showTab(b.getAttribute('data-tab') === 'traffic' ? 'robot' : 'traffic', true); } });
+  });
+  showTab(tab);
   $('#logout').addEventListener('click', () => { setToken(null); X.renderChrome(); X.toast('Sesión de administrador cerrada'); login(root); });
   let minutes = 8;
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
@@ -139,7 +160,8 @@ function login(root) {
     try {
       await gh(`/actions/workflows/${WF}`, {}, t);
       await gh('/contents/config/settings.json?ref=main', {}, t);
-      setToken(t); X.renderChrome(); X.toast('Sesión de administrador iniciada'); mount(root, X);
+      setToken(t); try { localStorage.setItem(X.NOTRACK_KEY, '1'); } catch {}   // tus visitas no cuentan en las estadísticas
+      X.renderChrome(); X.toast('Sesión de administrador iniciada'); mount(root, X);
     } catch (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar'; }
   });
 }

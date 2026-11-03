@@ -15,3 +15,12 @@ GH_REPO = "mansowtcg/slapscore"
 
 [triggers]
 crons = ["7,37 * * * *"]
+
+# Estadísticas de visitas: Durable Object con SQLite (incluido en el plan gratuito)
+[[durable_objects.bindings]]
+name = "STATS"
+class_name = "Stats"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Stats"]

@@ -23,6 +23,7 @@ Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://m
 - **Comparar jugadores**, **tabla de jugadores** (periodo, mínimo de partidos, rango, favoritos), **rankings** (con reparto de rangos), **récords** (siempre o 7 días), **EUSL** (eusl.gg, con enlace a cada equipo) y **cómo puntuamos**.
 - **Favoritos** guardados en el navegador de cada uno (con la lista de hoy abierta, sale un aviso cuando un favorito termina un partido); buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
 - **Buzón de sugerencias** (icono de bocadillo en la cabecera, enlace en el pie y recuadro en la portada): ideas, errores u otros, con contacto opcional. Los mensajes se guardan en Cloudflare y se leen y borran desde el panel de administrador.
+- **Panel de tráfico** (pestaña «Tráfico» del administrador): personas conectadas ahora mismo, visitantes, visitas, páginas vistas, páginas por visita, tiempo medio y rebote comparados con el periodo anterior, gráfico por horas, días o meses, páginas y jugadores más vistos, de dónde vienen (también enlaces con `?ref=`), países, dispositivos, navegadores, sistemas, idiomas, páginas de entrada, fidelidad, acciones (compartir, favoritos, sugerencias, instalar la app) y cuándo entra la gente. Periodos: hoy, ayer, 7, 30 y 90 días y 12 meses; tabla y CSV.
 - Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
 
 ## Datos (rama `data`)
@@ -66,6 +67,8 @@ El flujo publica siempre en GitHub Pages. Si el repositorio tiene estos secretos
 En Cloudflare la web queda en `https://slapscore.<tu-subdominio>.workers.dev`, sin límite de tráfico, y solo se suben los archivos que cambian.
 
 **Buzón de sugerencias.** El Worker recibe los mensajes en `/api/feedback` y los guarda en un almacén KV `slapscore-feedback`, que el flujo crea solo la primera vez (el token de Cloudflare necesita **Workers KV Storage: Edit**, incluido en la plantilla «Edit Cloudflare Workers»). Desde GitHub Pages la web envía los mensajes a la dirección de workers.dev (se puede cambiar con `api` en los ajustes). No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle, y como mucho 200 mensajes al día. Para leer o borrar mensajes el Worker pide el token de GitHub del panel y comprueba con GitHub que puede escribir en el repositorio.
+
+**Estadísticas de visitas.** La web avisa al Worker de cada página vista (`/api/v`, con `sendBeacon`), del tiempo con la página a la vista y de algunas acciones. Se guardan en un Durable Object con SQLite (`cloudflare/stats.js`, clase `Stats`), que entra en el plan gratuito (100.000 filas escritas y 5 millones leídas al día: cada evento es una fila). Sin cookies ni identificadores en el navegador: las personas se cuentan con un resumen cifrado de IP + navegador con una sal que cambia cada mes y se borra, y la IP no se guarda. No cuentan los robots, los navegadores automáticos ni el administrador (al entrar en el panel, su navegador queda marcado para no contar). Cada día cerrado se resume en una fila; los eventos se guardan 400 días. El panel los pide a `/api/stats` con el token de GitHub, igual que el buzón.
 
 ## App en el móvil
 
