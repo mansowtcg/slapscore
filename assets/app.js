@@ -837,10 +837,12 @@ function trackable() {
   try { if (localStorage.getItem(NOTRACK_KEY)) return false; } catch {}
   return true;
 }
+// fetch con keepalive (llega aunque se cierre la página) y no sendBeacon: los bloqueadores de anuncios que desactivan
+// el «hyperlink auditing» (uBlock Origin, por defecto) también bloquean sendBeacon en Chrome
 function beacon(o) {
   const url = apiBase() + '/api/v', body = JSON.stringify(o);
-  try { if (navigator.sendBeacon && navigator.sendBeacon(url, body)) return; } catch {}
-  fetch(url, { method: 'POST', body, keepalive: true, mode: 'no-cors', credentials: 'omit' }).catch(() => {});
+  try { fetch(url, { method: 'POST', body, keepalive: true, credentials: 'omit', headers: { 'content-type': 'text/plain' } }).catch(() => {}); }
+  catch { try { navigator.sendBeacon && navigator.sendBeacon(url, body); } catch {} }
 }
 function pageKey(r) {
   switch (r.view) {

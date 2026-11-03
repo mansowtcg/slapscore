@@ -130,7 +130,7 @@ function preflight(request, env, methods, headers) {
   const o = allowedOrigin(request, env);
   return new Response(null, { status: 204, headers: o ? { 'access-control-allow-origin': o, vary: 'Origin', 'access-control-allow-methods': methods, 'access-control-allow-headers': headers, 'access-control-max-age': '86400' } : {} });
 }
-// La web manda cada página vista con sendBeacon (texto JSON, sin cookies). Se responde enseguida y se guarda por detrás.
+// La web manda cada página vista con fetch keepalive (texto JSON, sin cookies). Se responde enseguida y se guarda por detrás.
 async function visit(request, env, ctx) {
   if (request.method === 'OPTIONS') return preflight(request, env, 'POST, OPTIONS', 'content-type');
   if (request.method !== 'POST') return new Response(null, { status: 405 });
@@ -149,12 +149,14 @@ async function visit(request, env, ctx) {
   return new Response(null, { status: 204, headers: h });
 }
 async function stats(request, env) {
-  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, OPTIONS', 'authorization');
-  if (request.method !== 'GET') return json({ error: 'method' }, 405, request, env);
+  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, DELETE, OPTIONS', 'authorization');
+  if (request.method !== 'GET' && request.method !== 'DELETE') return json({ error: 'method' }, 405, request, env);
   if (!env.STATS) return json({ error: 'unavailable' }, 503, request, env);
   if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
-  const range = new URL(request.url).searchParams.get('range') || '7d';
-  const r = await statsStub(env).fetch('https://stats/stats?range=' + encodeURIComponent(range));
+  // DELETE: quita las visitas de hoy del navegador del administrador (mismo resumen de IP + navegador)
+  const r = request.method === 'DELETE'
+    ? await statsStub(env).fetch('https://stats/forget', { method: 'POST', body: JSON.stringify({ id: (request.headers.get('cf-connecting-ip') || '') + '|' + (request.headers.get('user-agent') || '') }) })
+    : await statsStub(env).fetch('https://stats/stats?range=' + encodeURIComponent(new URL(request.url).searchParams.get('range') || '7d'));
   const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
   const o = allowedOrigin(request, env); if (o) { h['access-control-allow-origin'] = o; h.vary = 'Origin'; }
   return new Response(await r.text(), { status: r.status, headers: h });

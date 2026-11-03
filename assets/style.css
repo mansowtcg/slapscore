@@ -1024,6 +1024,7 @@ button.tr-kpi[aria-pressed="true"]{border-color:var(--primary)}
 .tr-how .code{overflow-wrap:anywhere}
 .tr-acts-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
 .tr-check{display:inline-flex;gap:8px;align-items:center;font-weight:600;font-size:13.5px}
+.tr-btns{display:inline-flex;gap:8px;flex-wrap:wrap}
 .tr-check input{width:16px;height:16px;accent-color:var(--primary)}
 @media (max-width:1100px){.tr-top{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:480px){.tr-range .lg{display:none}.tr-range .sh{display:inline}.tr-range button{padding:0 11px}}

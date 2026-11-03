@@ -90,6 +90,15 @@ export function mount(el, ctx, tokenFn) {
     if (m) { const k = m.getAttribute('data-more'); ST.open[k] = !ST.open[k]; const card = m.closest('[data-card]'); card.outerHTML = cardByKey(k); const b = $(`[data-more="${k}"]`, body); if (b) b.focus({ preventScroll: true }); return; }
     if (e.target.closest('#tr-heat-t')) { ST.heatTable = !ST.heatTable; $('#tr-heat', body).outerHTML = heatCard(); wireHeat(); const b = $('#tr-heat-t', body); if (b) b.focus({ preventScroll: true }); return; }
     if (e.target.closest('#tr-csv')) csv();
+    const fg = e.target.closest('#tr-forget');
+    if (fg) {
+      if (fg.dataset.sure !== '1') { fg.dataset.sure = '1'; fg.textContent = '¿Seguro? Quitar'; return; }
+      fg.disabled = true;
+      fetch(`${X.apiBase()}/api/stats`, { method: 'DELETE', cache: 'no-store', headers: { Authorization: `Bearer ${getToken()}` } })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((j) => { X.toast(j.removed ? `Quitadas ${j.removed === 1 ? '1 visita o acción' : `${int(j.removed)} visitas y acciones`} de este navegador` : 'No había visitas de este navegador hoy'); load(); })
+        .catch(() => { X.toast('No se pudieron quitar. Vuelve a intentarlo.'); fg.disabled = false; });
+    }
   });
   if (!ST.docTap) { ST.docTap = true; document.addEventListener('pointerdown', (e) => { if (ST.hideTip && !(e.target.closest && e.target.closest('.tr-svg'))) ST.hideTip(); }, true); }
   for (const t of ST.timers) clearInterval(t);
@@ -448,7 +457,7 @@ function aboutCard() {
       <li>Enlace con etiqueta para saber de dónde llega la gente: <span class="code">${X.esc(home)}?ref=discord</span></li>
     </ul>
     <div class="tr-acts-row"><label class="tr-check"><input type="checkbox" id="tr-notrack"${off ? ' checked' : ''}> No contar nunca mis visitas desde este navegador</label>
-    <button class="btn sm" type="button" id="tr-csv">Descargar CSV</button></div>
+    <span class="tr-btns"><button class="btn sm" type="button" id="tr-forget" title="Por si has entrado hoy desde este navegador sin la sesión de administrador">Quitar mis visitas de hoy</button><button class="btn sm" type="button" id="tr-csv">Descargar CSV</button></span></div>
   </div></div>`;
 }
 function csv() {

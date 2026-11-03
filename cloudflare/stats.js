@@ -201,6 +201,7 @@ export class Stats {
     const u = new URL(request.url);
     try {
       if (request.method === 'POST' && u.pathname === '/hit') { await this.hit(await request.json()); return new Response(null, { status: 204 }); }
+      if (request.method === 'POST' && u.pathname === '/forget') return Response.json(await this.forget(String((await request.json()).id || '')));
       if (request.method === 'GET' && u.pathname === '/stats') return Response.json(this.stats(u.searchParams.get('range') || '7d'));
     } catch (e) { return Response.json({ error: String(e && e.message || e) }, { status: 500 }); }
     return new Response('not found', { status: 404 });
@@ -237,6 +238,14 @@ export class Stats {
       this.sql.exec('INSERT INTO hits (id, vh, k, p, n) VALUES (?, ?, ?, ?, ?)', id, vh, d.k, d.p ?? null, d.n ?? null);
     }
     return true;
+  }
+
+  // quita los eventos de hoy de una persona (el administrador, para borrar sus propias visitas)
+  async forget(raw) {
+    const now = this.now(), vh = await this.visitor(raw, now), from = dayStart(dayOf(now)) * 1000;
+    const n = this.q('SELECT COUNT(*) AS n FROM hits WHERE vh = ? AND id >= ?', vh, from)[0].n;
+    if (n) this.sql.exec('DELETE FROM hits WHERE vh = ? AND id >= ?', vh, from);
+    return { removed: n };
   }
 
   // ---------- resúmenes diarios ----------
