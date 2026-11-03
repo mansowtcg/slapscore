@@ -33,7 +33,11 @@ const fmtDayLong = (d) => { const s = DF_WD.format(dd(d)); return s[0].toUpperCa
 const fmtMonthLong = (m) => { const s = DF_ML.format(dd(m)); return s[0].toUpperCase() + s.slice(1); };
 const hh = (h) => String(h).padStart(2, '0') + ':00';
 const addDays = (day, n) => new Date(Date.parse(day + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
-const int = (n) => X.int(n || 0);
+// el panel va siempre en español, aunque la web esté en inglés
+const NF0 = new Intl.NumberFormat('es-ES');
+const int = (n) => NF0.format(n || 0);
+const RTF = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+function ago(ms) { const s = Math.round((Date.now() - ms) / 1000); if (s < 45) return 'hace un momento'; const m = Math.round(s / 60); return m < 60 ? RTF.format(-m, 'minute') : RTF.format(-Math.round(m / 60), 'hour'); }
 const pctTxt = (x) => (x == null || !isFinite(x) ? '–' : Math.round(x * 100) + ' %');
 function dur(s) {
   s = Math.round(s || 0);
@@ -134,7 +138,7 @@ async function refreshLive() {
   try { const d = await api('live'); if (!ST.data || !root.isConnected) return; if (d.live.pages.some(([p]) => String(p).startsWith('j:'))) await names(); ST.data.live = d.live; const el = $('#tr-live', root); if (el) el.outerHTML = liveCard(); }
   catch {}
 }
-function drawAt() { const el = $('#tr-at', root); if (el) el.textContent = ST.at ? `Actualizado ${X.ago(ST.at)}` : ''; }
+function drawAt() { const el = $('#tr-at', root); if (el) el.textContent = ST.at ? `Actualizado ${ago(ST.at)}` : ''; }
 
 // ---------- dibujo ----------
 function render() {
