@@ -8,6 +8,7 @@
 //   index.json                      índice: días con versión, totales, pasadas
 //   days/<día>.json                 resumen del día: recuentos, líderes, mejores actuaciones, trozos
 //   days/<día>/<HH>.json.gz         resúmenes de los partidos de esa hora ('all' si el día está archivado)
+//                                   (las custom con periodos van en un solo resumen, con 'pd': cada periodo y las cifras de cada jugador)
 //   full/<día>/<HH>.json.gz         partidos tal cual los da slapshot.gg (solo los últimos N días)
 //   p/<bucket>.json.gz              perfiles de jugadores (2048 grupos)
 //   search.json.gz, players-{a,m,k}.json.gz, rankings.json, top.json, attr.json
@@ -122,13 +123,19 @@ const displayName = (pid) => (players[pid] && players[pid].n) || seenNames.get(p
 const statsOf = (st) => { const o = {}; for (const [k, v] of Object.entries(st)) if (v && !C.META_STATS.has(k)) o[k] = v; return o; };
 
 function summaryOf(m, key) {
-  return {
+  const o = {
     i: m.id, k: key, t: m.t, y: m.type, r: m.region, a: m.arena, e: m.endReason, o: m.ot ? 1 : 0,
     s: [m.score.home, m.score.away], w: m.winner === 'home' ? 0 : m.winner === 'away' ? 1 : -1, v: m.mvp, f: m.format,
     p: m.players.map((p) => [p.pid, p.name, p.team === 'home' ? 0 : 1, p.rating, p.st.goals || 0, p.st.assists || 0, p.rk || '', p.rkApprox ? 1 : 0,
       p.st.shots || 0, p.st.saves || 0, p.st.passes || 0, p.st.score || 0, p.st.takeaways || 0, p.st.blocks || 0,
       p.st.turnovers || 0, Math.round(p.st.possession_time_sec || 0), p.st.faceoffs_won || 0, p.st.faceoffs_lost || 0, p.st.post_hits || 0]),
   };
+  // partida custom con periodos: cada periodo con su marcador y las cifras de cada jugador (C.PER_COLS, en el orden de p)
+  if (m.per) o.pd = m.per.map((x) => ({
+    n: x.n, ...(x.from !== x.n ? { f: x.from } : {}), i: x.id, k: keyOf(x.t), t: x.t, s: [x.score.home, x.score.away], e: x.endReason, ...(x.ot ? { o: 1 } : {}), v: x.mvp,
+    q: x.rows.map((r) => (r ? [r.rating, ...C.PER_COLS.map((k) => Math.round(r.st[k] || 0))] : 0)),
+  }));
+  return o;
 }
 function normalizeAt(raw) {
   const m = C.normalize(raw, W);
@@ -151,10 +158,13 @@ function gamesOf(m, key) {
     })];
   });
 }
+// Periodos de partidas custom: se juntan al final de la pasada (pueden llegar en cualquier orden)
+const perPend = new Map();   // id del registro -> momento en que acabó ese periodo
 // Añade un partido (ya guardado en bruto) a los resúmenes y perfiles
 async function ingest(raw, key) {
   const id = String(raw.id);
   if (hiddenNow.has(id)) { S.hid[id] = key; return false; }
+  if (C.periodNo(raw)) { perPend.set(id, Date.parse(raw.created || '') || 0); return true; }
   const m = normalizeAt(raw); if (!m) return false;
   const day = key.slice(0, 10);
   const ch = await chunk(day, await chunkId(key));
@@ -372,7 +382,7 @@ if (S.wHash && S.wHash !== wHash && !legacy) {
       const ch = await chunk(day, key.slice(11));
       const list2 = [];
       for (const raw of (await rawShard(key)).list) {
-        if (hiddenNow.has(String(raw.id))) continue;
+        if (hiddenNow.has(String(raw.id)) || C.periodNo(raw)) continue;   // los periodos se juntan después
         const m = normalizeAt(raw); if (!m) continue;
         list2.push(summaryOf(m, key));
         rerate.set(m.id, new Map(m.players.map((p, i) => [p.pid, [p.rating, i === m.mvp ? 1 : 0]])));
@@ -385,6 +395,75 @@ if (S.wHash && S.wHash !== wHash && !legacy) {
 }
 S.wHash = wHash;
 
+lap('rerate2');
+// ---------- partidas custom con periodos: un solo partido con todos sus periodos ----------
+// slapshot.gg da cada periodo como un partido aparte con el marcador y las estadísticas acumulados. Se juntan los
+// periodos de la misma partida (C.linkPeriods) y el partido se guarda una sola vez, con el ID y la hora de su primer
+// periodo; los resúmenes sueltos de los demás periodos (de pasadas anteriores) se quitan. Al cambiar este formato
+// (PER_V) o la fórmula de la nota, se rehacen todas las partidas con periodos de los días no archivados.
+const PER_V = 1;
+const upgradePer = S.perV !== PER_V;
+let perGroups = 0;
+function rankUp(m) {
+  for (const p of m.players) {
+    const ra = players[p.pid] && players[p.pid].rh ? C.rankAt(players[p.pid].rh, m.t) : null;
+    p.rk = ra ? ra.rk : ''; p.rkApprox = ra ? ra.approx : false;
+  }
+  return m;
+}
+const tOf = (raw) => Date.parse((raw && raw.created) || '') || 0;
+// quita el resumen de un registro (si lo hay) y devuelve lo que había
+async function dropEntry(id, key) {
+  const day = key.slice(0, 10); if (isArchived(day) || !S.days[day] && !dirtyDays.has(day)) return null;
+  const ch = await chunk(day, await chunkId(key));
+  const i = ch.list.findIndex((e) => e.i === id); if (i < 0) return null;
+  const [e] = ch.list.splice(i, 1); ch.dirty = true; dirtyDays.add(day);
+  return e;
+}
+async function placeGroup(group) {
+  const root = group[0], rid = String(root.id), rkey = keyOf(tOf(root));
+  if (isArchived(rkey.slice(0, 10))) return;
+  // los demás periodos no tienen resumen propio
+  for (const r of group.slice(1)) { const e = await dropEntry(String(r.id), keyOf(tOf(r))); if (e) for (const p of e.p) if (p[0]) touch(p[0]).rm.add(e.i); }
+  // si se ocultó cualquiera de sus periodos, se oculta la partida entera
+  if (group.some((r) => hiddenNow.has(String(r.id)))) {
+    const e = await dropEntry(rid, rkey); if (e) for (const p of e.p) if (p[0]) touch(p[0]).rm.add(rid);
+    for (const r of group) if (hiddenNow.has(String(r.id))) S.hid[String(r.id)] = keyOf(tOf(r));
+    return;
+  }
+  const m = C.mergePeriods(group, W); if (!m || !m.id) return;
+  rankUp(m);
+  const day = rkey.slice(0, 10), ch = await chunk(day, await chunkId(rkey));
+  const sum = summaryOf(m, rkey), i = ch.list.findIndex((e) => e.i === m.id);
+  if (i >= 0) {
+    const now = new Set(m.players.map((p) => p.pid));
+    for (const p of ch.list[i].p) if (p[0] && !now.has(p[0])) touch(p[0]).rm.add(m.id);
+    ch.list[i] = sum;
+  } else ch.list.push(sum);
+  ch.dirty = true; dirtyDays.add(day); perGroups++;
+  for (const p of m.players) if (p.pid) seenNames.set(p.pid, p.name);
+  for (const [pid, g] of gamesOf(m, rkey)) if (pid) touch(pid).add.push(g);
+}
+if (upgradePer || rerate || perPend.size) {
+  const recs = [], seen = new Set();
+  const take = (raw) => { const id = String(raw.id); if (!seen.has(id) && C.periodNo(raw)) { seen.add(id); recs.push(raw); } };
+  if (upgradePer || rerate) {
+    // todos los días no archivados: lo que hay en disco y lo que ha llegado en esta pasada (aún sin escribir)
+    const keys = new Set(raws.keys());
+    for (const day of await list(path.join(DATA, 'full'))) for (const f of await list(path.join(DATA, 'full', day))) keys.add(day + '/' + f.replace('.json.gz', ''));
+    for (const key of keys) if (!isArchived(key.slice(0, 10))) for (const raw of (await rawShard(key)).list) take(raw);
+  } else {
+    // alrededor de cada periodo nuevo (una partida de 3 periodos dura menos de hora y media)
+    const keys = new Set();
+    for (const t of perPend.values()) for (let j = -2; j <= 2; j++) keys.add(keyOf(t + j * H));
+    for (const key of keys) if (!isArchived(key.slice(0, 10))) for (const raw of (await rawShard(key)).list) take(raw);
+  }
+  const all = upgradePer || rerate;
+  for (const g of C.linkPeriods(recs)) if (all || g.some((r) => perPend.has(String(r.id)))) await placeGroup(g);
+  console.log(`Partidas custom con periodos: ${perGroups} guardadas (${recs.length} periodos mirados${all ? ', todas' : ''})`);
+}
+S.perV = PER_V;
+
 // Pasada completa (tablas, rankings, récords y todos los perfiles) como mucho cada 20 minutos;
 // en las pasadas ligeras solo se publican los partidos, los días y los perfiles de los destacados.
 const HEAVY_MS = Number(process.env.HEAVY_EVERY_MS ?? 20 * 60_000);
@@ -394,7 +473,7 @@ const upgradeMeta = S.metaV !== META_V, upgradeProf = S.profV !== PROF_V;
 // Al cambiar de formato se rehacen todos los totales desde los resúmenes de cada día (que se guardan siempre).
 const upgradeAgg = S.aggV !== AGG_V;
 const hiddenChanged = Object.keys(S.hid).length !== (S._hidN || 0);
-const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || upgradeAgg || hiddenChanged;
+const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || upgradeAgg || hiddenChanged || upgradePer;
 if (upgradeMeta || upgradeAgg) for (const d of Object.keys(S.days)) dirtyDays.add(d);
 if (upgradeAgg) for (const f of await list(path.join(INT, 'agg', 'm'))) await out.rm(path.join(INT, 'agg', 'm', f));
 
@@ -610,7 +689,7 @@ if (!heavy) for (const [pid, x] of [...pend]) {
 const schedB = new Set([...pend.keys()].map(C.bucketOf));
 for (const [pid, games] of Object.entries(S.pendGames)) {
   if (!heavy && !schedB.has(C.bucketOf(pid))) continue;   // si su grupo se escribe igualmente, va ya
-  touch(pid).add.push(...games); delete S.pendGames[pid];
+  touch(pid).add.unshift(...games); delete S.pendGames[pid];
 }
 const byBucket = new Map();
 for (const pid of pend.keys()) { const b = C.bucketOf(pid); if (!byBucket.has(b)) byBucket.set(b, []); byBucket.get(b).push(pid); }
@@ -627,10 +706,14 @@ for (const [b, pids] of byBucket) {
     const x = pend.get(pid) || { add: [], rm: new Set(), rh: false };
     const prof = obj[pid] || { games: [], names: {} };
     let games = prof.games.filter((g) => !x.rm.has(g[1]) && !hiddenNow.has(g[1]));
-    const add = x.add.filter((g) => !hiddenNow.has(g[1]));
+    // una partida con periodos se vuelve a añadir cada vez que llega un periodo: vale la última versión;
+    // y lo que se ha quitado en esta pasada (un periodo que ahora va dentro de su partida) no vuelve
+    const lastOf = new Map(); for (const g of x.add) if (!hiddenNow.has(g[1]) && !x.rm.has(g[1])) lastOf.set(g[1], g);
+    const add = [...lastOf.values()];
     if (add.length) { const ids = new Set(add.map((g) => g[1])); games = games.filter((g) => !ids.has(g[1])).concat(add); }
     if (rerate) for (const g of games) { const r = rerate.get(g[1]); const v = r && r.get(pid); if (v) { g[7] = v[0]; g[8] = v[1]; } }
     if ((x.rh || sweep) && players[pid] && players[pid].rh) for (const g of games) if (g[2] >= recentT || !g[9]) { const ra = C.rankAt(players[pid].rh, g[2]); g[9] = ra ? ra.rk : ''; }
+    { const once = new Map(); for (const g of games) once.set(g[1], g); games = [...once.values()]; }   // cada partido una vez (en custom alguien puede salir en los dos equipos)
     games.sort((a, b) => b[2] - a[2]); games = games.slice(0, CAP);
     const a = TA.get(pid), ac = CA.get(pid);
     if ((!a && !ac) || !games.length) { delete obj[pid]; continue; }

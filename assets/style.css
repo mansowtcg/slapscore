@@ -1032,3 +1032,25 @@ button.tr-kpi[aria-pressed="true"]{border-color:var(--primary)}
 @media (prefers-reduced-motion:reduce){.tr-dot.on{animation:none}}
 .tr-svg:focus{outline:none}
 .tr-svg:focus-visible{outline:2px solid var(--primary);outline-offset:4px;border-radius:6px}
+
+/* ---------- partidas custom con periodos ---------- */
+.per-sc{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;font-family:var(--font-num);font-size:14px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.per-sc span{background:var(--surface-3);border-radius:var(--radius-xs);padding:2px 8px}
+.per-seg{display:flex;width:fit-content;max-width:100%;overflow-x:auto;margin:0;scrollbar-width:none}
+.per-seg::-webkit-scrollbar{display:none}
+.per-seg button{white-space:nowrap;flex:none}
+.per-seg .sh{display:none}
+@media (max-width:520px){.per-seg{width:100%}.per-seg button{flex:1 1 0;padding:0 6px}.per-seg .lg{display:none}.per-seg .sh{display:inline}}
+.per-tbl{font-variant-numeric:tabular-nums}
+.per-tbl th,.per-tbl td{text-align:center;min-width:44px}
+.per-tbl th:first-child,.per-tbl td:first-child{text-align:left}
+.per-tbl td{font-family:var(--font-num);font-size:16px;color:var(--fg-2)}
+.per-tbl td:first-child{font-family:var(--font);font-size:13.5px}
+.per-tbl td.w{font-weight:800;color:var(--fg)}
+.per-tbl .tt{border-left:1px solid var(--line)}
+.per-tbl td.tt{font-weight:800}
+.per-tbl th.on,.per-tbl td.on{background:var(--primary-soft)}
+.per-tbl thead th.on{color:var(--fg)}
+.per-note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.ev-box-f{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;align-items:center}
+.ev-box-f .muted{margin-right:auto;font-weight:600}

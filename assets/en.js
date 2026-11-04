@@ -181,6 +181,16 @@ export default {
   'Privacidad': 'Privacy',
   'SlapScore no usa cookies ni publicidad. Para saber cuánta gente usa la web contamos las visitas de forma anónima: qué páginas se ven, desde qué web se llega, el país y el tipo de dispositivo.': 'SlapScore uses no cookies and no ads. To know how many people use the site we count visits anonymously: which pages are viewed, which site people come from, their country and type of device.',
   'No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.': "We don't store your IP or put identifiers in your browser. Your favourites and settings stay in it only.",
+  // partidas custom con periodos
+  '{n} per.': '{n} per.', '{o} periodo': '{o} period', 'Periodos {a} y {b}': 'Periods {a} and {b}', 'Periodos {a} a {b}': 'Periods {a} to {b}',
+  'Marcador por periodos': 'Score by period', 'Ver estadísticas de': 'Show stats for', 'Partido completo': 'Full match', 'Mejor del periodo': 'Best in the period',
+  'JSON original de slapshot.gg (uno por periodo)': 'Original slapshot.gg JSON (one per period)', 'Estadísticas de los jugadores en el periodo': 'Player stats in this period',
+  'Las cifras de {l} van juntas: no llegamos a ver esos periodos por separado.': 'The figures for {l} are combined: we never saw those periods separately.',
+  'Terminó en el {o} periodo por la regla de piedad.': 'It ended in the {o} period by the mercy rule.', 'Solo hay datos hasta el {o} periodo.': 'We only have data up to the {o} period.',
+  'Puede que aún se esté jugando.': 'It may still be in progress.', 'Nota por periodo': 'Rating by period', 'No jugó': "Didn't play", 'Nota del partido (media)': 'Match rating (average)',
+  'La nota del partido es la media de las notas de cada periodo que jugó. Elige un periodo arriba para ver cómo sale cada una.': 'The match rating is the average of the ratings for each period they played. Pick a period above to see how each one is worked out.',
+  'Este tramo junta {n} periodos: la nota sale de la media por periodo.': 'This block combines {n} periods: the rating uses the per-period average.',
+  'En las partidas custom con periodos, slapshot.gg da cada periodo por separado. SlapScore los junta en un solo partido: el resultado y las estadísticas son las del partido entero, cuenta como un partido y dentro puedes ver cada periodo. La nota del partido es la media de las notas de los periodos que jugó.': 'In custom games with periods, slapshot.gg reports each period separately. SlapScore joins them into a single match: the result and stats cover the whole match, it counts as one match and you can look at each period inside it. The match rating is the average of the ratings for the periods each player played.',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

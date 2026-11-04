@@ -96,14 +96,37 @@ async function loadMatch(key, id) {
   if (!c) throw notFoundErr();
   const [list, raws] = await Promise.all([loadChunk(d, c), meta.x ? null : loadRaw(d, hh, c.v).catch(() => null)]);
   const e = list.find((x) => x.i === id) || null, raw = raws ? raws.find((x) => x.id === id) || null : null;
+  // enlace antiguo a un periodo suelto de una partida custom: lleva a la partida completa
+  if (!e && raw && C.periodNo(raw)) { const host = await periodHost(raw).catch(() => null); if (host) return { redirect: matchHref(host.k, host.i) }; }
   if (!e && !raw) throw notFoundErr();
-  return { meta, e, raw };
+  // partida custom con periodos: hacen falta los registros de todos sus periodos (pueden estar en otras horas)
+  let per = null;
+  if (e && e.pd && raw) per = await Promise.all(e.pd.map((x) => (x.i === id ? raw : rawAt(x.k, x.i)))).then((l) => (l.every(Boolean) ? l : null)).catch(() => null);
+  return { meta, e, raw, per };
+}
+// Registro original de un partido por su clave día/hora (null si el día está archivado o no está)
+async function rawAt(key, id) {
+  const d = key.slice(0, 10), hh = key.slice(11), di = S.dayMap.get(d); if (!di) return null;
+  const meta = await loadMeta(d); if (meta.x) return null;
+  const c = (meta.chunks || []).find((x) => inChunk(x.c, hh));
+  const l = await loadRaw(d, hh, c ? c.v : di.u).catch(() => null);
+  return (l && l.find((x) => x.id === id)) || null;
+}
+// Partida a la que pertenece un periodo suelto: se busca en las horas anteriores
+async function periodHost(raw) {
+  const t = Date.parse(raw.created || '') || 0;
+  for (let j = 0; j <= 2; j++) {
+    const k = C.madrid(t - j * 3_600_000), d = k.day, di = S.dayMap.get(d); if (!di) continue;
+    const meta = await loadMeta(d), c = (meta.chunks || []).find((x) => inChunk(x.c, k.hour)); if (!c) continue;
+    const e = (await loadChunk(d, c)).find((x) => x.pd && x.pd.some((y) => y.i === raw.id)); if (e) return e;
+  }
+  return null;
 }
 // Buscar un partido por su ID entre los de los últimos días
 async function findMatchById(mid) {
   for (const di of (S.index.days || []).slice(0, 3)) {
     const meta = await loadMeta(di.d).catch(() => null); if (!meta) continue;
-    for (const c of meta.chunks || []) { const l = await loadChunk(di.d, c).catch(() => []); const e = l.find((x) => x.i === mid); if (e) return e; }
+    for (const c of meta.chunks || []) { const l = await loadChunk(di.d, c).catch(() => []); const e = l.find((x) => x.i === mid || (x.pd && x.pd.some((y) => y.i === mid))); if (e) return e; }
   }
   return null;
 }
@@ -790,7 +813,7 @@ function pname(p, q) {
 function evRow(m, q) {
   const side = (tm) => `<div class="ev-team${m.w === tm ? ' won' : ''}">${crest(tm, 18)}<span class="names">${m.p.filter((p) => p[2] === tm).map((p) => pname(p, q)).join(', ')}</span></div>`;
   const mvp = m.p[m.v];
-  const status = m.o ? `<span class="ot">${esc(t('Prór.'))}</span>` : esc(m.e === 'Tie' ? t('Empate') : m.e === 'Forfeit' ? t('Rend.') : /Left$/.test(m.e) ? t('Aband.') : t('Final'));
+  const status = m.o ? `<span class="ot">${esc(t('Prór.'))}</span>` : m.pd ? esc(t('{n} per.', { n: m.pd[m.pd.length - 1].n })) : esc(m.e === 'Tie' ? t('Empate') : m.e === 'Forfeit' ? t('Rend.') : /Left$/.test(m.e) ? t('Aband.') : t('Final'));
   return `<div class="evw" data-i="${esc(m.i)}"><a class="ev" href="${matchHref(m.k, m.i)}"><div class="ev-time"><b>${DF_TIME.format(new Date(m.t))}</b><span>${status}</span></div>
     <div class="ev-teams">${side(0)}${side(1)}</div>
     <div class="ev-score"><span class="${m.w === 0 ? 'won' : ''}">${m.s[0]}</span><span class="${m.w === 1 ? 'won' : ''}">${m.s[1]}</span></div>
@@ -806,7 +829,7 @@ function evBox(m) {
     : `<td class="${typeof p[i] === 'number' && p[i] > 0 && p[i] === best[k] ? 'best' : ''}">${typeof p[i] === 'number' ? int(p[i]) : '–'}</td>`).join('')}</tr>`;
   return `<div class="tscroll"><table class="tbl evt"><thead><tr><th>${esc(t('Jugador'))}</th>${MINI.map(([l, , ti]) => `<th${ti ? ` title="${esc(t(ti))}"` : ''}>${esc(t(l))}</th>`).join('')}</tr></thead><tbody>
     ${[0, 1].map((tm) => `<tr class="tg"><td colspan="${MINI.length + 1}"><span class="pc">${crest(tm, 16)}${esc(teamName(tm))} · ${m.s[tm]}</span></td></tr>` + m.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map(row).join('')).join('')}
-  </tbody></table></div><div class="ev-box-f"><a href="${matchHref(m.k, m.i)}">${esc(t('Ver el partido completo'))}</a></div>`;
+  </tbody></table></div><div class="ev-box-f">${m.pd ? `<span class="muted">${esc(t('Periodos'))}: ${m.pd.map((x) => `${x.s[0]}-${x.s[1]}`).join(' · ')}</span>` : ''}<a href="${matchHref(m.k, m.i)}">${esc(t('Ver el partido completo'))}</a></div>`;
 }
 function leadersCard(meta, day, cls = '') {
   const L = (meta && meta.lead) || []; if (!L.length) return '';
@@ -1000,22 +1023,40 @@ function drawRight(st, top) {
 // PARTIDO
 // =====================================================================
 let MTAB = 'resumen';
+const MPER = { id: '', j: -1 };   // periodo elegido en una partida custom con periodos (-1: el partido entero)
+const ordP = (n) => C.periodOrd(n, LANG);
+// "1.er periodo"; un tramo que junta varios periodos (el robot no vio el primero por separado): "Periodos 1 y 2"
+function perLabel(x) { return x.from === x.n ? t('{o} periodo', { o: ordP(x.n) }) : x.n - x.from === 1 ? t('Periodos {a} y {b}', { a: x.from, b: x.n }) : t('Periodos {a} a {b}', { a: x.from, b: x.n }); }
+const perShort = (x) => (x.from === x.n ? `P${x.n}` : `P${x.from}-${x.n}`);
+// El partido visto en un periodo: mismas funciones de dibujo, con las cifras y notas de ese periodo
+function periodView(m, j) {
+  const x = m.per && m.per[j]; if (!x) return m;
+  const players = [], at = new Map();
+  m.players.forEach((p, i) => { const r = x.rows[i]; if (!r) return; at.set(i, players.length); players.push({ ...p, st: r.st, rating: r.rating, rawRating: r.rawRating ?? r.rating, parts: r.parts || [], res: r.res, k: r.k || 1 }); });
+  return { ...m, full: m, isPeriod: j, players, score: x.score, winner: x.winner, mvp: at.has(x.mvp) ? at.get(x.mvp) : -1, tot: x.tot, endReason: x.endReason, ot: x.ot };
+}
 async function viewMatch(r, tok) {
   MAIN.innerHTML = `<div class="card evh"><div class="sk" style="height:14px;width:220px;margin-bottom:18px"></div><div style="display:flex;justify-content:space-around;align-items:center"><div class="sk" style="width:60px;height:60px;border-radius:50%"></div><div class="sk" style="width:140px;height:48px"></div><div class="sk" style="width:60px;height:60px;border-radius:50%"></div></div></div><div style="height:16px"></div>${skeletonList(6)}`;
   let res;
   try { res = await loadMatch(r.key, r.id); }
   catch (e) { if (!live(tok)) return; if (e.status === 404) return notFound(t('No encuentro este partido.'), `<p>${esc(t('Puede que todavía no se haya guardado o que el enlace sea antiguo.'))}</p>`); return errorBox(e); }
   if (!live(tok)) return;
-  const { meta, e: se, raw } = res;
+  if (res.redirect) { location.replace(res.redirect); return; }
+  const { meta, e: se, raw, per } = res;
   let m;
-  if (raw) {
-    m = C.normalize(raw, S.W); m.raw = raw;
+  // con periodos y sin todos sus registros (alguno en un día archivado): se rehace con el resumen
+  const fromSum = !raw || !!(se && se.pd && !per);
+  if (!fromSum) {
+    m = per ? C.mergePeriods(per, S.W) : C.normalize(raw, S.W); m.raw = per || raw;
     const rk = new Map(); if (se) for (const p of se.p) rk.set(p[0], { rk: p[6], approx: !!p[7] });
     m.players.forEach((p) => { const x = rk.get(p.pid); p.rk = x ? x.rk : ''; p.rkApprox = x ? x.approx : false; });
   } else m = fromSummary(se);
-  m.key = r.key; m.archived = !raw; m.dayArchived = !!meta.x;
+  m.key = r.key; m.archived = fromSum; m.dayArchived = !!meta.x;
+  if (MPER.id !== m.id) { MPER.id = m.id; MPER.j = -1; }
+  if (!m.per || MPER.j >= m.per.length) MPER.j = -1;
+  const view = () => (m.per && MPER.j >= 0 ? periodView(m, MPER.j) : m);
   if (m.archived && MTAB === 'json') MTAB = 'resumen';
-  S.curMatch = m;
+  S.curMatch = m; S.curView = view;
   document.title = `${HOME()} ${m.score.home}-${m.score.away} ${AWAY()} · ${typeLabel(m.type)} · SlapScore`;
   const lose = (tm) => m.winner && m.winner !== tm ? 'lose' : '';
   const hidden = S.hidden.has(m.id);
@@ -1026,29 +1067,39 @@ async function viewMatch(r, tok) {
       <div class="evh-main">
         <div class="evh-team">${crest('home', 56)}<b>${esc(HOME())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'home'))}</span></div>
         <div class="evh-score"><div class="sc" aria-label="${esc(HOME())} ${m.score.home}, ${esc(AWAY())} ${m.score.away}"><span class="${lose('home')}">${m.score.home}</span><i>-</i><span class="${lose('away')}">${m.score.away}</span></div>
-          <span class="pill ${m.ot ? 'ot' : ''}">${esc(endLabel(m.endReason, m.ot))}</span>${isCustom(m.type) ? `<span class="pill cu-pill" title="${esc(t('No cuenta para la nota media en públicas'))}">${esc(t('Custom'))}</span>` : ''}</div>
+          <span class="pill ${m.ot ? 'ot' : ''}">${esc(endLabel(m.endReason, m.ot))}</span>${isCustom(m.type) ? `<span class="pill cu-pill" title="${esc(t('No cuenta para la nota media en públicas'))}">${esc(t('Custom'))}</span>` : ''}
+          ${m.per ? `<div class="per-sc" aria-label="${esc(t('Marcador por periodos'))}">${m.per.map((x) => `<span title="${esc(perLabel(x))}">${x.score.home}-${x.score.away}</span>`).join('')}</div>` : ''}</div>
         <div class="evh-team">${crest('away', 56)}<b>${esc(AWAY())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'away'))}</span></div>
       </div>
     </section>
     <div style="height:16px"></div>
     <div class="layout two">
       <div class="col">
+        ${m.per && m.per.length > 1 ? `<div class="seg per-seg in" role="group" aria-label="${esc(t('Ver estadísticas de'))}" id="mper">${[[-1, t('Partido completo'), t('Total')], ...m.per.map((x, j) => [j, perLabel(x), perShort(x)])].map(([j, l, sh]) => `<button type="button" data-per="${j}" aria-pressed="${MPER.j === j}"><span class="lg">${esc(l)}</span><span class="sh" aria-hidden="true">${esc(sh)}</span></button>`).join('')}</div>` : ''}
         <div class="card"><div class="tabs" role="tablist" id="mtabs">${[['resumen', 'Resumen'], ['alineaciones', 'Alineaciones'], ['estadisticas', 'Estadísticas'], ...(m.archived ? [] : [['json', 'JSON']])].map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${MTAB === k}">${esc(t(l))}</button>`).join('')}<span class="ind"></span></div>
         <div class="panel" id="mpanel" role="tabpanel"></div></div>
       </div>
-      <aside class="col sticky">${m.archived ? archiveCard(m) : ''}${mvpCard(m)}${infoCard(m)}${isAdmin() && !m.dayArchived ? `<div class="adminbar"><b>Admin</b><span class="muted" style="flex:1">${hidden ? 'Este partido está oculto.' : 'Oculta partidos con datos erróneos.'}</span><button class="btn sm ${hidden ? '' : 'danger'}" type="button" id="m-hide">${hidden ? 'Mostrar partido' : 'Ocultar partido'}</button></div>` : ''}</aside>
+      <aside class="col sticky">${!raw ? archiveCard(m) : ''}<div id="m-mvp">${mvpCard(view())}</div>${infoCard(m)}${isAdmin() && !m.dayArchived ? `<div class="adminbar"><b>Admin</b><span class="muted" style="flex:1">${hidden ? 'Este partido está oculto.' : 'Oculta partidos con datos erróneos.'}</span><button class="btn sm ${hidden ? '' : 'danger'}" type="button" id="m-hide">${hidden ? 'Mostrar partido' : 'Ocultar partido'}</button></div>` : ''}</aside>
     </div>`;
   const tabs = $('#mtabs');
   const moveInd = () => { const b = $('[aria-selected="true"]', tabs), ind = $('.ind', tabs); if (b && ind) { ind.style.width = b.offsetWidth + 'px'; ind.style.transform = `translateX(${b.offsetLeft}px)`; } };
   $$('[data-tab]', tabs).forEach((b) => b.addEventListener('click', () => {
     if (MTAB === b.getAttribute('data-tab')) return;
     MTAB = b.getAttribute('data-tab'); $$('[data-tab]', tabs).forEach((x) => x.setAttribute('aria-selected', String(x === b))); moveInd();
-    drawPanel(m);
+    drawPanel(view());
     const p = $('#mpanel'); if (p && !REDUCED.matches) { p.classList.remove('swap'); void p.offsetWidth; p.classList.add('swap'); }
   }));
   S.onResize = moveInd; requestAnimationFrame(moveInd); if (document.fonts) document.fonts.ready.then(() => { if (S.onResize === moveInd) moveInd(); });
-  drawPanel(m);
-  MAIN.onclick = (e) => { const b = e.target.closest('[data-perf]'); if (b && S.curMatch) { const p = S.curMatch.players[Number(b.getAttribute('data-perf'))]; if (p) openPerf(S.curMatch, p); } };
+  drawPanel(view());
+  const seg = $('#mper');
+  if (seg) seg.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-per]'); if (!b) return;
+    const j = Number(b.getAttribute('data-per')); if (j === MPER.j) return;
+    MPER.j = j; $$('[data-per]', seg).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const v = view(); drawPanel(v); const mv = $('#m-mvp'); if (mv) mv.innerHTML = mvpCard(v);
+    const p = $('#mpanel'); if (p && !REDUCED.matches) { p.classList.remove('swap'); void p.offsetWidth; p.classList.add('swap'); }
+  });
+  MAIN.onclick = (e) => { const b = e.target.closest('[data-perf]'); if (b && S.curView) { const v = S.curView(); const p = v.players[Number(b.getAttribute('data-perf'))]; if (p) openPerf(v, p); } };
   $('#m-share').addEventListener('click', () => shareImage('match', m, `slapscore-${m.key.slice(0, 10)}-${m.id.slice(0, 8)}.png`));
   const hb = $('#m-hide');
   if (hb) hb.addEventListener('click', async () => {
@@ -1067,8 +1118,25 @@ function fromSummary(e) {
   const tot = { home: {}, away: {} };
   for (const p of players) for (const k of Object.keys(p.st)) tot[p.team][k] = (tot[p.team][k] || 0) + p.st[k];
   const home = players.filter((p) => p.team === 'home').length;
-  return { id: e.i, t: e.t, type: e.y, region: e.r, arena: e.a, endReason: e.e, ot: !!e.o, length: null, periods: null, score: { home: e.s[0], away: e.s[1] },
+  const m = { id: e.i, t: e.t, type: e.y, region: e.r, arena: e.a, endReason: e.e, ot: !!e.o, length: null, periods: null, score: { home: e.s[0], away: e.s[1] },
     winner: e.w === 0 ? 'home' : e.w === 1 ? 'away' : null, players, mvp: e.v, size: { home, away: players.length - home }, tot, format: e.f };
+  if (e.pd) {
+    m.periods = true; m.tEnd = e.pd[e.pd.length - 1].t;
+    m.per = e.pd.map((x) => {
+      const score = { home: x.s[0], away: x.s[1] }, winner = score.home > score.away ? 'home' : score.away > score.home ? 'away' : null;
+      const rows = e.p.map((p, i) => {
+        const q = x.q[i]; if (!q) return null;
+        const st = {}; C.PER_COLS.forEach((k, j) => { st[k] = q[j + 1] || 0; });
+        const team = p[2] === 0 ? 'home' : 'away';
+        return { team, st, rating: q[0], rawRating: q[0], parts: [], res: !winner ? 'D' : team === winner ? 'W' : 'L' };
+      });
+      const tt = { home: {}, away: {} };
+      for (const r of rows) if (r) for (const k of Object.keys(r.st)) tt[r.team][k] = (tt[r.team][k] || 0) + r.st[k];
+      return { n: x.n, from: x.f || x.n, id: x.i, t: x.t, score, winner, endReason: x.e, ot: !!x.o, rows, mvp: x.v, tot: tt };
+    });
+    players.forEach((p, i) => { p.perR = m.per.map((x) => (x.rows[i] ? x.rows[i].rating : null)); });
+  }
+  return m;
 }
 function archiveUrl(day) {
   const a = S.index.archive || {};
@@ -1080,12 +1148,15 @@ function archiveCard(m) {
 }
 function mvpCard(m) {
   const p = m.players[m.mvp]; if (!p) return '';
-  return `<div class="card in"><div class="card-h"><h3>${esc(t('Jugador del partido'))}</h3>${rank(p.rk, 22, { approx: p.rkApprox })}</div>
+  const x = m.isPeriod != null ? m.per[m.isPeriod] : null;
+  return `<div class="card in"><div class="card-h"><h3>${esc(x ? t('Mejor del periodo') : t('Jugador del partido'))}</h3>${x ? `<small>${esc(perLabel(x))}</small>` : rank(p.rk, 22, { approx: p.rkApprox })}</div>
     <button type="button" class="prow" data-perf="${m.mvp}" style="border-top:0;padding-top:4px;padding-bottom:16px">${avatar(p.name, p.pid, 'md')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="font-size:17px">${esc(p.name)}</span><span class="ln">${statLine(p.st, 4)}</span></span>${badge(p.rating, 'lg')}</button></div>`;
 }
 function infoCard(m) {
+  const lastN = m.per ? m.per[m.per.length - 1].n : 0;
   const rows = [['Arena', m.arena], ['Región', regionLabel(m.region)], ['Tipo', typeLabel(m.type)], ['Formato', m.format],
-    ['Duración', m.length ? C.fmtPoss(m.length) : ''], ['Resultado', endLabel(m.endReason, m.ot)], ['Periodos', m.periods == null ? '' : m.periods ? t('Sí') : t('No')]].filter((x) => x[1]);
+    ['Duración', m.per && m.periodLength ? `${lastN} × ${C.fmtPoss(m.periodLength)}` : m.length ? C.fmtPoss(m.length) : ''], ['Resultado', endLabel(m.endReason, m.ot)],
+    ['Periodos', m.per ? String(lastN) : m.periods == null ? '' : m.periods ? t('Sí') : t('No')]].filter((x) => x[1]);
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Datos del partido'))}</h3></div><dl class="info">${rows.map(([k, v]) => `<dt>${esc(t(k))}</dt><dd>${esc(v)}</dd>`).join('')}<dt>ID</dt><dd><button class="btn sm" type="button" data-copy="${esc(m.id)}" title="${esc(m.id)}">${esc(t('Copiar ID'))}</button></dd></dl></div>`;
 }
 function statLine(st, max = 3) {
@@ -1117,7 +1188,7 @@ function drawPanel(m) {
   const el = $('#mpanel'); if (!el) return;
   if (MTAB === 'json') {
     const raw = JSON.stringify(m.raw, null, 2);
-    el.innerHTML = `<div class="lu-head"><b>${esc(t('JSON original de slapshot.gg'))}</b><button class="btn sm" type="button" id="cp">${esc(t('Copiar'))}</button></div><pre class="json" id="jsonpre">${esc(raw)}</pre>`;
+    el.innerHTML = `<div class="lu-head"><b>${esc(Array.isArray(m.raw) ? t('JSON original de slapshot.gg (uno por periodo)') : t('JSON original de slapshot.gg'))}</b><button class="btn sm" type="button" id="cp">${esc(t('Copiar'))}</button></div><pre class="json" id="jsonpre">${esc(raw)}</pre>`;
     $('#cp').addEventListener('click', () => copyText(raw, $('#jsonpre')));
     return;
   }
@@ -1132,8 +1203,23 @@ function drawPanel(m) {
       <div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 16px;margin:12px -16px -16px">${['home', 'away'].map((tm) => lineupList(m, tm)).join('')}</div>`;
     return;
   }
-  el.innerHTML = `<div class="sgrp-h">${esc(t('Estadísticas de los jugadores'))}</div>${boxScore(m)}
+  el.innerHTML = `${m.per ? perTable(m) : ''}<div class="sgrp-h">${esc(m.isPeriod != null ? t('Estadísticas de los jugadores en el periodo') : t('Estadísticas de los jugadores'))}</div>${boxScore(m)}
     <div class="sgrp-h">${esc(t('Comparativa de equipos'))}</div>${['shots', 'saves', 'passes', 'possession_time_sec', 'takeaways', 'turnovers', 'faceoffs_won'].map((k) => cmpRow(m, k)).join('')}`;
+}
+// Marcador por periodos (con el periodo elegido resaltado) y avisos si faltan periodos
+function perTable(m) {
+  const F = m.full || m, sel = m.isPeriod ?? -1, last = F.per[F.per.length - 1];
+  const cell = (cls, v) => `<td class="${cls}">${v}</td>`;
+  const row = (tm) => `<tr><td><span class="pc">${crest(tm, 16)}${esc(teamName(tm))}</span></td>${F.per.map((x, j) => cell(`${j === sel ? 'on' : ''}${x.winner === tm ? ' w' : ''}`, x.score[tm])).join('')}${cell(`tt${sel < 0 ? ' on' : ''}${F.winner === tm ? ' w' : ''}`, F.score[tm])}</tr>`;
+  const notes = [];
+  const joined = F.per.find((x) => x.from !== x.n);
+  if (joined) notes.push(t('Las cifras de {l} van juntas: no llegamos a ver esos periodos por separado.', { l: perLabel(joined).toLowerCase() }));
+  if (last.n < 3) {
+    if (last.endReason === 'MercyRule') notes.push(t('Terminó en el {o} periodo por la regla de piedad.', { o: ordP(last.n) }));
+    else notes.push(t('Solo hay datos hasta el {o} periodo.', { o: ordP(last.n) }) + (Date.now() - (F.tEnd || F.t) < 25 * 60_000 ? ' ' + t('Puede que aún se esté jugando.') : ''));
+  }
+  return `<div class="sgrp-h">${esc(t('Marcador por periodos'))}</div><div class="tscroll"><table class="tbl per-tbl"><thead><tr><th>${esc(t('Equipo'))}</th>${F.per.map((x, j) => `<th class="${j === sel ? 'on' : ''}" title="${esc(perLabel(x))}">${esc(perShort(x))}</th>`).join('')}<th class="tt${sel < 0 ? ' on' : ''}">${esc(t('Total'))}</th></tr></thead>
+    <tbody>${row('home')}${row('away')}</tbody></table></div>${notes.map((x) => `<p class="per-note">${esc(x)}</p>`).join('')}`;
 }
 const BOX = [['rating', 'Nota', 'Nota'], ['goals', 'G', 'Goles'], ['primary_assists', 'A1', 'Asistencias primarias'], ['secondary_assists', 'A2', 'Asistencias secundarias'],
   ['score', 'PTS', 'Puntos de juego'], ['shots', 'TIR', 'Tiros'], ['saves', 'PAR', 'Paradas'], ['blocks', 'BLQ', 'Bloqueos'], ['passes', 'PAS', 'Pases'],
@@ -1202,12 +1288,19 @@ function openPerf(m, p) {
   const keys = C.STAT_ORDER.filter((k) => p.st[k]);
   const maxAbs = Math.max(0.3, ...p.parts.map((x) => Math.abs(x.c)));
   const res = p.res === 'W' ? t('Victoria') : p.res === 'L' ? t('Derrota') : t('Empate');
+  const px = m.isPeriod != null ? m.per[m.isPeriod] : null;
+  const fmtN = (n) => (typeof n === 'number' && !Number.isInteger(n) ? dec(n) : n);
+  // partido entero con periodos: la nota es la media de sus periodos
+  const perBlock = m.per && m.isPeriod == null && p.perR ? `<div class="bd"><h3>${esc(t('Nota por periodo'))}</h3>
+      ${m.per.map((x, j) => `<div class="bd-row"><span>${esc(perLabel(x))}</span><span></span>${p.perR[j] == null ? `<span class="muted">${esc(t('No jugó'))}</span>` : badge(p.perR[j])}</div>`).join('')}
+      <div class="bd-row tot"><span>${esc(t('Nota del partido (media)'))}</span><span></span><b>${fmtR(p.rating)}</b></div>
+      <p class="muted" style="margin:10px 0 0;font-size:12.5px">${esc(t('La nota del partido es la media de las notas de cada periodo que jugó. Elige un periodo arriba para ver cómo sale cada una.'))}</p></div>` : '';
   openSheet(`<div class="sheet-h">${avatar(p.name, p.pid, 'md')}<div style="min-width:0"><div class="nm" id="sheet-title"><span>${esc(p.name)}</span>${rank(p.rk, 22, { approx: p.rkApprox })}</div>
-      <small>${crest(p.team, 16)}${esc(teamName(p.team))} · <span class="res ${p.res}">${resLetter(p.res)}</span> ${esc(res)} ${m.score.home}-${m.score.away}${m.players[m.mvp] === p ? ' · <span class="mvp-tag">MVP</span>' : ''}</small></div>${badge(p.rating, 'xl')}</div>
+      <small>${crest(p.team, 16)}${esc(teamName(p.team))}${px ? ` · ${esc(perLabel(px))}` : ''} · <span class="res ${p.res}">${resLetter(p.res)}</span> ${esc(res)} ${m.score.home}-${m.score.away}${m.players[m.mvp] === p ? ' · <span class="mvp-tag">MVP</span>' : ''}</small></div>${badge(p.rating, 'xl')}</div>
     <div class="sgrid">${(keys.length ? keys : ['goals']).map((k) => `<div><b>${k === 'possession_time_sec' ? C.fmtPoss(p.st[k]) : int(p.st[k])}</b><span>${esc(statName(k))}</span></div>`).join('')}</div>
-    ${m.archived ? `<div class="bd"><p class="muted" style="margin:0">${esc(t('El desglose de la nota no está disponible en los partidos archivados.'))}</p></div>` : `<div class="bd"><h3>${esc(t('Cómo sale la nota'))}</h3><div class="bd-row"><span>${esc(t('Nota de partida'))}</span><span></span><b>${fmtR(S.W.base)}</b></div>
-      ${p.parts.map((x) => `<div class="bd-row"><span>${esc(t(x.label))}${x.n !== '' && x.n != null ? ` <span class="muted">(${esc(x.n)})</span>` : ''}</span><span class="bar"><i class="${x.c >= 0 ? 'pos' : 'neg'}" style="width:${Math.round(Math.abs(x.c) / maxAbs * 50)}%"></i></span><b class="${x.c >= 0 ? 'pos' : 'neg'}">${x.c >= 0 ? '+' : '−'}${dec(Math.abs(x.c), 2)}</b></div>`).join('')}
-      <div class="bd-row tot"><span>${esc(t('Nota final'))}</span><span></span><b>${fmtR(p.rating)}</b></div></div>`}
+    ${perBlock || (m.archived ? `<div class="bd"><p class="muted" style="margin:0">${esc(t('El desglose de la nota no está disponible en los partidos archivados.'))}</p></div>` : `<div class="bd"><h3>${esc(t('Cómo sale la nota'))}</h3>${p.k > 1 ? `<p class="muted" style="margin:0 0 8px;font-size:12.5px">${esc(t('Este tramo junta {n} periodos: la nota sale de la media por periodo.', { n: p.k }))}</p>` : ''}<div class="bd-row"><span>${esc(t('Nota de partida'))}</span><span></span><b>${fmtR(S.W.base)}</b></div>
+      ${p.parts.map((x) => `<div class="bd-row"><span>${esc(t(x.label))}${x.n !== '' && x.n != null ? ` <span class="muted">(${esc(fmtN(x.n))})</span>` : ''}</span><span class="bar"><i class="${x.c >= 0 ? 'pos' : 'neg'}" style="width:${Math.round(Math.abs(x.c) / maxAbs * 50)}%"></i></span><b class="${x.c >= 0 ? 'pos' : 'neg'}">${x.c >= 0 ? '+' : '−'}${dec(Math.abs(x.c), 2)}</b></div>`).join('')}
+      <div class="bd-row tot"><span>${esc(t('Nota final'))}</span><span></span><b>${fmtR(p.rating)}</b></div></div>`)}
     <div class="sheet-f"><button class="btn" type="button" data-close>${esc(t('Cerrar'))}</button><a class="btn primary" href="#j-${esc(p.pid)}">${esc(t('Ver perfil'))}</a></div>`);
 }
 
@@ -1226,7 +1319,7 @@ async function shareImage(kind, obj, fname) {
     const Sh = await import('./share.js');
     const X = { t, lang: LANG, host: location.host + location.pathname.replace(/\/(index\.html)?$/, ''), fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
-      endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) : '' };
+      endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
     const cv = kind === 'match' ? await Sh.matchImage(obj, X) : await Sh.profileImage(obj, X);
     const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
     if (!$('#sh-pv')) return;
@@ -1783,6 +1876,7 @@ function viewMethod() {
         <p>${t('Todos empiezan en {b}. Cada acción suma o resta según su peso; después se añade el resultado y se resta un poco por cada gol que encaja su equipo, porque en Slapshot defienden todos.', { b: `<b>${dec(W.base)}</b>` })}</p>
         <p>${esc(t('En 2v2 y 1v1 cada jugador acumula más acciones, así que ahí pesan menos para que las notas se puedan comparar entre formatos. Por encima de 8,5 y por debajo de 4,5 la escala se comprime, así que un 10 o un 3 solo salen en partidos excepcionales. El jugador con la nota más alta es el MVP.'))}</p>
         <p>${esc(t('Las partidas públicas y las custom van por separado: cada jugador tiene una nota media y unas estadísticas para cada tipo, y en su perfil eliges cuáles ver. Las tablas, los rankings y los récords cuentan solo las públicas.'))}</p>
+        <p>${esc(t('En las partidas custom con periodos, slapshot.gg da cada periodo por separado. SlapScore los junta en un solo partido: el resultado y las estadísticas son las del partido entero, cuenta como un partido y dentro puedes ver cada periodo. La nota del partido es la media de las notas de los periodos que jugó.'))}</p>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px">${[[9.2, '9 o más'], [8.4, '8 – 8,9'], [7.4, '7 – 7,9'], [6.7, '6,5 – 6,9'], [6.2, '6 – 6,4'], [5.5, 'menos de 6']].map(([r, l]) => `<span style="display:flex;gap:8px;align-items:center">${badge(r)}<span class="muted">${esc(t(l))}</span></span>`).join('')}</div>
       </div></div>
       <div class="card in"><div class="card-h"><h3>${esc(t('Rangos'))}</h3><small>${esc(hasOfficial() ? t('logos oficiales') : t('emblemas de SlapScore'))}</small></div><div class="card-b"><div class="rk-legend">

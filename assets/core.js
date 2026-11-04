@@ -144,8 +144,162 @@ export function normalize(raw, W) {
   };
 }
 
+// ---------- partidos custom con periodos ----------
+// slapshot.gg da cada periodo de una partida custom como un partido aparte, y su marcador y estadísticas son
+// ACUMULADOS (el 2.º periodo ya incluye lo del 1.º). Aquí se juntan los periodos de una misma partida y se sacan
+// las cifras de cada periodo restando el anterior.
+const gsOf = (raw) => (raw && raw.game_stats && typeof raw.game_stats === 'object') ? raw.game_stats : {};
+// Número de periodo (1, 2, 3…) de un registro de una partida custom con periodos; 0 si no lo es
+export function periodNo(raw) {
+  if (!raw || fold(raw.match_type) !== 'custom') return 0;
+  const gs = gsOf(raw);
+  if (bool(gs.periods_enabled) !== true) return 0;
+  const n = num(gs.current_period);
+  return n && n >= 1 ? Math.floor(n) : 0;
+}
+const CUM_KEYS = ['goals', 'assists', 'shots', 'saves', 'passes', 'score', 'blocks', 'takeaways', 'turnovers', 'possession_time_sec', 'conceded_goals'];
+const LINK_GAP = 40 * 60_000;   // como mucho 40 minutos entre el final de un periodo y el del siguiente
+function plMap(raw) {
+  const m = new Map();
+  for (const pl of Array.isArray(gsOf(raw).players) ? gsOf(raw).players : []) {
+    const id = String(pl.game_user_id ?? pl.username ?? ''); if (!id) continue;
+    const st = pl.stats && typeof pl.stats === 'object' ? pl.stats : {};
+    m.set(id, { team: teamOf(pl.team), st });
+  }
+  return m;
+}
+// ¿Puede el registro b ser el periodo siguiente de a? Devuelve una puntuación (más alta, más probable) o -1
+function continues(a, b) {
+  if ((a.raw.region || '') !== (b.raw.region || '') || (gsOf(a.raw).arena || '') !== (gsOf(b.raw).arena || '')) return -1;
+  const sa = gsOf(a.raw).score || {}, sb = gsOf(b.raw).score || {};
+  if ((num(sb.home) ?? 0) < (num(sa.home) ?? 0) || (num(sb.away) ?? 0) < (num(sa.away) ?? 0)) return -1;
+  const pa = plMap(a.raw), pb = plMap(b.raw);
+  let same = 0, ppInfo = false, ppUp = false;
+  for (const [id, x] of pa) {
+    const y = pb.get(id); if (!y || y.team !== x.team) continue;
+    same++;
+    for (const k of CUM_KEYS) if ((num(y.st[k]) ?? 0) < (num(x.st[k]) ?? 0)) return -1;   // los acumulados nunca bajan
+    const p0 = num(x.st.periods_played), p1 = num(y.st.periods_played);
+    if (p0 != null && p1 != null) { ppInfo = true; if (p1 < p0) return -1; if (p1 > p0) ppUp = true; }
+  }
+  if (!pa.size || same * 2 < pa.size) return -1;   // al menos la mitad de los jugadores siguen, en el mismo equipo
+  if (ppInfo && !ppUp) return -1;                  // alguien tiene que haber jugado un periodo más
+  return same / Math.max(pa.size, pb.size) + 0.1 * (1 - (b.t - a.t) / LINK_GAP);
+}
+// Agrupa registros en partidas: devuelve listas de registros (cada una ordenada por periodo).
+// Los registros que no son de periodos salen solos.
+export function linkPeriods(raws) {
+  const recs = raws.map((raw) => ({ raw, n: periodNo(raw), t: Date.parse((raw && raw.created) || '') || 0 }))
+    .sort((a, b) => a.t - b.t || a.n - b.n);
+  const prev = new Map(), next = new Map();
+  for (const r of recs) {
+    if (r.n < 2) continue;
+    let best = null, bestS = -1;
+    for (const q of recs) {
+      if (q.n !== r.n - 1 || next.has(q) || q.t >= r.t || r.t - q.t > LINK_GAP) continue;
+      const s = continues(q, r); if (s > bestS) { bestS = s; best = q; }
+    }
+    if (best) { next.set(best, r); prev.set(r, best); }
+  }
+  const out = [];
+  for (const r of recs) {
+    if (prev.has(r)) continue;
+    const g = [r.raw]; let x = r;
+    while (next.has(x)) { x = next.get(x); g.push(x.raw); }
+    out.push(g);
+  }
+  return out;
+}
+// Cifras de cada jugador en cada periodo dentro del resumen del día (e.pd[].q): [nota, ...estas]
+export const PER_COLS = ['goals', 'assists', 'shots', 'saves', 'passes', 'score', 'takeaways', 'blocks', 'turnovers', 'possession_time_sec', 'faceoffs_won', 'faceoffs_lost', 'post_hits'];
+// Ordinal del periodo para mostrar: 1.er, 2.º, 3.er (en inglés 1st, 2nd…)
+export function periodOrd(n, lang) {
+  if (lang === 'en') return n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+  return n + (n === 1 || n === 3 ? '.er' : '.º');
+}
+// Partida completa a partir de sus periodos (registros de slapshot.gg, en orden). Devuelve lo mismo que normalize()
+// con las cifras del partido entero y, en m.per, cada periodo con sus propias cifras y notas.
+// La nota del partido es la media de las notas de los periodos que jugó cada uno.
+export function mergePeriods(raws, W) {
+  W = W || DEFAULT_WEIGHTS;
+  if (!raws || !raws.length) return null;
+  if (raws.length === 1 && !periodNo(raws[0])) return normalize(raws[0], W);
+  const first = raws[0], last = raws[raws.length - 1];
+  // jugadores: todos los que salen en algún periodo, con sus acumulados más recientes
+  const latest = new Map();
+  for (const raw of raws) for (const pl of Array.isArray(gsOf(raw).players) ? gsOf(raw).players : []) {
+    const id = String(pl.game_user_id ?? pl.username ?? ''); if (id) latest.set(id, pl);
+  }
+  const lens = raws.map((r) => num(gsOf(r).match_length)).filter((x) => x != null);
+  const m = normalize({ ...first, game_stats: { ...gsOf(last), players: [...latest.values()] } }, W);
+  if (!m) return null;
+  m.id = String(first.id || gsOf(first).match_id || '');
+  m.t = Date.parse(first.created || '') || 0;
+  m.tEnd = Date.parse(last.created || '') || m.t;
+  m.length = lens.length ? lens.reduce((a, b) => a + b, 0) : null;
+  m.periodLength = lens.length ? lens[0] : null;
+  m.periods = true;
+  const idx = new Map(m.players.map((p, i) => [p.pid, i]));
+  const prev = new Map(); let ps = { home: 0, away: 0 }, lastN = 0;
+  const sums = m.players.map(() => ({ r: 0, raw: 0, n: 0 }));
+  const sizeMax = { home: 0, away: 0 };
+  m.per = raws.map((raw) => {
+    const c = normalize(raw, W);
+    // si falta algún periodo anterior (el robot no lo vio), este tramo junta varios: del 1 al n
+    const n = periodNo(raw) || lastN + 1, from = lastN + 1, span = Math.max(1, n - lastN);
+    lastN = n;
+    const score = { home: Math.max(0, c.score.home - ps.home), away: Math.max(0, c.score.away - ps.away) };
+    const winner = score.home > score.away ? 'home' : score.away > score.home ? 'away' : null;
+    const rows = m.players.map(() => null);
+    const size = { home: 0, away: 0 };
+    const cur = new Map(c.players.map((p) => [p.pid, p]));
+    for (const p of c.players) {
+      const i = idx.get(p.pid); if (i == null) continue;
+      const before = prev.get(p.pid);
+      const pp0 = before ? num(before.st.periods_played) : 0, pp1 = num(p.st.periods_played);
+      const d = {};
+      for (const k of Object.keys(p.st)) if (!META_STATS.has(k)) d[k] = Math.max(0, p.st[k] - ((before && before.st[k]) || 0));
+      const moved = Object.values(d).some((v) => v > 0);
+      const played = pp1 != null && pp0 != null ? pp1 > pp0 : (!before || moved);
+      if (!played) continue;
+      // periodos de este tramo que jugó (para que juntar dos periodos no infle la nota)
+      const k = pp1 != null && pp0 != null ? Math.max(1, Math.min(span, pp1 - pp0)) : span;
+      rows[i] = { team: p.team, st: d, k };
+      size[p.team]++;
+    }
+    for (const tm of ['home', 'away']) sizeMax[tm] = Math.max(sizeMax[tm], size[tm]);
+    rows.forEach((x, i) => {
+      if (!x) return;
+      x.res = !winner ? 'D' : x.team === winner ? 'W' : 'L';
+      x.ga = x.st.conceded_goals != null ? x.st.conceded_goals : (x.team === 'home' ? score.away : score.home);
+      const st = x.k > 1 ? Object.fromEntries(Object.entries(x.st).map(([k, v]) => [k, v / x.k])) : x.st;
+      const r = rate(st, x.res, x.ga / x.k, size[x.team], W);
+      x.rating = r.rating; x.rawRating = r.raw; x.parts = r.parts;
+      sums[i].r += r.rating * x.k; sums[i].raw += r.raw * x.k; sums[i].n += x.k;
+    });
+    for (const [pid, p] of cur) prev.set(pid, p);
+    ps = { home: Math.max(ps.home, c.score.home), away: Math.max(ps.away, c.score.away) };
+    const tot = { home: {}, away: {} };
+    for (const x of rows) if (x) for (const k of Object.keys(x.st)) tot[x.team][k] = (tot[x.team][k] || 0) + x.st[k];
+    let mvp = -1;
+    rows.forEach((x, i) => { if (x && (mvp < 0 || x.rating > rows[mvp].rating || (x.rating === rows[mvp].rating && x.rawRating > rows[mvp].rawRating))) mvp = i; });
+    return { n, from, id: String(raw.id || ''), t: Date.parse(raw.created || '') || 0, score, cum: c.score, winner,
+      endReason: c.endReason, ot: c.ot, rows, mvp, size, tot, raw };
+  });
+  // nota del partido: media de sus periodos (un tramo que junta varios periodos cuenta por cada uno)
+  m.players.forEach((p, i) => {
+    const s = sums[i];
+    p.perR = m.per.map((x) => (x.rows[i] ? x.rows[i].rating : null));
+    if (s.n) { p.rating = r1(s.r / s.n); p.rawRating = s.raw / s.n; p.parts = []; }
+  });
+  const order = m.players.map((p, i) => i).sort((a, b) => m.players[b].rating - m.players[a].rating || m.players[b].rawRating - m.players[a].rawRating || (m.players[b].st.goals - m.players[a].st.goals));
+  m.mvp = order[0] ?? -1;
+  if (sizeMax.home + sizeMax.away) { m.size = sizeMax; m.format = `${sizeMax.home}v${sizeMax.away}`; }
+  return m;
+}
+
 // ---------- rangos ----------
-export const TIERS = ['BRONZE', 'SILVER', 'GOLD', 'PLAT', 'DIAMOND', 'LEGEND'];
+export const TIERS =['BRONZE', 'SILVER', 'GOLD', 'PLAT', 'DIAMOND', 'LEGEND'];
 export const TIER_NAME = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold', PLAT: 'Platinum', DIAMOND: 'Diamond', LEGEND: 'Legend' };
 const ROMAN = { I: 1, II: 2, III: 3, IV: 4, V: 5 };
 export function parseRank(rk) {
