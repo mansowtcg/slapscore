@@ -4,7 +4,7 @@ Resultados, estadísticas completas y notas estilo SofaScore de los partidos de 
 
 Web: https://slapscore.app · Panel de administrador: https://slapscore.app/#admin
 
-La web se sirve desde Cloudflare (Worker `slapscore` con el dominio slapscore.app y www.slapscore.app). Las direcciones antiguas (https://mansowtcg.github.io/slapscore/ y la de workers.dev) siguen publicándose y llevan a slapscore.app con el mismo enlace (ajuste `home`); `#admin` no redirige nunca.
+La web se sirve desde Cloudflare (Worker `slapscore` con los dominios slapscore.app y www.slapscore.app; www lleva a slapscore.app).
 
 ## Cómo funciona
 
@@ -55,21 +55,20 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `retainDays`: días con el detalle completo en la web (por defecto 60).
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
-- `api`: dirección del Worker de Cloudflare para el buzón de sugerencias (por defecto, la de workers.dev).
 
 Se pueden cambiar desde el panel de administrador, que usa un token de GitHub de grano fino con permisos de **Actions** y **Contents** en lectura y escritura sobre este repositorio. El token solo se guarda en el navegador de quien lo usa.
 
-## Publicar también en Cloudflare (gratis, opcional)
+## Publicación en Cloudflare (gratis)
 
-El flujo publica siempre en GitHub Pages. Si el repositorio tiene estos secretos (Settings › Secrets and variables › Actions), además publica en Cloudflare Workers:
+La web se publica en Cloudflare Workers, en https://slapscore.app y https://www.slapscore.app (dominios del Worker `slapscore`; workers.dev está desactivado y GitHub Pages ya no se usa). El flujo la publica en cada pasada con estos secretos (Settings › Secrets and variables › Actions):
 
 - `CLOUDFLARE_API_TOKEN`: token de Cloudflare con la plantilla «Edit Cloudflare Workers».
 - `CLOUDFLARE_ACCOUNT_ID`: el ID de la cuenta de Cloudflare.
 - `DISPATCH_TOKEN` (opcional): token de GitHub de grano fino con **Actions: lectura y escritura** sobre este repositorio. Con él, el Worker (`cloudflare/worker.js`) comprueba cada 30 minutos que la cadena de pasadas sigue viva y, si se ha cortado, la relanza.
 
-En Cloudflare la web queda en `https://slapscore.<tu-subdominio>.workers.dev`, sin límite de tráfico, y solo se suben los archivos que cambian.
+Los archivos estáticos los sirve Cloudflare sin pasar por el Worker (sin límite de tráfico) y solo se suben los que cambian. Las cabeceras de caché y de seguridad están en `_headers`.
 
-**Buzón de sugerencias.** El Worker recibe los mensajes en `/api/feedback` y los guarda en un almacén KV `slapscore-feedback`, que el flujo crea solo la primera vez (el token de Cloudflare necesita **Workers KV Storage: Edit**, incluido en la plantilla «Edit Cloudflare Workers»). Desde GitHub Pages la web envía los mensajes a la dirección de workers.dev (se puede cambiar con `api` en los ajustes). No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle, y como mucho 200 mensajes al día. Para leer o borrar mensajes el Worker pide el token de GitHub del panel y comprueba con GitHub que puede escribir en el repositorio.
+**Buzón de sugerencias.** El Worker recibe los mensajes en `/api/feedback` y los guarda en un almacén KV `slapscore-feedback`, que el flujo crea solo la primera vez (el token de Cloudflare necesita **Workers KV Storage: Edit**, incluido en la plantilla «Edit Cloudflare Workers»). No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle, y como mucho 200 mensajes al día. Para leer o borrar mensajes el Worker pide el token de GitHub del panel y comprueba con GitHub que puede escribir en el repositorio.
 
 **Estadísticas de visitas.** La web avisa al Worker de cada página vista (`/api/v`, con `fetch` y `keepalive`), del tiempo con la página a la vista y de algunas acciones. Se guardan en un Durable Object con SQLite (`cloudflare/stats.js`, clase `Stats`), que entra en el plan gratuito (100.000 filas escritas y 5 millones leídas al día: cada evento es una fila). Sin cookies ni identificadores en el navegador: las personas se cuentan con un resumen cifrado de IP + navegador con una sal que cambia cada mes y se borra, y la IP no se guarda. No cuentan los robots, los navegadores automáticos ni el administrador (al entrar en el panel, su navegador queda marcado para no contar). Cada día cerrado se resume en una fila; los eventos se guardan 400 días. El panel los pide a `/api/stats` con el token de GitHub, igual que el buzón.
 

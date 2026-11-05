@@ -842,12 +842,8 @@ function supportCard(cls = '') {
   return `<div class="card in support ${cls}"><div class="card-b"><b>${esc(t('SlapScore es gratis y sin anuncios'))}</b><p>${esc(t('Lo hace un jugador de la comunidad. Si te resulta útil, puedes ayudar a mantenerlo.'))}</p><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a></div></div>`;
 }
 // ---------- buzón de sugerencias ----------
-// Los mensajes van al Worker de Cloudflare (mismo sitio si la web se sirve desde allí; si no, su dirección de workers.dev)
-function apiBase() {
-  const u = String((S.settings && S.settings.api) || '').trim().replace(/\/+$/, '');
-  if (/^https:\/\/[^\s"'<>]+$/.test(u)) return u;
-  return location.hostname.endsWith('github.io') ? 'https://slapscore.misalud.workers.dev' : '';
-}
+// La web y su API (Worker de Cloudflare) están en la misma dirección: el token del administrador nunca sale de ella
+function apiBase() { return ''; }
 
 // ---------- visitas (estadísticas anónimas del panel de administrador) ----------
 // Sin cookies ni identificadores: la web solo avisa de qué página se ve (y, en la primera, de qué dominio viene),

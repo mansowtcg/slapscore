@@ -3,7 +3,7 @@
 name = "slapscore"
 main = "cloudflare/worker.js"
 compatibility_date = "2026-10-01"
-workers_dev = true
+workers_dev = false   # solo slapscore.app y www.slapscore.app (dominios del Worker en Cloudflare)
 
 [assets]
 directory = "./_site"
