@@ -258,7 +258,7 @@ function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
   const sup = supportUrl();
-  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button><a href="#admin">${esc(t('Administrador'))}</a></span>`;
+  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button><a href="#admin">${esc(t('Administrador'))}</a></span>`;
 }
 // Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
 function quiet(tr) { if (tr) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (tr[k]) tr[k].catch(() => {}); return tr; }
@@ -404,13 +404,13 @@ function route() {
   if (h.startsWith('d-')) return { view: 'matches', day: h.slice(2) };
   if (h.startsWith('cmp-')) { const [a, b] = h.slice(4).split('-'); return { view: 'compare', a, b: b || '' }; }
   if (h === 'records' || h === 'récords') return { view: 'records' };
-  return { view: ['jugadores', 'rankings', 'notas', 'admin', 'eusl'].includes(h) ? h : 'matches' };
+  return { view: ['jugadores', 'rankings', 'notas', 'admin', 'eusl', 'legal'].includes(h) ? h : 'matches' };
 }
 function setNav(view) {
   const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', eusl: 'eusl', notas: 'notas' };
   const k = map[view];
   $$('[data-nav]').forEach((a) => (a.getAttribute('data-nav') === k || (a.dataset.also || '').split(',').includes(k)) ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
-  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador' }[view];
+  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
   document.title = tt ? `${t(tt)} · SlapScore` : 'SlapScore';
 }
 let lastPath = null, lastHash = location.hash || '#', lastView = '';
@@ -495,6 +495,7 @@ function render(r, tok) {
   if (r.view === 'records') return viewRecords(tok);
   if (r.view === 'eusl') return viewEusl(tok);
   if (r.view === 'notas') return viewMethod();
+  if (r.view === 'legal') return viewLegal(tok);
   if (r.view === 'admin') return viewAdmin(tok);
   return viewMatches(r.day, tok);
 }
@@ -853,6 +854,8 @@ const NOTRACK_KEY = 'slapscore-notrack';
 const TRK = { started: false, vis: 0, acc: 0 };
 function trackable() {
   if (!S.booted || navigator.webdriver || location.protocol !== 'https:' || isAdmin()) return false;
+  // quien pide no ser rastreado (No rastrear / Global Privacy Control) no se cuenta
+  if (navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1') return false;
   try { if (localStorage.getItem(NOTRACK_KEY)) return false; } catch {}
   return true;
 }
@@ -869,7 +872,7 @@ function pageKey(r) {
     case 'match': return 'partido';
     case 'compare': return 'cmp';
     case 'jugadores': return 'tabla';
-    case 'rankings': case 'records': case 'eusl': case 'notas': return r.view;
+    case 'rankings': case 'records': case 'eusl': case 'notas': case 'legal': return r.view;
     case 'admin': return null;
     default: return r.day && r.day !== today() ? 'dia' : 'home';
   }
@@ -916,7 +919,7 @@ function openFeedback() {
       <div class="field"><label for="fb-text">${esc(t('Tu mensaje'))}</label><textarea class="input fb-ta" id="fb-text" maxlength="2000" rows="5" required autofocus placeholder="${esc(t('Por ejemplo: estaría bien poder filtrar por arena en los rankings'))}">${esc(FB.text)}</textarea><small class="muted fb-n" id="fb-n"></small></div>
       <div class="field"><label for="fb-contact">${esc(t('Discord o email (opcional)'))}</label><input class="input" id="fb-contact" maxlength="120" autocomplete="off" value="${esc(FB.contact)}" placeholder="${esc(t('Solo si quieres que te respondamos'))}"></div>
       <input class="fb-hp" name="website" id="fb-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <p class="muted fb-note">${esc(t('Junto al mensaje se envía la página en la que estás, para poder ver el error.'))}</p>
+      <p class="muted fb-note">${esc(t('Junto al mensaje se envía la página en la que estás, para poder ver el error.'))} <a href="#legal">${esc(t('Privacidad'))}</a></p>
       <p class="err" id="fb-err" role="alert" hidden></p>
       <div class="fb-acts"><button class="btn primary" type="submit" id="fb-send">${esc(t('Enviar'))}</button></div>
     </form>`, 'fb-sheet');
@@ -1869,6 +1872,19 @@ async function viewEusl(tok) {
 // =====================================================================
 // CÓMO PUNTUAMOS
 // =====================================================================
+// Aviso legal y privacidad (texto en assets/legal.js, se carga al entrar)
+async function viewLegal(tok) {
+  let L;
+  try { L = await import('./legal.js'); } catch (e) { if (live(tok)) errorBox(e); return; }
+  if (!live(tok)) return;
+  MAIN.innerHTML = L.render(LANG);
+  MAIN.onclick = (e) => {
+    const a = e.target.closest('[data-legal-go]'); if (!a) return;
+    e.preventDefault();
+    const el = document.getElementById('lg-' + a.getAttribute('data-legal-go'));
+    if (el) el.scrollIntoView({ behavior: REDUCED.matches ? 'auto' : 'smooth', block: 'start' });
+  };
+}
 function viewMethod() {
   const W = S.W, D = C.DEFAULT_WEIGHTS;
   const tt = (S.index && S.index.totals) || {}, lr = (S.index && S.index.lastRun) || {};
@@ -1897,7 +1913,8 @@ function viewMethod() {
       </tbody></table></div></div>
       <div class="card in"><div class="card-h"><h3>${esc(t('Privacidad'))}</h3></div><div class="card-b">
         <p style="margin-top:0">${esc(t('SlapScore no usa cookies ni publicidad. Para saber cuánta gente usa la web contamos las visitas de forma anónima: qué páginas se ven, desde qué web se llega, el país y el tipo de dispositivo.'))}</p>
-        <p style="margin-bottom:0">${esc(t('No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.'))}</p>
+        <p>${esc(t('No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.'))}</p>
+        <p style="margin-bottom:0"><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a></p>
       </div></div>
     </div></div>`;
 }

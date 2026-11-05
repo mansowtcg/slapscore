@@ -622,7 +622,7 @@ main[data-static="1"] .in{animation:none}
 .note .card-b p{margin:4px 0 10px;color:var(--muted);font-size:13px}
 .note .card-b .btn svg{width:13px;height:13px}
 .hnote{font-size:12.5px;padding:10px 16px 14px;margin:0}
-.foot-r{display:flex;gap:16px}
+.foot-r{display:flex;flex-wrap:wrap;gap:6px 16px}
 .seedrow small.code{display:block;font-size:11px}
 
 /* calendario */
@@ -1066,3 +1066,16 @@ button.tr-kpi[aria-pressed="true"]{border-color:var(--primary)}
 .per-note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
 .ev-box-f{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;align-items:center}
 .ev-box-f .muted{margin-right:auto;font-weight:600}
+
+/* ---------- aviso legal y privacidad ---------- */
+.legal-toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+.legal-toc a{font-size:13.5px;font-weight:600;padding:6px 12px;border-radius:999px;background:var(--surface-2);color:var(--fg-2);text-decoration:none}
+.legal-toc a:hover{background:var(--surface-3);color:var(--fg)}
+.legal{display:flex;flex-direction:column;gap:16px;max-width:860px}
+.legal section{scroll-margin-top:84px}
+.legal h2{font-size:18px;margin:0}
+.legal p{margin:0 0 10px;line-height:1.6}
+.legal p:last-child{margin-bottom:0}
+.legal ul{margin:0 0 10px;padding-left:20px;line-height:1.6}
+.legal li{margin:3px 0}
+.legal code{font-size:13px;background:var(--surface-2);padding:1px 6px;border-radius:6px}
