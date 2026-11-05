@@ -17,6 +17,7 @@ const ES = {
       <ul><li><b>Para qué:</b> resultados, estadísticas, perfiles, rankings, récords y comparativas.</li>
       <li><b>Base legal:</b> interés legítimo (art. 6.1.f del RGPD) en ofrecer información estadística sobre un juego cuyos datos ya son públicos.</li>
       <li><b>Cuánto tiempo:</b> el detalle completo de cada partido se muestra 60 días; después quedan sus resúmenes y una copia del partido completo en el archivo público del repositorio de GitHub de SlapScore. Cada perfil muestra los últimos 400 partidos.</li></ul>
+      <p>Si apoyas el proyecto y pides la insignia de Supporter, se muestra en tu perfil y junto a tu nombre; puedes pedir que se quite cuando quieras.</p>
       <p>Si eres jugador y no quieres aparecer, mira <a href="#legal" data-legal-go="jugadores">más abajo</a>.</p>`],
     ['visitas', 'Visitas a la web', `
       <p>Para saber cuánta gente usa SlapScore se cuentan las visitas <b>sin cookies y sin guardar la IP</b>. Por cada página vista se anota la página, la hora, el país aproximado (lo indica Cloudflare), el tipo de dispositivo, el nombre del navegador y del sistema, el idioma, la web desde la que llegas y algunas acciones (compartir, favoritos, sugerencias, instalar la app).</p>
@@ -59,6 +60,7 @@ const EN = {
       <ul><li><b>Why:</b> results, stats, profiles, rankings, records and comparisons.</li>
       <li><b>Legal basis:</b> legitimate interest (Art. 6(1)(f) GDPR) in providing statistics about a game whose data is already public.</li>
       <li><b>How long:</b> full match details are shown for 60 days; after that their summaries remain, and a copy of the full match is kept in the public archive of SlapScore's GitHub repository. Each profile shows the last 400 matches.</li></ul>
+      <p>If you support the project and ask for the Supporter badge, it is shown on your profile and next to your name; you can ask for it to be removed at any time.</p>
       <p>If you are a player and don't want to appear, see <a href="#legal" data-legal-go="jugadores">below</a>.</p>`],
     ['visitas', 'Visits to the site', `
       <p>To know how many people use SlapScore, visits are counted <b>without cookies and without storing your IP</b>. For each page view we record the page, the time, the approximate country (provided by Cloudflare), the device type, the browser and system name, the language, the site you came from and a few actions (share, favourites, feedback, installing the app).</p>

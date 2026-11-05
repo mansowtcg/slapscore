@@ -51,7 +51,7 @@ async function writeSettings(mutate, message) {
     try {
       const { sha, data } = await readSettings();
       const next = mutate(JSON.parse(JSON.stringify(data))) || data;
-      for (const k of ['seeds', 'hidden', 'hiddenPlayers']) if (!Array.isArray(next[k])) next[k] = [];
+      for (const k of ['seeds', 'hidden', 'hiddenPlayers', 'supporters']) if (!Array.isArray(next[k])) next[k] = [];
       if (!next.weights || typeof next.weights !== 'object') next.weights = {};
       await gh('/contents/config/settings.json', { method: 'PUT', body: JSON.stringify({ message, content: encodeB64(JSON.stringify(next, null, 2) + '\n'), sha, branch: 'main' }) });
       X.applySettings(next);
@@ -100,6 +100,7 @@ export async function mount(root, ctx) {
     </div>
     <div class="col">
       <div class="card in" id="inbox-card"><div class="card-h"><h3>Buzón de sugerencias</h3><button class="btn sm" type="button" id="inbox-reload">Actualizar</button></div><div id="inbox"><div class="card-b"><div class="sk" style="height:90px"></div></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Supporters</h3><small>apoyan el proyecto: insignia ♥ y sus partidos al momento</small></div><div id="sups"><div class="card-b"><div class="sk" style="height:60px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan en cada pasada</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
@@ -131,8 +132,8 @@ export async function mount(root, ctx) {
   drawProgress(null);
   loadWorkflow(); loadRuns(); drawRanks(); loadInbox();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
-  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawExtra(st.data); }
-  catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
+  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawExtra(st.data); }
+  catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'sups', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
 }
 
@@ -373,6 +374,36 @@ async function drawSeeds(set) {
     if (seeds.includes(id)) { X.toast('Ese jugador ya está en la lista'); return; }
     const sb = $('#seed-add button'); if (sb.disabled) return; sb.disabled = true;
     try { const s = await writeSettings((x) => { x.seeds = [...new Set([...(x.seeds || []).map(String), id])]; return x; }, `Seguir jugador ${id}`); X.toast('Añadido: se revisará en la próxima pasada'); drawSeeds(s); }
+    catch (ex) { X.toast(ex.message); sb.disabled = false; }
+  });
+}
+
+// ---------- supporters ----------
+// Quien apoya el proyecto (Ko-fi) y nos pasa su perfil: insignia ♥ en toda la web y el robot sigue sus partidos en
+// cada pasada (como los «seguidos»). No cambia su nota ni su sitio en tablas y rankings.
+async function drawSups(set) {
+  const el = $('#sups'); if (!el) return;
+  const { esc, int } = X;
+  let P = {}; try { P = await X.loadPlayers(); } catch {}
+  const list = (set.supporters || []).map(String);
+  el.innerHTML = `${list.length ? list.map((id) => { const p = P[id]; return `<div class="seedrow">${X.avatar(p ? p.n : id, id, 'sm')}<span class="nm">${esc(p ? p.n : 'Jugador ' + id)} <span class="sup">♥</span><small>ID ${esc(id)}${p ? ` · ${int(p.a.gp)} partidos` : ' · aún sin partidos'}</small></span><button class="btn sm" type="button" data-sup-rm="${esc(id)}">Quitar</button></div>`; }).join('')
+    : '<div class="card-b muted">Nadie todavía. Cuando alguien apoye el proyecto y te pase su perfil, añádelo aquí.</div>'}
+    <form class="card-b" id="sup-add" style="display:flex;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--line)"><input class="input" style="flex:1 1 200px" id="sup-in" placeholder="ID o enlace del perfil" autocomplete="off" aria-label="ID o enlace del perfil del supporter"><button class="btn" type="submit">Añadir supporter</button></form>`;
+  $$('[data-sup-rm]', el).forEach((b) => b.addEventListener('click', async () => {
+    const id = b.getAttribute('data-sup-rm'); b.disabled = true;
+    try { const s = await writeSettings((x) => { x.supporters = (x.supporters || []).map(String).filter((y) => y !== id); return x; }, `Quitar supporter ${id}`); X.toast('Quitado de supporters'); drawSups(s); }
+    catch (e) { X.toast(e.message); b.disabled = false; }
+  }));
+  $('#sup-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = $('#sup-in').value.trim();
+    const m = /#j-(\d{1,15})\b/.exec(v) || /players\/(\d{1,15})/.exec(v) || /^(\d{1,15})$/.exec(v);
+    if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
+    const id = m[1];
+    if (list.includes(id)) { X.toast('Ya es supporter'); return; }
+    if ((set.hiddenPlayers || []).map(String).includes(id)) { X.toast('Ese jugador está oculto por privacidad'); return; }
+    const sb = $('#sup-add button'); if (sb.disabled) return; sb.disabled = true;
+    try { const s = await writeSettings((x) => { x.supporters = [...new Set([...(x.supporters || []).map(String), id])]; return x; }, `Añadir supporter ${id}`); X.toast('Añadido: insignia ♥ y seguimiento prioritario'); drawSups(s); }
     catch (ex) { X.toast(ex.message); sb.disabled = false; }
   });
 }

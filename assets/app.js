@@ -20,6 +20,7 @@ function applySettings(s) {
   S.W = C.weightsFrom(S.settings.weights);
   // los ocultos se guardan como "día/hora|id" (o solo el id en ajustes antiguos)
   S.hidden = new Set((S.settings.hidden || []).map((h) => String(h).split('|').pop()));
+  S.sup = new Set((Array.isArray(S.settings.supporters) ? S.settings.supporters : []).map(String));
 }
 function setIndex(idx) {
   S.index = idx; S.ver = idx.updated;
@@ -806,10 +807,12 @@ function drawList(st) {
   const more = $('#m-more'); if (more) more.addEventListener('click', () => { more.disabled = true; MF.limit += 120; refreshList(st); });
 }
 // nombre en las listas: favoritos con estrella, destacados en negrita, coincidencias del filtro resaltadas
+// insignia de quien apoya el proyecto (Ko-fi): un corazón junto al nombre
+const supMark = (id) => (S.sup && S.sup.has(String(id)) ? '<span class="sup" role="img" aria-label="Supporter" title="Supporter">♥</span>' : '');
 function pname(p, q) {
   const id = String(p[0]), nm = esc(p[1]);
   const inner = q && fold(p[1]).includes(q) ? `<span class="hl">${nm}</span>` : nm;
-  return `${FAVS.has(id) ? '<span class="fv">★</span>' : ''}${S.featured.has(id) ? `<b class="ft">${inner}</b>` : inner}`;
+  return `${FAVS.has(id) ? '<span class="fv">★</span>' : ''}${S.featured.has(id) ? `<b class="ft">${inner}</b>` : inner}${supMark(id)}`;
 }
 function evRow(m, q) {
   const side = (tm) => `<div class="ev-team${m.w === tm ? ' won' : ''}">${crest(tm, 18)}<span class="names">${m.p.filter((p) => p[2] === tm).map((p) => pname(p, q)).join(', ')}</span></div>`;
@@ -972,7 +975,7 @@ function drawFavs(st) {
   const paint = (list) => {
     if (!live(st.tok)) return;
     if (right) right.innerHTML = `<div class="card-h"><h3>${esc(t('Tus favoritos'))}</h3><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div><div style="padding-bottom:8px">${list.map((x) =>
-      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.star}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(x.sub)}</span></span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
+      `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.star}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(x.sub)}</span></span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
     if (strip) strip.innerHTML = `<div class="favs-h"><b>${ICON.star}${esc(t('Tus favoritos'))}</b><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div>
       <div class="favs" role="list">${list.map((x) => `<a role="listitem" href="#j-${esc(x.id)}" class="fav-i">${avatar(x.n, x.id, 'sm')}<span class="t">${esc(x.n)}</span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
     $$('[data-favf]').forEach((b) => b.addEventListener('click', () => { MF.fav = !MF.fav; MF.limit = 120; const c = $('[data-x="fav"]'); if (c) c.setAttribute('aria-pressed', String(MF.fav)); drawFavs(st); refreshList(st); }));
@@ -986,18 +989,18 @@ const liveList = () => ((S.index && S.index.live) || []).filter((x) => Date.now(
 function liveCard(day, cls = '') {
   const L = day === today() ? liveList() : []; if (!L.length) return '';
   return `<div class="card in live-card ${cls}"><div class="card-h"><h3><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</h3><small>${esc(t('destacados'))}</small></div><div style="padding-bottom:8px">${L.slice(0, 6).map((x) =>
-    `<a class="lrow" href="#j-${esc(x.id)}"><span class="i"></span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(t('último partido {x}', { x: ago(x.t) }))}</span></span>${ICON.right}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="#j-${esc(x.id)}"><span class="i"></span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(t('último partido {x}', { x: ago(x.t) }))}</span></span>${ICON.right}</a>`).join('')}</div></div>`;
 }
 function liveStrip(day) {
   const L = day === today() ? liveList() : []; if (!L.length) return '';
-  return `<div class="live-strip"><span class="lbl"><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</span>${L.slice(0, 10).map((x) => `<a href="#j-${esc(x.id)}">${rank(x.rk, 18)}<span>${esc(x.n)}</span></a>`).join('')}</div>`;
+  return `<div class="live-strip"><span class="lbl"><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</span>${L.slice(0, 10).map((x) => `<a href="#j-${esc(x.id)}">${rank(x.rk, 18)}<span>${esc(x.n)}${supMark(x.id)}</span></a>`).join('')}</div>`;
 }
 // Equipo de la semana: las mejores medias de los últimos 7 días
 function teamWeekCard(top) {
   const W = (top && top.week) || []; if (W.length < 3) return '';
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
-    <div class="podium">${[1, 0, 2].map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 18)}</span>${badge(x.avg, 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>
-    ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} G · ${x.as} A</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
+    <div class="podium">${[1, 0, 2].map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 18)}</span>${badge(x.avg, 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>
+    ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} G · ${x.as} A</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
 }
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
@@ -1018,9 +1021,9 @@ function drawRight(st, top) {
   html += supportCard();
   html += feedbackCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
-    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
+    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}${supMark(p.id)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
   if (top && top.active && top.active.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Más activos'))}</h3><small>${esc(t('7 días'))}</small></div><div style="padding-bottom:8px">${top.active.slice(0, 5).map((p, i) =>
-    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}</span>${rank(p.rk, 20)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}${supMark(p.id)}</span>${rank(p.rk, 20)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
   html += `<div class="card in links"><a href="#records">${ICON.trophy}<span><b>${esc(t('Récords'))}</b><small>${esc(t('Las mejores marcas y rachas'))}</small></span>${ICON.right}</a><a href="#eusl">${ICON.league}<span><b>EUSL</b><small>${esc(t('Clasificación y resultados de la liga'))}</small></span>${ICON.right}</a></div>`;
   el.innerHTML = html;
 }
@@ -1284,7 +1287,7 @@ function statsTable(m) {
   for (const tm of ['home', 'away']) {
     const ps = m.players.map((p, i) => [p, i]).filter(([p]) => p.team === tm).sort((a, b) => b[0].rating - a[0].rating);
     body += `<tr class="tg"><td colspan="${keys.length + 2}">${esc(teamName(tm))} · ${m.score[tm]}</td></tr>`;
-    body += ps.map(([p]) => `<tr><td><a class="pc" href="#j-${esc(p.pid)}">${rank(p.rk, 20, { approx: p.rkApprox })}${esc(p.name)}</a></td><td>${badge(p.rating)}</td>${keys.map((k) => `<td>${val(k, p.st[k])}</td>`).join('')}</tr>`).join('');
+    body += ps.map(([p]) => `<tr><td><a class="pc" href="#j-${esc(p.pid)}">${rank(p.rk, 20, { approx: p.rkApprox })}${esc(p.name)}${supMark(p.pid)}</a></td><td>${badge(p.rating)}</td>${keys.map((k) => `<td>${val(k, p.st[k])}</td>`).join('')}</tr>`).join('');
     body += `<tr class="tot"><td>${esc(t('Total'))}</td><td></td>${keys.map((k) => `<td>${val(k, m.tot[tm][k])}</td>`).join('')}</tr>`;
   }
   return `<table class="tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Nota'))}</th>${keys.map((k) => `<th title="${esc(statName(k))}">${esc(statAbbr(k))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
@@ -1414,7 +1417,7 @@ async function viewPlayer(pid, tok) {
   MAIN.innerHTML = `
     <nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(P.n)}</span></nav>
     <section class="card in">
-      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${favBtn(P.id, P.n)}</h1>
+      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${favBtn(P.id, P.n)}</h1>
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
@@ -1519,7 +1522,7 @@ function matesCard(P, games) {
   if (!list.length) return '';
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Compañeros habituales'))}</h3><small>${esc(t('victorias juntos'))}</small></div><div style="padding-bottom:8px">${list.map((r, i) => {
     const n = (P.names && P.names[r.id]) || r.id;
-    return `<a class="lrow" href="#j-${esc(r.id)}"><span class="i">${i + 1}</span>${avatar(n, r.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(n)}</span><span class="sub">${esc(t('{n} juntos', { n: pl(r.n, 'partido', 'partidos') }))}</span></span><span class="v">${pct(r.w / r.n)}</span></a>`;
+    return `<a class="lrow" href="#j-${esc(r.id)}"><span class="i">${i + 1}</span>${avatar(n, r.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(n)}${supMark(r.id)}</span><span class="sub">${esc(t('{n} juntos', { n: pl(r.n, 'partido', 'partidos') }))}</span></span><span class="v">${pct(r.w / r.n)}</span></a>`;
   }).join('')}</div></div>`;
 }
 // Rivales con los que más se ha cruzado: su % de victorias contra ellos y enlace al cara a cara

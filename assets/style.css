@@ -1082,3 +1082,10 @@ button.tr-kpi[aria-pressed="true"]{border-color:var(--primary)}
 
 /* jugadores ocultos (privacidad): sin enlace a un perfil */
 a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:none}
+
+/* supporters (apoyan el proyecto) */
+.sup{color:#D6336C;font-size:.85em;margin-left:4px;font-weight:700}
+.pill.sup-pill{background:#FCE4EC;color:#A61E4D;font-size:13px;vertical-align:middle;margin-left:6px}
+:root[data-theme="dark"] .sup{color:#F06595}
+:root[data-theme="dark"] .pill.sup-pill{background:rgba(240,101,149,.16);color:#F783AC}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sup{color:#F06595}:root:not([data-theme="light"]) .pill.sup-pill{background:rgba(240,101,149,.16);color:#F783AC}}

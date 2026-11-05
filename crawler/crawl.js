@@ -48,7 +48,9 @@ const settings = await readJSON(SETTINGS, {});
 const W = C.weightsFrom(settings.weights);
 const wHash = hash(JSON.stringify(W));
 const RETAIN = Math.max(35, Math.min(400, Number(settings.retainDays) || 60));
-const seeds = [...new Set((settings.seeds || []).map(String))];
+// seguidos: los de la lista y los supporters (apoyan el proyecto): sus partidos se buscan en cada pasada mientras juegan.
+// Solo cambia lo pronto que aparecen sus partidos; las notas, tablas y rankings son iguales para todos.
+const seeds = [...new Set([...(settings.seeds || []), ...(Array.isArray(settings.supporters) ? settings.supporters : [])].map(String))];
 // Jugadores ocultos: han pedido no aparecer (privacidad). Sus partidos siguen, pero sin su nombre ni su ID:
 // en su lugar sale «—», sin perfil, sin estadísticas y sin entrar en tablas, rankings ni récords.
 const HIDDEN_NAME = '—';

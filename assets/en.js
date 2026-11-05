@@ -181,7 +181,7 @@ export default {
   'Privacidad': 'Privacy',
   'SlapScore no usa cookies ni publicidad. Para saber cuánta gente usa la web contamos las visitas de forma anónima: qué páginas se ven, desde qué web se llega, el país y el tipo de dispositivo.': 'SlapScore uses no cookies and no ads. To know how many people use the site we count visits anonymously: which pages are viewed, which site people come from, their country and type of device.',
   'No guardamos tu IP ni ponemos identificadores en tu navegador. Tus favoritos y ajustes se quedan solo en él.': "We don't store your IP or put identifiers in your browser. Your favourites and settings stay in it only.",
-  'Aviso legal y privacidad': 'Legal & privacy',
+  'Aviso legal y privacidad': 'Legal & privacy', 'Apoya SlapScore': 'Supports SlapScore',
   // partidas custom con periodos
   '{n} per.': '{n} per.', '{o} periodo': '{o} period', 'Periodos {a} y {b}': 'Periods {a} and {b}', 'Periodos {a} a {b}': 'Periods {a} to {b}',
   'Marcador por periodos': 'Score by period', 'Ver estadísticas de': 'Show stats for', 'Partido completo': 'Full match', 'Mejor del periodo': 'Best in the period',
