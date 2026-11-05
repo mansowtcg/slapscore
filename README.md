@@ -2,7 +2,9 @@
 
 Resultados, estadísticas completas y notas estilo SofaScore de los partidos de **Slapshot: Rebound**.
 
-Web: https://mansowtcg.github.io/slapscore/ · Panel de administrador: https://mansowtcg.github.io/slapscore/#admin
+Web: https://slapscore.app · Panel de administrador: https://slapscore.app/#admin
+
+La web se sirve desde Cloudflare (Worker `slapscore` con el dominio slapscore.app y www.slapscore.app). Las direcciones antiguas (https://mansowtcg.github.io/slapscore/ y la de workers.dev) siguen publicándose y llevan a slapscore.app con el mismo enlace (ajuste `home`); `#admin` no redirige nunca.
 
 ## Cómo funciona
 
