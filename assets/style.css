@@ -1079,3 +1079,6 @@ button.tr-kpi[aria-pressed="true"]{border-color:var(--primary)}
 .legal ul{margin:0 0 10px;padding-left:20px;line-height:1.6}
 .legal li{margin:3px 0}
 .legal code{font-size:13px;background:var(--surface-2);padding:1px 6px;border-radius:6px}
+
+/* jugadores ocultos (privacidad): sin enlace a un perfil */
+a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:none}

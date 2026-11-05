@@ -235,9 +235,12 @@ export function mergePeriods(raws, W) {
   if (raws.length === 1 && !periodNo(raws[0])) return normalize(raws[0], W);
   const first = raws[0], last = raws[raws.length - 1];
   // jugadores: todos los que salen en algún periodo, con sus acumulados más recientes
+  // clave de cada jugador: su ID; los que no tienen (jugadores ocultos) se distinguen por equipo y orden
+  const keysOf = (list, idOf, teamOfP) => { const n = { home: 0, away: 0 }; return list.map((x) => idOf(x) || `~${teamOfP(x)}${n[teamOfP(x)]++}`); };
   const latest = new Map();
-  for (const raw of raws) for (const pl of Array.isArray(gsOf(raw).players) ? gsOf(raw).players : []) {
-    const id = pidOf(pl); if (id) latest.set(id, pl);
+  for (const raw of raws) {
+    const list = Array.isArray(gsOf(raw).players) ? gsOf(raw).players : [];
+    keysOf(list, pidOf, (pl) => teamOf(pl.team)).forEach((k, j) => latest.set(k, list[j]));
   }
   const lens = raws.map((r) => num(gsOf(r).match_length)).filter((x) => x != null);
   const m = normalize({ ...first, game_stats: { ...gsOf(last), players: [...latest.values()] } }, W);
@@ -248,7 +251,8 @@ export function mergePeriods(raws, W) {
   m.length = lens.length ? lens.reduce((a, b) => a + b, 0) : null;
   m.periodLength = lens.length ? lens[0] : null;
   m.periods = true;
-  const idx = new Map(m.players.map((p, i) => [p.pid, i]));
+  const pkeys = (list) => keysOf(list, (p) => p.pid, (p) => p.team);
+  const idx = new Map(pkeys(m.players).map((k, i) => [k, i]));
   const prev = new Map(); let ps = { home: 0, away: 0 }, lastN = 0;
   const sums = m.players.map(() => ({ r: 0, raw: 0, n: 0 }));
   const sizeMax = { home: 0, away: 0 };
@@ -261,10 +265,11 @@ export function mergePeriods(raws, W) {
     const winner = score.home > score.away ? 'home' : score.away > score.home ? 'away' : null;
     const rows = m.players.map(() => null);
     const size = { home: 0, away: 0 };
-    const cur = new Map(c.players.map((p) => [p.pid, p]));
-    for (const p of c.players) {
-      const i = idx.get(p.pid); if (i == null) continue;
-      const before = prev.get(p.pid);
+    const ck = pkeys(c.players);
+    const cur = new Map(c.players.map((p, j) => [ck[j], p]));
+    for (const [key, p] of cur) {
+      const i = idx.get(key); if (i == null) continue;
+      const before = prev.get(key);
       const pp0 = before ? num(before.st.periods_played) : 0, pp1 = num(p.st.periods_played);
       const d = {};
       for (const k of Object.keys(p.st)) if (!META_STATS.has(k)) d[k] = Math.max(0, p.st[k] - ((before && before.st[k]) || 0));

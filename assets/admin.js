@@ -51,7 +51,7 @@ async function writeSettings(mutate, message) {
     try {
       const { sha, data } = await readSettings();
       const next = mutate(JSON.parse(JSON.stringify(data))) || data;
-      for (const k of ['seeds', 'hidden']) if (!Array.isArray(next[k])) next[k] = [];
+      for (const k of ['seeds', 'hidden', 'hiddenPlayers']) if (!Array.isArray(next[k])) next[k] = [];
       if (!next.weights || typeof next.weights !== 'object') next.weights = {};
       await gh('/contents/config/settings.json', { method: 'PUT', body: JSON.stringify({ message, content: encodeB64(JSON.stringify(next, null, 2) + '\n'), sha, branch: 'main' }) });
       X.applySettings(next);
@@ -105,6 +105,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Web, archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Partidos ocultos</h3></div><div id="hidden"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Jugadores ocultos</h3><small>han pedido no aparecer (privacidad)</small></div><div id="hidplayers"><div class="card-b"><div class="sk" style="height:40px"></div></div></div></div>
     </div>
   </div></section>`;
   // pestañas: Tráfico (se carga al abrirla por primera vez) y Robot y ajustes
@@ -130,8 +131,8 @@ export async function mount(root, ctx) {
   drawProgress(null);
   loadWorkflow(); loadRuns(); drawRanks(); loadInbox();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
-  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawExtra(st.data); }
-  catch (e) { for (const id of ['seeds', 'hidden', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
+  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawExtra(st.data); }
+  catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
 }
 
@@ -372,6 +373,37 @@ async function drawSeeds(set) {
     if (seeds.includes(id)) { X.toast('Ese jugador ya está en la lista'); return; }
     const sb = $('#seed-add button'); if (sb.disabled) return; sb.disabled = true;
     try { const s = await writeSettings((x) => { x.seeds = [...new Set([...(x.seeds || []).map(String), id])]; return x; }, `Seguir jugador ${id}`); X.toast('Añadido: se revisará en la próxima pasada'); drawSeeds(s); }
+    catch (ex) { X.toast(ex.message); sb.disabled = false; }
+  });
+}
+
+// ---------- jugadores ocultos (privacidad) ----------
+// Al añadir uno, el robot quita su nombre e ID de todos los partidos publicados, borra su perfil y sus totales
+// y no lo vuelve a mostrar (sale «—»). Quitarlo de la lista no recupera lo borrado: solo vuelve a salir en los partidos nuevos.
+function drawHidPlayers(set) {
+  const el = $('#hidplayers'); if (!el) return;
+  const { esc } = X;
+  const list = (set.hiddenPlayers || []).map(String);
+  el.innerHTML = `${list.length ? list.map((id) => `<div class="seedrow"><span class="nm">Jugador oculto<small>ID ${esc(id)}</small></span><button class="btn sm" type="button" data-hp-rm="${esc(id)}">Quitar</button></div>`).join('')
+    : '<div class="card-b muted">Ninguno. Si un jugador pide no aparecer (por correo a contact@slapscore.app), pega aquí su ID o el enlace a su perfil.</div>'}
+    <form class="card-b" id="hp-add" style="display:flex;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--line)"><input class="input" style="flex:1 1 200px" id="hp-in" placeholder="ID o enlace del perfil" autocomplete="off" aria-label="ID o enlace del perfil del jugador"><button class="btn" type="submit">Ocultar jugador</button></form>
+    <p class="card-b muted" style="margin:0;padding-top:0;font-size:12.5px">Se quitan su nombre y su ID de todos los partidos publicados, su perfil y sus estadísticas en la siguiente pasada. Los archivos de partidos de hace más de 60 días que ya están en el archivo de GitHub no se tocan.</p>`;
+  $$('[data-hp-rm]', el).forEach((b) => b.addEventListener('click', async () => {
+    const id = b.getAttribute('data-hp-rm'); b.disabled = true;
+    try { const s = await writeSettings((x) => { x.hiddenPlayers = (x.hiddenPlayers || []).map(String).filter((y) => y !== id); return x; }, `Dejar de ocultar jugador ${id}`); X.toast('Quitado: volverá a salir en los partidos nuevos'); drawHidPlayers(s); }
+    catch (e) { X.toast(e.message); b.disabled = false; }
+  }));
+  $('#hp-add').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = $('#hp-in').value.trim();
+    const m = /#j-(\d{1,15})\b/.exec(v) || /players\/(\d{1,15})/.exec(v) || /^(\d{1,15})$/.exec(v);
+    if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
+    const id = m[1];
+    if (list.includes(id)) { X.toast('Ese jugador ya está oculto'); return; }
+    const sb = $('#hp-add button'); if (sb.disabled) return;
+    if (sb.dataset.sure !== '1') { sb.dataset.sure = '1'; sb.textContent = '¿Seguro? Ocultar'; return; }
+    sb.disabled = true;
+    try { const s = await writeSettings((x) => { x.hiddenPlayers = [...new Set([...(x.hiddenPlayers || []).map(String), id])]; x.seeds = (x.seeds || []).map(String).filter((y) => y !== id); return x; }, `Ocultar jugador ${id} (privacidad)`); X.toast('Oculto: desaparece en la próxima pasada'); drawHidPlayers(s); }
     catch (ex) { X.toast(ex.message); sb.disabled = false; }
   });
 }

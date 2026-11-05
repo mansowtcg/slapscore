@@ -51,6 +51,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 
 - `seeds`: jugadores que se revisan con prioridad.
 - `hidden`: partidos ocultos (`AAAA-MM-DD/HH|id`).
+- `hiddenPlayers`: jugadores ocultos (IDs) que han pedido no aparecer. En sus partidos salen como «—», sin ID: se borran su perfil, sus totales y su nombre de todo lo publicado (también de los resúmenes de los días archivados) y no vuelven a salir. Se gestionan desde el panel (tarjeta «Jugadores ocultos»). Los partidos de hace más de 60 días que ya están en el archivo de GitHub no se tocan.
 - `weights`: pesos de la nota que cambian respecto a los de `assets/core.js`. Al cambiarlos se recalculan las notas de los partidos no archivados.
 - `retainDays`: días con el detalle completo en la web (por defecto 60).
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.

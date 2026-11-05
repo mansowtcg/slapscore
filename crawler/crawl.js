@@ -49,6 +49,16 @@ const W = C.weightsFrom(settings.weights);
 const wHash = hash(JSON.stringify(W));
 const RETAIN = Math.max(35, Math.min(400, Number(settings.retainDays) || 60));
 const seeds = [...new Set((settings.seeds || []).map(String))];
+// Jugadores ocultos: han pedido no aparecer (privacidad). Sus partidos siguen, pero sin su nombre ni su ID:
+// en su lugar sale «—», sin perfil, sin estadísticas y sin entrar en tablas, rankings ni récords.
+const HIDDEN_NAME = '—';
+const hidP = new Set((Array.isArray(settings.hiddenPlayers) ? settings.hiddenPlayers : []).map((x) => String(x).trim()).filter((x) => C.pidOf({ game_user_id: x })));
+function anonRaw(raw) {
+  let changed = false;
+  const list = raw && raw.game_stats && Array.isArray(raw.game_stats.players) ? raw.game_stats.players : [];
+  for (const pl of list) if (pl && hidP.has(C.pidOf(pl))) { pl.game_user_id = null; pl.username = HIDDEN_NAME; changed = true; }
+  return changed;
+}
 const hiddenNow = new Map();   // id -> clave día/hora (si se conoce)
 for (const h of (settings.hidden || []).map(String)) { const i = h.indexOf('|'); if (i >= 0) hiddenNow.set(h.slice(i + 1), /^\d{4}-\d\d-\d\d\/\d\d$/.test(h.slice(0, i)) ? h.slice(0, i) : null); else hiddenNow.set(h, null); }
 
@@ -83,11 +93,12 @@ if (!S) {
 }
 S.hid = S.hid || {}; S.days = S.days || {};
 const players = S.players;
+for (const pid of hidP) { delete players[pid]; if (S.pendGames) delete S.pendGames[pid]; if (S.streak) delete S.streak[pid]; if (S.cur) delete S.cur[pid]; }
 for (const p of Object.values(players)) {
   if (!p.prk && p.prank) p.prk = C.rankKeyFromName(p.prank) || undefined;
   if (!p.rk && p.rank) p.rk = C.rankKeyFromName(p.rank) || undefined;
 }
-for (const id of seeds) { if (!players[id]) players[id] = { n: null, found: NOW }; players[id].seed = true; }
+for (const id of seeds) { if (hidP.has(id)) continue; if (!players[id]) players[id] = { n: null, found: NOW }; players[id].seed = true; }
 for (const [id, p] of Object.entries(players)) if (p.seed && !seeds.includes(id)) delete p.seed;
 const isArchived = (day) => !!(S.days[day] && S.days[day].x) || day < CUTOFF;
 
@@ -153,8 +164,8 @@ function gamesOf(m, key) {
     return [p.pid, C.gamePack({
       k: key, i: m.id, t: m.t, tm: p.team === 'home' ? 0 : 1, gf: m.score[p.team], ga: m.score[other], r: p.res, rt: p.rating,
       mv: idx === m.mvp ? 1 : 0, st: statsOf(p.st), rk: p.rk, y: m.type, f: m.format, ar: m.arena,
-      mt: m.players.filter((o) => o.team === p.team && o !== p).map((o) => o.pid),
-      op: m.players.filter((o) => o.team === other).map((o) => o.pid),
+      mt: m.players.filter((o) => o.team === p.team && o !== p && o.pid).map((o) => o.pid),
+      op: m.players.filter((o) => o.team === other && o.pid).map((o) => o.pid),
     })];
   });
 }
@@ -177,6 +188,7 @@ async function ingest(raw, key) {
 // Partido nuevo de slapshot.gg
 async function addRaw(raw, allowOld) {
   if (!raw || !C.okMatchId(raw.id) || !raw.game_stats || !Array.isArray(raw.game_stats.players)) return false;
+  anonRaw(raw);
   const key = keyOf(Date.parse(raw.created) || 0);
   if (!allowOld && isArchived(key.slice(0, 10))) return false;   // demasiado antiguo: fuera de la ventana
   const s = await rawShard(key);
@@ -192,8 +204,8 @@ async function addRaw(raw, allowOld) {
 // que jugaron en él (p.cov): si tres destacados juegan juntos, basta con mirar a uno de ellos.
 const TOP_N = Number(process.env.TOP_N ?? 100);
 const MIN = 60_000;
-const seedSet = new Set(seeds);
-const prio = new Set(seeds);
+const seedSet = new Set(seeds.filter((id) => !hidP.has(id)));
+const prio = new Set(seeds.filter((id) => !hidP.has(id)));
 Object.entries(players).filter(([, p]) => p.mmr != null && !p.gone).sort((a, b) => b[1].mmr - a[1].mmr).slice(0, TOP_N).forEach(([id]) => prio.add(id));
 // Rangos: mientras haya muchos jugadores sin rango consultado, los destacados ceden sitio y el 70-85 % del resto son de rango
 const RANK_WINDOW = 60 * D;
@@ -323,6 +335,7 @@ while (Date.now() - started < BUDGET_MS && reqs < MAX_REQ && !blocked) {
   if (d.is_premium != null) p.prem = !!d.is_premium;
   for (const m of d.match_history || []) {
     if (!m || !m.id || !m.game_stats) continue;
+    anonRaw(m);
     const t = Date.parse(m.created) || 0;
     const plist = Array.isArray(m.game_stats.players) ? m.game_stats.players : [];
     for (const pl of plist) {
@@ -464,6 +477,45 @@ if (upgradePer || rerate || perPend.size) {
 }
 S.perV = PER_V;
 
+// ---------- jugadores ocultos: limpiar lo ya publicado cuando se añade alguno ----------
+const hidPHash = hash(JSON.stringify([...hidP].sort()));
+const hidPChanged = hidP.size > 0 && S.hidPHash !== hidPHash;
+if (hidPChanged) {
+  let nRaw = 0, nSum = 0, nAgg = 0;
+  // partidos completos de los días no archivados y los que esperan a subirse al archivo
+  for (const day of await list(path.join(DATA, 'full'))) for (const f of await list(path.join(DATA, 'full', day))) {
+    const s = await rawShard(day + '/' + f.replace('.json.gz', ''));
+    let ch = false; for (const raw of s.list) if (anonRaw(raw)) ch = true;
+    if (ch) { s.dirty = true; nRaw++; }
+  }
+  for (const f of await list(path.join(INT, 'outbox'))) {
+    const p = path.join(INT, 'outbox', f), l = await readJSON(p, null);
+    if (!Array.isArray(l)) continue;
+    let ch = false; for (const raw of l) if (anonRaw(raw)) ch = true;
+    if (ch) await out.json(p, l);
+  }
+  // resúmenes de todos los días (también los archivados): sin nombre ni ID
+  for (const day of await list(path.join(DATA, 'days'))) {
+    if (!/^\d{4}-\d\d-\d\d$/.test(day)) continue;
+    for (const f of await list(path.join(DATA, 'days', day))) {
+      if (!f.endsWith('.json.gz')) continue;
+      const ch = await chunk(day, f.slice(0, -8));
+      let c = false;
+      for (const e of ch.list) for (const p of e.p) if (hidP.has(String(p[0]))) { p[0] = ''; p[1] = HIDDEN_NAME; p[6] = ''; p[7] = 0; c = true; }
+      if (c) { ch.dirty = true; dirtyDays.add(day); nSum++; }
+    }
+  }
+  // totales por día y por mes
+  for (const sub of ['d', 'm']) for (const f of await list(path.join(INT, 'agg', sub))) {
+    const p = path.join(INT, 'agg', sub, f), x = await readJSON(p, null); if (!x) continue;
+    const maps = x.v != null && (x.p || x.c) ? [x.p || {}, x.c || {}] : [x];   // formato con públicas/custom, o el antiguo
+    let c = false; for (const mp of maps) for (const pid of hidP) if (Object.prototype.hasOwnProperty.call(mp, pid)) { delete mp[pid]; c = true; }
+    if (c) { await out.json(p, x); nAgg++; }
+  }
+  console.log(`Jugadores ocultos (${hidP.size}): ${nRaw} archivos de partidos, ${nSum} de resúmenes y ${nAgg} de totales limpiados`);
+}
+S.hidPHash = hidPHash;
+
 // Pasada completa (tablas, rankings, récords y todos los perfiles) como mucho cada 20 minutos;
 // en las pasadas ligeras solo se publican los partidos, los días y los perfiles de los destacados.
 const HEAVY_MS = Number(process.env.HEAVY_EVERY_MS ?? 20 * 60_000);
@@ -473,7 +525,7 @@ const upgradeMeta = S.metaV !== META_V, upgradeProf = S.profV !== PROF_V;
 // Al cambiar de formato se rehacen todos los totales desde los resúmenes de cada día (que se guardan siempre).
 const upgradeAgg = S.aggV !== AGG_V;
 const hiddenChanged = Object.keys(S.hid).length !== (S._hidN || 0);
-const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || upgradeAgg || hiddenChanged || upgradePer;
+const heavy = !S.lastHeavy || NOW - S.lastHeavy >= HEAVY_MS || !!process.env.FORCE_HEAVY || !!rerate || !!legacy || upgradeMeta || upgradeProf || upgradeAgg || hiddenChanged || upgradePer || hidPChanged;
 if (upgradeMeta || upgradeAgg) for (const d of Object.keys(S.days)) dirtyDays.add(d);
 if (upgradeAgg) for (const f of await list(path.join(INT, 'agg', 'm'))) await out.rm(path.join(INT, 'agg', 'm', f));
 
@@ -570,6 +622,7 @@ lap('archive');
 function leaders(entries) {
   const map = new Map();
   for (const m of entries) for (const p of m.p) {
+    if (!p[0]) continue;
     let a = map.get(p[0]);
     if (!a) { a = { id: p[0], n: p[1], rk: p[6], gp: 0, g: 0, a: 0, rs: 0, t: 0 }; map.set(p[0], a); }
     a.gp++; a.g += p[4]; a.a += p[5]; a.rs += p[3];
@@ -616,7 +669,7 @@ for (const day of [...dirtyDays].sort()) {
   const counts = new Map();
   for (const e of all) { const k = `${e.y}\u0001${e.r}\u0001${e.a}`; counts.set(k, (counts.get(k) || 0) + 1); }
   const perf = [];
-  for (const e of all) e.p.forEach((p) => perf.push({ e, p }));
+  for (const e of all) e.p.forEach((p) => { if (p[0]) perf.push({ e, p }); });
   perf.sort((a, b) => b.p[3] - a.p[3] || (b.p[4] + b.p[5]) - (a.p[4] + a.p[5]));
   // marcas del día para la página de récords (sin partidas personalizadas, que pueden ser de modos especiales)
   const pubPerf = perf.filter((x) => !isCustom(x.e.y)), pubAll = all.filter((e) => !isCustom(e.y));
@@ -693,7 +746,7 @@ for (const [pid, games] of Object.entries(S.pendGames)) {
 }
 const byBucket = new Map();
 for (const pid of pend.keys()) { const b = C.bucketOf(pid); if (!byBucket.has(b)) byBucket.set(b, []); byBucket.get(b).push(pid); }
-const sweep = rerate || legacy || upgradeProf;
+const sweep = rerate || legacy || upgradeProf || hidPChanged;
 if (sweep) for (const f of await list(path.join(DATA, 'p'))) if (f.endsWith('.json.gz')) { const b = f.slice(0, -8); if (!byBucket.has(b)) byBucket.set(b, []); }
 S.streak = S.streak || {}; S.cur = S.cur || {};
 const recentT = Date.parse(RECENT + 'T00:00:00Z') - 2 * H;
@@ -703,6 +756,7 @@ for (const [b, pids] of byBucket) {
   let obj = {}; try { if (oldText) obj = JSON.parse(oldText); } catch {}
   const todo = new Set(pids); if (sweep) for (const pid of Object.keys(obj)) todo.add(pid);
   for (const pid of todo) {
+    if (hidP.has(pid)) { delete obj[pid]; continue; }
     const x = pend.get(pid) || { add: [], rm: new Set(), rh: false };
     const prof = obj[pid] || { games: [], names: {} };
     let games = prof.games.filter((g) => !x.rm.has(g[1]) && !hiddenNow.has(g[1]));
@@ -715,6 +769,7 @@ for (const [b, pids] of byBucket) {
     if ((x.rh || sweep) && players[pid] && players[pid].rh) for (const g of games) if (g[2] >= recentT || !g[9]) { const ra = C.rankAt(players[pid].rh, g[2]); g[9] = ra ? ra.rk : ''; }
     { const once = new Map(); for (const g of games) once.set(g[1], g); games = [...once.values()]; }   // cada partido una vez (en custom alguien puede salir en los dos equipos)
     games.sort((a, b) => b[2] - a[2]); games = games.slice(0, CAP);
+    if (hidP.size) for (const g of games) { g[13] = g[13].filter((o) => !hidP.has(o)); g[14] = g[14].filter((o) => !hidP.has(o)); }
     const a = TA.get(pid), ac = CA.get(pid);
     if ((!a && !ac) || !games.length) { delete obj[pid]; continue; }
     const names = {};
