@@ -2,7 +2,7 @@
 
 Resultados, estadísticas completas y notas estilo SofaScore de los partidos de **Slapshot: Rebound**.
 
-Web: https://slapscore.app · Panel de administrador: https://slapscore.app/#admin
+Web: https://slapscore.app
 
 La web se sirve desde Cloudflare (Worker `slapscore` con los dominios slapscore.app y www.slapscore.app; www lleva a slapscore.app).
 

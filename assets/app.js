@@ -259,7 +259,7 @@ function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
   const sup = supportUrl();
-  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button><a href="#admin">${esc(t('Administrador'))}</a></span>`;
+  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button></span>`;
 }
 // Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
 function quiet(tr) { if (tr) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (tr[k]) tr[k].catch(() => {}); return tr; }
@@ -398,6 +398,7 @@ async function pickPlayer(title, exclude, onPick) {
 
 // ---------- router ----------
 let TOK = 0;
+const ADMIN_ENTRY = 'entrada-ibai';
 function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith('m-')) return { view: 'match', ...(parseMatch(h) || {}) };
@@ -405,7 +406,11 @@ function route() {
   if (h.startsWith('d-')) return { view: 'matches', day: h.slice(2) };
   if (h.startsWith('cmp-')) { const [a, b] = h.slice(4).split('-'); return { view: 'compare', a, b: b || '' }; }
   if (h === 'records' || h === 'récords') return { view: 'records' };
-  return { view: ['jugadores', 'rankings', 'notas', 'admin', 'eusl', 'legal'].includes(h) ? h : 'matches' };
+  // panel de administrador: #admin solo existe con la sesión iniciada (si no, es una dirección cualquiera);
+  // para entrar desde otro navegador hay una dirección que no se enlaza en ningún sitio
+  if (h === 'admin') return { view: isAdmin() ? 'admin' : 'matches' };
+  if (h === ADMIN_ENTRY) return { view: 'admin', entry: true };
+  return { view: ['jugadores', 'rankings', 'notas', 'eusl', 'legal'].includes(h) ? h : 'matches' };
 }
 function setNav(view) {
   const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', eusl: 'eusl', notas: 'notas' };
@@ -497,7 +502,7 @@ function render(r, tok) {
   if (r.view === 'eusl') return viewEusl(tok);
   if (r.view === 'notas') return viewMethod();
   if (r.view === 'legal') return viewLegal(tok);
-  if (r.view === 'admin') return viewAdmin(tok);
+  if (r.view === 'admin') { if (r.entry && isAdmin()) { location.replace('#admin'); return; } return viewAdmin(tok); }
   return viewMatches(r.day, tok);
 }
 const live = (tok) => tok === TOK;
@@ -2010,7 +2015,7 @@ function moved() {
     const u = new URL(String(S.settings.home || ''));
     const old = OLD_HOST.test(location.hostname) || location.hostname === 'www.' + u.hostname;
     // #admin nunca redirige, para poder corregirlo si algo falla
-    if (u.protocol === 'https:' && u.origin !== location.origin && old && location.hash !== '#admin') {
+    if (u.protocol === 'https:' && u.origin !== location.origin && old && location.hash !== '#admin' && location.hash !== '#' + ADMIN_ENTRY) {
       const q = new URLSearchParams(location.search);
       try { const h = document.referrer ? new URL(document.referrer).hostname : ''; if (h && h !== location.hostname && !q.has('rf')) q.set('rf', h); } catch {}
       const qs = q.toString();

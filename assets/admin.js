@@ -125,7 +125,7 @@ export async function mount(root, ctx) {
     b.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); showTab(b.getAttribute('data-tab') === 'traffic' ? 'robot' : 'traffic', true); } });
   });
   showTab(tab);
-  $('#logout').addEventListener('click', () => { setToken(null); X.renderChrome(); X.toast('Sesión de administrador cerrada'); login(root); });
+  $('#logout').addEventListener('click', () => { setToken(null); X.renderChrome(); X.toast('Sesión de administrador cerrada'); location.replace('#partidos'); });
   let minutes = 8;
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
@@ -138,22 +138,10 @@ export async function mount(root, ctx) {
 }
 
 function login(root) {
-  const { esc } = X;
-  root.innerHTML = `<h1 class="h1 in">Administrador</h1><p class="lead">Trae partidos al momento, pausa el robot y cambia los ajustes de SlapScore.</p>
-  <div class="adm-grid">
-    <div class="card in"><div class="card-h"><h3>Entrar</h3></div><div class="card-b">
-      <p style="margin-top:0">El panel funciona con un token de GitHub con permiso sobre <b>${esc(REPO)}</b>. Se guarda solo en este navegador. Se envía a GitHub y, para leer el buzón de sugerencias, al servidor de SlapScore en Cloudflare, que solo lo usa para comprobar con GitHub que eres administrador.</p>
-      <form id="login" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="tk">Token de GitHub</label><input class="input" id="tk" type="password" autocomplete="off" placeholder="github_pat_…" required></div>
-      <p class="err" id="lerr" hidden></p><div><button class="btn primary" type="submit" id="lbtn">Entrar</button></div></form>
-    </div></div>
-    <div class="card in"><div class="card-h"><h3>Cómo crear el token</h3></div><div class="card-b"><ol class="steps">
-      <li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub › Fine-grained tokens › Generate new token</a>.</li>
-      <li>Ponle un nombre, por ejemplo «SlapScore admin», y la caducidad que quieras.</li>
-      <li>En <b>Repository access</b> elige <b>Only select repositories</b> y marca <span class="code">${esc(REPO.split('/')[1])}</span>.</li>
-      <li>En <b>Permissions</b>, dentro de <b>Repository permissions</b>, pon <b>Actions</b> y <b>Contents</b> en <b>Read and write</b>.</li>
-      <li>Pulsa <b>Generate token</b>, cópialo y pégalo aquí.</li>
-    </ol><p class="muted" style="margin-bottom:0">No lo compartas: quien lo tenga puede cambiar el repositorio.</p></div></div>
-  </div>`;
+  root.innerHTML = `<div class="card in" style="max-width:420px;margin:24px auto"><div class="card-b">
+    <form id="login" style="display:flex;flex-direction:column;gap:12px" autocomplete="off"><input class="input" id="tk" type="password" autocomplete="off" aria-label="Token" required>
+    <p class="err" id="lerr" hidden></p><div><button class="btn primary" type="submit" id="lbtn">Entrar</button></div></form>
+  </div></div>`;
   $('#login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const t = $('#tk').value.trim(), err = $('#lerr'), btn = $('#lbtn');
@@ -163,7 +151,8 @@ function login(root) {
       await gh(`/actions/workflows/${WF}`, {}, t);
       await gh('/contents/config/settings.json?ref=main', {}, t);
       setToken(t); try { localStorage.setItem(X.NOTRACK_KEY, '1'); } catch {}   // tus visitas no cuentan en las estadísticas
-      X.renderChrome(); X.toast('Sesión de administrador iniciada'); mount(root, X);
+      X.renderChrome(); X.toast('Sesión de administrador iniciada');
+      if (location.hash === '#admin') mount(root, X); else location.replace('#admin');   // la dirección de entrada no se queda en la barra
     } catch (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar'; }
   });
 }
