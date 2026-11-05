@@ -18,7 +18,7 @@ export { Stats };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
 const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, DAY_LIMIT = 200, LIST_LIMIT = 300;
-const DEFAULT_ORIGINS = ['https://mansowtcg.github.io'];
+const DEFAULT_ORIGINS = ['https://mansowtcg.github.io', 'https://slapscore.app', 'https://www.slapscore.app'];
 const adminCache = new Map();   // resumen del token -> caduca (ms), para no preguntar a GitHub en cada petición
 
 function allowedOrigin(request, env) {

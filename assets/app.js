@@ -879,6 +879,7 @@ function pageKey(r) {
   }
 }
 const devKind = () => { const m = Math.min(screen.width || 0, screen.height || 0); return !matchMedia('(pointer: coarse)').matches ? 'd' : m >= 600 ? 't' : 'm'; };
+const OLD_HOST = /\.(github\.io|workers\.dev)$/;   // direcciones antiguas de la web
 function trackView(r) {
   const p = pageKey(r);
   if (!p || !trackable()) return;
@@ -886,7 +887,13 @@ function trackView(r) {
   if (!TRK.started) {
     TRK.started = true; engOn();
     try { const q = new URLSearchParams(location.search); const v = q.get('ref') || q.get('utm_source'); if (v) o.q = v.slice(0, 40); } catch {}
-    try { const h = document.referrer ? new URL(document.referrer).hostname : ''; if (h && h !== location.hostname) o.r = h; } catch {}
+    // de dónde viene: si llegó redirigido desde la dirección antigua, la página de origen va en ?rf=
+    try {
+      const q = new URLSearchParams(location.search), rf = q.get('rf');
+      const h = rf || (document.referrer ? new URL(document.referrer).hostname : '');
+      if (h && h !== location.hostname && !OLD_HOST.test(h)) o.r = h.slice(0, 80);
+      if (rf) { q.delete('rf'); const qs = q.toString(); history.replaceState(history.state, '', location.pathname + (qs ? '?' + qs : '') + location.hash); }
+    } catch {}
   }
   beacon(o);
 }
@@ -1980,12 +1987,19 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
   document.addEventListener('pointerover', (e) => { const b = e.target.closest && e.target.closest('button[data-day]'); const d = b && b.getAttribute('data-day'); if (d && S.index) loadMeta(d).then((m) => firstChunks(d, m)).catch(() => {}); }, { passive: true });
 })();
 
-// Si la web se muda (ajuste "home"), la dirección antigua de GitHub Pages lleva a la nueva
+// Si la web se muda (ajuste "home"), las direcciones antiguas (GitHub Pages, workers.dev) y www. llevan a la nueva,
+// con el mismo enlace (?ref= incluido) y diciendo de qué página venía la visita (?rf=)
 function moved() {
   try {
     const u = new URL(String(S.settings.home || ''));
-    // solo desde las direcciones de GitHub Pages y workers.dev; #admin nunca redirige, para poder corregirlo si algo falla
-    if (u.protocol === 'https:' && u.origin !== location.origin && /\.(github\.io|workers\.dev)$/.test(location.hostname) && location.hash !== '#admin') { location.replace(u.origin + u.pathname + location.hash); return true; }
+    const old = OLD_HOST.test(location.hostname) || location.hostname === 'www.' + u.hostname;
+    // #admin nunca redirige, para poder corregirlo si algo falla
+    if (u.protocol === 'https:' && u.origin !== location.origin && old && location.hash !== '#admin') {
+      const q = new URLSearchParams(location.search);
+      try { const h = document.referrer ? new URL(document.referrer).hostname : ''; if (h && h !== location.hostname && !q.has('rf')) q.set('rf', h); } catch {}
+      const qs = q.toString();
+      location.replace(u.origin + u.pathname + (qs ? '?' + qs : '') + location.hash); return true;
+    }
   } catch {}
   return false;
 }
