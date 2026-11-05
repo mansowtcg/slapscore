@@ -31,6 +31,9 @@ jobs:
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+        with:
+          # el robot no necesita la credencial de GitHub en disco (solo la usa «Guardar datos», en su propia copia)
+          persist-credentials: false
       - name: Comprobar
         id: gate
         env:
