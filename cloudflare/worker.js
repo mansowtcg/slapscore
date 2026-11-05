@@ -17,7 +17,7 @@ import { Stats, cleanHit, BOT } from './stats.js';
 export { Stats };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
-const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, DAY_LIMIT = 200, LIST_LIMIT = 300;
+const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, LIST_LIMIT = 300;
 const DEFAULT_ORIGINS = ['https://slapscore.app', 'https://www.slapscore.app'];
 const adminCache = new Map();   // resumen del token -> caduca (ms), para no preguntar a GitHub en cada petición
 
@@ -29,7 +29,7 @@ function allowedOrigin(request, env) {
   return o === self || DEFAULT_ORIGINS.includes(o) || list.includes(o) ? o : null;
 }
 function json(data, status, request, env, extra = {}) {
-  const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...extra };
+  const h = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra };
   const o = allowedOrigin(request, env);
   if (o) { h['access-control-allow-origin'] = o; h.vary = 'Origin'; }
   return new Response(JSON.stringify(data), { status, headers: h });
@@ -38,7 +38,13 @@ async function sha(s) {
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
-const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+// sin caracteres de control ni de dirección del texto (con ellos un mensaje podría mostrarse cambiado en el panel)
+const clean = (s, max) => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, max);
+// IP para los límites: en IPv6, la red /64 (cada conexión de casa tiene millones de direcciones)
+const ipKey = (ip) => (String(ip).includes(':') ? String(ip).toLowerCase().split(':').slice(0, 4).join(':') : String(ip));
+const MAX_BODY = 8192;
+const tooBig = (request) => Number(request.headers.get('content-length') || 0) > MAX_BODY;
+const failCache = new Map();   // tokens rechazados hace poco: no se vuelve a preguntar a GitHub en 1 minuto
 
 // ¿Es este token de GitHub de alguien que puede escribir en el repositorio?
 async function isAdmin(request, env) {
@@ -47,14 +53,18 @@ async function isAdmin(request, env) {
   const key = await sha(m[1]);
   const until = adminCache.get(key);
   if (until && until > Date.now()) return true;
+  const failed = failCache.get(key);
+  if (failed && failed > Date.now()) return false;
   const r = await fetch(`https://api.github.com/repos/${env.GH_REPO}`, {
     headers: { authorization: `Bearer ${m[1]}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'slapscore-feedback' },
   }).catch(() => null);
   if (!r || !r.ok) return false;
   const j = await r.json().catch(() => null);
   const ok = !!(j && j.permissions && (j.permissions.push || j.permissions.admin));
-  if (ok) adminCache.set(key, Date.now() + 10 * 60_000);
+  if (ok) adminCache.set(key, Date.now() + 5 * 60_000);
+  else failCache.set(key, Date.now() + 60_000);
   if (adminCache.size > 50) adminCache.delete(adminCache.keys().next().value);
+  if (failCache.size > 500) failCache.clear();
   return ok;
 }
 
@@ -74,19 +84,21 @@ async function feedback(request, env, path) {
   // enviar una sugerencia (cualquiera)
   if (request.method === 'POST' && path === '/api/feedback') {
     if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403, request, env);
+    if (tooBig(request)) return json({ error: 'bad' }, 413, request, env);
     let b;
-    try { b = await request.json(); } catch { return json({ error: 'bad' }, 400, request, env); }
+    try { b = JSON.parse((await request.text()).slice(0, MAX_BODY)); } catch { return json({ error: 'bad' }, 400, request, env); }
     if (!b || typeof b !== 'object') return json({ error: 'bad' }, 400, request, env);
     if (b.website) return json({ ok: true }, 200, request, env);   // campo trampa: solo lo rellenan los robots
     const type = TYPES.has(b.type) ? b.type : 'other';
     const text = clean(b.text, MAX_TEXT);
     if (text.length < 5) return json({ error: 'short' }, 400, request, env);
-    const ip = request.headers.get('cf-connecting-ip') || '';
-    const rl = 'rl:' + await sha(ip + '|' + new Date().toISOString().slice(0, 13));
-    if (await KV.get(rl)) return json({ error: 'wait' }, 429, request, env);
-    const day = 'n:' + new Date().toISOString().slice(0, 10);
-    const n = Number(await KV.get(day)) || 0;
-    if (n >= DAY_LIMIT) return json({ error: 'full' }, 429, request, env);
+    // límites (1 por minuto y 5 al día por conexión, 200 al día en total): los lleva el Durable Object, de uno en uno,
+    // para que no se puedan saltar mandando muchos a la vez
+    if (env.STATS) {
+      const r = await statsStub(env).fetch('https://stats/fb', { method: 'POST', body: JSON.stringify({ ip: ipKey(request.headers.get('cf-connecting-ip') || '') }) }).catch(() => null);
+      const v = r ? await r.json().catch(() => null) : null;
+      if (!v || !v.ok) return json({ error: v && v.error === 'full' ? 'full' : 'wait' }, 429, request, env);
+    }
     const t = Date.now();
     const id = `fb:${String(9999999999999 - t).padStart(13, '0')}-${crypto.randomUUID().slice(0, 8)}`;
     const item = {
@@ -95,9 +107,8 @@ async function feedback(request, env, path) {
       page: clean(b.page, MAX_PAGE),
       lang: b.lang === 'en' ? 'en' : 'es',
     };
-    await KV.put(id, JSON.stringify(item));
-    await KV.put(rl, '1', { expirationTtl: 60 });
-    await KV.put(day, String(n + 1), { expirationTtl: 3 * 86400 });
+    // los mensajes se borran solos al año
+    try { await KV.put(id, JSON.stringify(item), { expirationTtl: 365 * 86400 }); } catch { return json({ error: 'unavailable' }, 503, request, env); }
     return json({ ok: true }, 200, request, env);
   }
 
@@ -118,7 +129,7 @@ async function feedback(request, env, path) {
   const del = /^\/api\/feedback\/(fb:[0-9]{13}-[0-9a-f]{8})$/.exec(path);
   if (request.method === 'DELETE' && del) {
     if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
-    await KV.delete(del[1]);
+    try { await KV.delete(del[1]); } catch { return json({ error: 'unavailable' }, 503, request, env); }
     return json({ ok: true }, 200, request, env);
   }
   return json({ error: 'not found' }, 404, request, env);
@@ -138,10 +149,12 @@ async function visit(request, env, ctx) {
   if (!o) return new Response(null, { status: 403 });
   const h = { 'access-control-allow-origin': o, vary: 'Origin', 'cache-control': 'no-store' };
   const ua = request.headers.get('user-agent') || '';
-  if (!env.STATS || !ua || BOT.test(ua)) return new Response(null, { status: 204, headers: h });
+  if (!env.STATS || !ua || BOT.test(ua) || tooBig(request)) return new Response(null, { status: 204, headers: h });
   let b = null;
   try { b = JSON.parse((await request.text()).slice(0, 2000)); } catch {}
-  const d = cleanHit(b, { ip: request.headers.get('cf-connecting-ip') || '', ua, cc: request.cf && request.cf.country });
+  const ip = request.headers.get('cf-connecting-ip') || '';
+  const d = cleanHit(b, { ip, ua, cc: request.cf && request.cf.country });
+  if (d) d.rk = ipKey(ip);   // solo para el límite por conexión (no se guarda)
   if (d) {
     const p = statsStub(env).fetch('https://stats/hit', { method: 'POST', body: JSON.stringify(d) }).catch(() => {});
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
@@ -164,7 +177,8 @@ async function stats(request, env) {
 
 export default {
   async fetch(request, env, ctx) {
-    const path = decodeURIComponent(new URL(request.url).pathname).replace(/\/+$/, '');
+    let path = '';
+    try { path = decodeURIComponent(new URL(request.url).pathname).replace(/\/+$/, ''); } catch { return new Response('Bad request', { status: 400 }); }
     if (path === '/api/v') return visit(request, env, ctx);
     if (path === '/api/stats') return stats(request, env);
     if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);

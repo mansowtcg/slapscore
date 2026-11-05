@@ -443,7 +443,7 @@ function drawWeights(set) {
   const { C, esc, dec } = X;
   const cur = C.weightsFrom(set.weights);
   el.innerHTML = `<p class="muted" style="margin-top:0">Los cambios recalculan las notas de los partidos de los últimos ${X.int((X.S.index && X.S.index.retain) || 60)} días (los archivados conservan la suya). Tardan unos minutos en verse en la web.</p>
-    <form id="wform"><div class="wgrid">${C.WEIGHT_FIELDS.map(([k, l, step]) => `<div class="field"><label for="w-${k}">${esc(l)}</label><input class="input" id="w-${k}" name="${k}" type="number" step="${step}" value="${cur[k]}" inputmode="decimal"></div>`).join('')}</div>
+    <form id="wform"><div class="wgrid">${C.WEIGHT_FIELDS.map(([k, l, step]) => `<div class="field"><label for="w-${k}">${esc(l)}</label><input class="input" id="w-${k}" name="${k}" type="number" step="${step}" value="${esc(cur[k])}" inputmode="decimal"></div>`).join('')}</div>
     <div style="display:flex;align-items:center;gap:12px;margin:16px 0;padding:12px;border-radius:12px;background:var(--surface-2)"><span style="flex:1;font-size:13px"><b>Ejemplo:</b> 1 gol, 1 asistencia, 4 tiros, 2 paradas, 9 pases, 2 robos, 2 pérdidas y victoria en 3v3 encajando 2.</span><span id="w-prev"></span></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn primary" type="submit">Guardar fórmula</button><button class="btn" type="button" id="w-reset">Restaurar valores por defecto</button></div></form>`;
   const form = $('#wform');

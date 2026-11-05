@@ -1,3 +1,18 @@
+# Cabeceras de la web en Cloudflare (Workers static assets).
+# Seguridad: solo se ejecuta el código de la propia web (más el script del tema, por su huella sha256),
+# nada se puede incrustar en otra web, y los datos solo se piden a slapscore.app (y a GitHub desde el panel).
+# Si cambias el script del tema en index.html, recalcula su huella.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-RAH9JvFkIpeolsN6W5O8TJC2ti9+1dDTtyzmLbyKfqM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://www.eusl.gg https://eusl.gg; font-src 'self'; connect-src 'self' https://api.github.com; worker-src 'self'; manifest-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), serial=(), hid=(), magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+# Logos de rango que se suben desde el panel: si alguien abre un SVG directamente, no puede ejecutar nada
+/assets/ranks/*
+  Content-Security-Policy: sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'
 /data/*
   Cache-Control: public, max-age=31536000, immutable
 /assets/*

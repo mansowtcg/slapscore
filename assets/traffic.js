@@ -50,7 +50,7 @@ let DN_R = null, DN_L = null;
 try { DN_R = new Intl.DisplayNames(['es'], { type: 'region' }); DN_L = new Intl.DisplayNames(['es'], { type: 'language' }); } catch {}
 const country = (cc) => { try { return DN_R ? DN_R.of(cc) : cc; } catch { return cc; } };
 const language = (l) => { try { const s = DN_L ? DN_L.of(l) : l; return s ? s[0].toUpperCase() + s.slice(1) : l; } catch { return l; } };
-const srcLabel = (k) => SRC[k] ?? (k.startsWith('tag:') ? `«${k.slice(4)}» (enlace con ?ref=)` : k);
+const srcLabel = (k) => (Object.prototype.hasOwnProperty.call(SRC, k) ? SRC[k] : k.startsWith('tag:') ? `«${k.slice(4)}» (enlace con ?ref=)` : k);
 
 // ---------- datos ----------
 async function api(range) {

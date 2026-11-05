@@ -46,6 +46,8 @@ self.addEventListener('fetch', (e) => {
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') { e.respondWith(cacheFirst(req, FONTS)); return; }
   if (url.origin !== location.origin) return;
   const path = url.pathname;
+  // la API (buzón, estadísticas del administrador) nunca se guarda en la copia sin conexión
+  if (path.startsWith('/api/')) return;
   if (req.mode === 'navigate') { e.respondWith(networkFirst(req, SHELL).catch(() => caches.match('index.html'))); return; }
   // Datos que cambian: siempre de la red (con copia para usar sin conexión)
   if (/\/data\/index\.json$|\/config\/settings\.json$|\/assets\/ranks\/index\.json$/.test(path) || url.searchParams.has('v') && /^\d+$/.test(url.searchParams.get('v'))) {

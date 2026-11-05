@@ -176,7 +176,7 @@ async function ingest(raw, key) {
 }
 // Partido nuevo de slapshot.gg
 async function addRaw(raw, allowOld) {
-  if (!raw || !raw.id || !raw.game_stats || !Array.isArray(raw.game_stats.players)) return false;
+  if (!raw || !C.okMatchId(raw.id) || !raw.game_stats || !Array.isArray(raw.game_stats.players)) return false;
   const key = keyOf(Date.parse(raw.created) || 0);
   if (!allowOld && isArchived(key.slice(0, 10))) return false;   // demasiado antiguo: fuera de la ventana
   const s = await rawShard(key);
@@ -326,7 +326,7 @@ while (Date.now() - started < BUDGET_MS && reqs < MAX_REQ && !blocked) {
     const t = Date.parse(m.created) || 0;
     const plist = Array.isArray(m.game_stats.players) ? m.game_stats.players : [];
     for (const pl of plist) {
-      const pid = String(pl.game_user_id || ''); if (!pid) continue;
+      const pid = C.pidOf(pl); if (!pid) continue;
       let q = players[pid];
       if (!q) { q = players[pid] = { n: pl.username || null, found: Date.now() }; discovered++; }
       if (pl.username && !q.chk && t >= (q.seen || 0)) q.n = pl.username;
@@ -335,8 +335,8 @@ while (Date.now() - started < BUDGET_MS && reqs < MAX_REQ && !blocked) {
     }
     if (await addRaw(m)) {
       newMatches++;
-      for (const pl of plist) { const q = players[String(pl.game_user_id || '')]; if (q) q.hits = (q.hits || 0) + 1; }
-      if (plist.some((pl) => prio.has(String(pl.game_user_id || '')))) { prioMatches++; featuredNew.push(String(m.id)); }
+      for (const pl of plist) { const id = C.pidOf(pl); const q = id ? players[id] : null; if (q) q.hits = (q.hits || 0) + 1; }
+      if (plist.some((pl) => prio.has(C.pidOf(pl)))) { prioMatches++; featuredNew.push(String(m.id)); }
     }
   }
 }

@@ -176,11 +176,11 @@ function ago(ms) {
 const regionLabel = (r) => String(r || '').split('-').map((x) => x.length <= 3 ? x.toUpperCase() : x[0].toUpperCase() + x.slice(1)).join(' ');
 const regionShort = (r) => String(r || '?').split('-')[0].toUpperCase();
 const typeLabel = (y) => C.TYPE_LABEL[y] ? t(C.TYPE_LABEL[y]) : (y ? cap(y) : t('Partida'));
-const endLabel = (e, ot) => ot && (!e || e === 'EndOfRegulation') ? t('Final en prórroga') : (C.END_LABEL[e] ? t(C.END_LABEL[e]) : (e ? e.replace(/([a-z])([A-Z])/g, '$1 $2') : t('Final')));
+const endLabel = (e, ot) => ot && (!e || e === 'EndOfRegulation') ? t('Final en prórroga') : (C.END_LABEL[e] ? t(C.END_LABEL[e]) : (e ? String(e).replace(/([a-z])([A-Z])/g, '$1 $2') : t('Final')));
 const statName = (k) => C.LABELS[k] ? t(C.LABELS[k][0]) : k.replace(/_/g, ' ');
 const statAbbr = (k) => C.LABELS[k] ? t(C.LABELS[k][1]) : k.slice(0, 4).toUpperCase();
 const resLetter = (r) => r === 'W' ? t('V') : r === 'L' ? t('D') : t('E');
-const matchHref = (key, id) => `#m-${key.replace(/[-/]/g, '')}-${id}`;
+const matchHref = (key, id) => esc(`#m-${String(key).replace(/[-/]/g, '')}-${id}`);
 function parseMatch(h) {
   const m = /^m-(\d{4})(\d{2})(\d{2})(\d{2})-(.+)$/.exec(h);
   return m ? { key: `${m[1]}-${m[2]}-${m[3]}/${m[4]}`, id: m[5] } : null;
@@ -1453,7 +1453,7 @@ async function viewPlayer(pid, tok) {
     const r = E && E.roster && E.roster[String(P.id)], tg = $('.ph-tags', MAIN);
     if (!r || !tg || location.hash !== '#j-' + P.id || $('.eu-pill', tg)) return;
     const x = (E.teams || {})[r[0]] || {}, lg = (E.leagues || {})[r[1]] || '';
-    tg.insertAdjacentHTML('beforeend', `<a class="pill eu-pill" href="#eusl" title="${esc(t('Juega en la EUSL'))}">${x.logo ? `<img src="${esc(x.logo)}" width="16" height="16" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}EUSL ${esc(lg)} · ${esc(x.n || '?')}</a>`);
+    tg.insertAdjacentHTML('beforeend', `<a class="pill eu-pill" href="#eusl" title="${esc(t('Juega en la EUSL'))}">${x.logo ? `<img src="${esc(x.logo)}" width="16" height="16" alt="" referrerpolicy="no-referrer" data-fb="rm">` : ''}EUSL ${esc(lg)} · ${esc(x.n || '?')}</a>`);
   }).catch(() => {});
 }
 async function adminFollow(pid, follow, btn) {
@@ -1828,9 +1828,9 @@ async function viewEusl(tok) {
   // escudo del equipo (de eusl.gg); si no carga, sus iniciales
   // con link, el nombre lleva a la ficha del equipo en eusl.gg (no en los resultados: la fila entera ya es un enlace)
   const team = (id, size = 22, link = false) => {
-    const x = E.teams[id] || { n: '?' }, ab = `<span class="eu-x" style="--h:${hue(x.n)};width:${size}px;height:${size}px"${x.logo ? ' hidden' : ''}>${esc((x.ab || x.n).slice(0, 3))}</span>`;
+    const x = E.teams[id] || { n: '?' }, ab = `<span class="eu-x" style="--h:${hue(x.n)};width:${size}px;height:${size}px"${x.logo ? ' hidden' : ''}>${esc(String(x.ab || x.n || '').slice(0, 3))}</span>`;
     const nm = link && /^https:\/\/(www\.)?eusl\.gg\//.test(x.link || '') ? `<a class="t" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.n)}</a>` : `<span class="t">${esc(x.n)}</span>`;
-    return `<span class="eu-t">${x.logo ? `<img src="${esc(x.logo)}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false">` : ''}${ab}${nm}</span>`;
+    return `<span class="eu-t">${x.logo ? `<img src="${esc(x.logo)}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-fb="next">` : ''}${ab}${nm}</span>`;
   };
   const lg = (id) => E.leagues[id] || '';
   const tabs = [['tabla', 'Clasificación'], ['res', 'Resultados'], ['prox', 'Próximos'], ['gol', 'Jugadores']];
@@ -1848,7 +1848,7 @@ async function viewEusl(tok) {
       const list = EU.tab === 'res' ? E.results : E.upcoming;
       el.innerHTML = list.length ? list.map((g) => {
         const [a, b] = g.teams, w = g.s ? (g.s[0] > g.s[1] ? 0 : g.s[1] > g.s[0] ? 1 : -1) : -1;
-        return `<a class="ev eu-ev" href="${esc(g.link)}" target="_blank" rel="noopener"><div class="ev-time"><b>${esc(shortDate(g.t))}</b><span>${g.s ? (g.ot ? `<span class="ot">${esc(t('Prór.'))}</span>` : esc(t('Final'))) : DF_TIME.format(new Date(g.t))}</span></div>
+        return `<a class="ev eu-ev" href="${/^https:\/\/(www\.)?eusl\.gg\//.test(g.link || '') ? esc(g.link) : '#eusl'}" target="_blank" rel="noopener"><div class="ev-time"><b>${esc(shortDate(g.t))}</b><span>${g.s ? (g.ot ? `<span class="ot">${esc(t('Prór.'))}</span>` : esc(t('Final'))) : DF_TIME.format(new Date(g.t))}</span></div>
           <div class="ev-teams"><div class="ev-team${w === 0 ? ' won' : ''}">${team(a, 18)}</div><div class="ev-team${w === 1 ? ' won' : ''}">${team(b, 18)}</div></div>
           <div class="ev-score">${g.s ? `<span class="${w === 0 ? 'won' : ''}">${g.s[0]}</span><span class="${w === 1 ? 'won' : ''}">${g.s[1]}</span>` : ''}</div><div class="ev-mvp"><span class="region" title="${esc(lg(g.league))}">${esc(/playoff/i.test(lg(g.league)) ? 'PO' : lg(g.league).slice(0, 3).toUpperCase())}</span></div></a>`;
       }).join('') : `<div class="empty"><strong>${esc(EU.tab === 'res' ? t('Sin resultados todavía.') : t('No hay partidos programados.'))}</strong>${EU.tab === 'prox' ? esc(t('Cuando la liga publique el calendario, aparecerá aquí.')) : ''}</div>`;
@@ -2000,6 +2000,14 @@ function moved() {
   return false;
 }
 
+// Sin JavaScript dentro del HTML (lo prohíbe la política de seguridad de la web): logos que no cargan y botón de reintentar
+document.addEventListener('error', (e) => {
+  const el = e.target; if (!el || el.tagName !== 'IMG' || !el.dataset || !el.dataset.fb) return;
+  if (el.dataset.fb === 'rm') el.remove();
+  else { el.hidden = true; if (el.nextElementSibling) el.nextElementSibling.hidden = false; }
+}, true);
+document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('[data-reload]')) location.reload(); });
+
 // ---------- arranque ----------
 (async function boot() {
   renderChrome(); go({ instant: true });
@@ -2008,7 +2016,7 @@ function moved() {
     applySettings(set || {}); setIndex(idx);
     if (moved()) return;
   } catch (e) {
-    MAIN.innerHTML = `<div class="card empty"><strong>${esc(t('No se pudieron cargar los partidos.'))}</strong><p>${esc(e.status === 404 ? t('El robot aún no ha publicado datos.') : t('Comprueba tu conexión y vuelve a intentarlo.'))}</p><button class="btn" type="button" onclick="location.reload()">${esc(t('Reintentar'))}</button></div>`;
+    MAIN.innerHTML = `<div class="card empty"><strong>${esc(t('No se pudieron cargar los partidos.'))}</strong><p>${esc(e.status === 404 ? t('El robot aún no ha publicado datos.') : t('Comprueba tu conexión y vuelve a intentarlo.'))}</p><button class="btn" type="button" data-reload>${esc(t('Reintentar'))}</button></div>`;
     return;
   }
   renderChrome(); go({ instant: true }); S.booted = true;

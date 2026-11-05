@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJSON, Writer, hash } from './io.js';
+// enlaces y logos: solo direcciones https de eusl.gg (lo que viene de su API se muestra en slapscore.app)
+const EUSL_URL = /^https:\/\/(www\.)?eusl\.gg\/[^\s"'<>]*$/;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
@@ -58,7 +60,7 @@ try {
     const teams = (e.teams || []).filter(Boolean).slice(0, 2);
     const sc = teams.map((id) => { const r = (e.results || {})[id]; return r && r.series !== '' && r.series != null ? n(r.series) : null; });
     const oc = teams.map((id) => [].concat((e.outcome || {})[id] || ((e.results || {})[id] || {}).outcome || [])[0] || '');
-    return { id: e.id, t, league: (e.leagues || [])[0] || 0, teams, s: sc.every((x) => x != null) ? sc : null, ot: oc.some((o) => /overtime/i.test(o)) ? 1 : 0, link: e.link, perf: e.performance };
+    return { id: e.id, t, league: (e.leagues || [])[0] || 0, teams, s: sc.every((x) => x != null) ? sc : null, ot: oc.some((o) => /overtime/i.test(o)) ? 1 : 0, link: EUSL_URL.test(e.link || '') ? e.link : '', perf: e.performance };
   });
   const results = games.filter((g) => g.s).sort((a, b) => b.t - a.t).slice(0, 30);
   const upcoming = games.filter((g) => !g.s && g.t > now - 3 * 3_600_000).sort((a, b) => a.t - b.t).slice(0, 20);
@@ -93,7 +95,7 @@ try {
       const m = t._embedded && t._embedded['wp:featuredmedia'] && t._embedded['wp:featuredmedia'][0];
       const sz = (m && m.media_details && m.media_details.sizes) || {};
       const logo = (sz['sportspress-fit-icon'] || sz.thumbnail || {}).source_url || (m && m.source_url) || '';
-      teams[t.id] = { n: txt(t.title && t.title.rendered), ab: t.abbreviation || '', logo: /^https:\/\//.test(logo) ? logo : '', link: t.link };
+      teams[t.id] = { n: txt(t.title && t.title.rendered), ab: typeof t.abbreviation === 'string' ? t.abbreviation : '', logo: EUSL_URL.test(logo) ? logo : '', link: EUSL_URL.test(t.link || '') ? t.link : '' };
     }
   }
   for (const t of tables) for (const r of t.rows) if (!teams[r.id]) teams[r.id] = { n: r.name, ab: '', logo: '' };

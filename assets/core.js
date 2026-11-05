@@ -115,7 +115,7 @@ export function normalize(raw, W) {
     for (const k of Object.keys(src)) { const n = num(src[k]); if (n != null) st[k] = n; }
     if (st.assists == null && (st.primary_assists != null || st.secondary_assists != null)) st.assists = (st.primary_assists || 0) + (st.secondary_assists || 0);
     for (const k of FILL) if (st[k] == null) st[k] = 0;
-    return { pid: String(pl.game_user_id ?? pl.username ?? ''), name: String(pl.username || 'Jugador'), team: teamOf(pl.team), st };
+    return { pid: pidOf(pl), name: String(pl.username || 'Jugador'), team: teamOf(pl.team), st };
   });
   const score = { home: num(sc.home), away: num(sc.away) };
   for (const tm of ['home', 'away']) if (score[tm] == null) score[tm] = players.filter((p) => p.team === tm).reduce((a, p) => a + (p.st.goals || 0), 0);
@@ -144,6 +144,15 @@ export function normalize(raw, W) {
   };
 }
 
+// ID de jugador de slapshot.gg ("1545491", "bot-…"). Nunca el nombre (lo elige cada jugador) ni algo como
+// "constructor" o "__proto__", que como clave de un objeto rompería los totales.
+export function pidOf(pl) {
+  const s = pl && pl.game_user_id != null ? String(pl.game_user_id) : '';
+  return /^[A-Za-z0-9_-]{1,64}$/.test(s) && !(s in Object.prototype) ? s : '';
+}
+// ID de partido de slapshot.gg (UUID)
+export const okMatchId = (id) => /^[A-Za-z0-9-]{1,64}$/.test(String(id ?? ''));
+
 // ---------- partidos custom con periodos ----------
 // slapshot.gg da cada periodo de una partida custom como un partido aparte, y su marcador y estadísticas son
 // ACUMULADOS (el 2.º periodo ya incluye lo del 1.º). Aquí se juntan los periodos de una misma partida y se sacan
@@ -162,7 +171,7 @@ const LINK_GAP = 40 * 60_000;   // como mucho 40 minutos entre el final de un pe
 function plMap(raw) {
   const m = new Map();
   for (const pl of Array.isArray(gsOf(raw).players) ? gsOf(raw).players : []) {
-    const id = String(pl.game_user_id ?? pl.username ?? ''); if (!id) continue;
+    const id = pidOf(pl); if (!id) continue;
     const st = pl.stats && typeof pl.stats === 'object' ? pl.stats : {};
     m.set(id, { team: teamOf(pl.team), st });
   }
@@ -228,7 +237,7 @@ export function mergePeriods(raws, W) {
   // jugadores: todos los que salen en algún periodo, con sus acumulados más recientes
   const latest = new Map();
   for (const raw of raws) for (const pl of Array.isArray(gsOf(raw).players) ? gsOf(raw).players : []) {
-    const id = String(pl.game_user_id ?? pl.username ?? ''); if (id) latest.set(id, pl);
+    const id = pidOf(pl); if (id) latest.set(id, pl);
   }
   const lens = raws.map((r) => num(gsOf(r).match_length)).filter((x) => x != null);
   const m = normalize({ ...first, game_stats: { ...gsOf(last), players: [...latest.values()] } }, W);

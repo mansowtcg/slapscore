@@ -23,7 +23,9 @@ const GAP = 30 * 60_000;          // una visita termina tras 30 minutos sin acti
 const LIVE = 5 * 60_000;          // "ahora mismo": actividad en los últimos 5 minutos
 const KEEP_DAYS = 400;
 const SUM_V = 1;                  // versión del resumen diario (si cambia, se rehacen los días que aún tienen eventos)
-const PER_VISITOR = 80;           // eventos como mucho por persona cada 10 minutos
+const PER_IP = 300;               // eventos como mucho por conexión (IP; en IPv6, su red /64) cada 10 minutos
+const DAY_CAP = 60000;            // eventos guardados como mucho al día (el plan gratuito permite 100.000 filas escritas)
+const FB_GAP = 60_000, FB_PER_IP = 5, FB_DAY = 200;   // buzón: 1 mensaje por minuto y 5 al día por conexión, 200 al día en total
 const TOP = { pl: 300, src: 100, ent: 40, pg: 40, cc: 120, br: 30, os: 30, lang: 60, ev: 30 };
 
 // ---------- fechas en hora de Madrid ----------
@@ -99,7 +101,7 @@ export function cleanHit(b, { ip, ua, cc }) {
   const out = { k, id: ip + '|' + ua };
   if (k === 0) {
     const p = String(b.p || '');
-    if (!PAGES.has(p) && !/^j:[A-Za-z0-9_-]{1,40}$/.test(p)) return null;
+    if (!PAGES.has(p) && !/^j:\d{1,12}$/.test(p)) return null;
     out.p = p;
     out.ref = source(b.r, b.q) || null;
     out.cc = /^[A-Z]{2}$/.test(cc || '') && cc !== 'XX' && cc !== 'T1' ? cc : null;
@@ -120,7 +122,8 @@ export function cleanHit(b, { ip, ua, cc }) {
 }
 
 // ---------- resumen de un conjunto de eventos (un día o parte de él) ----------
-const inc = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
+// claves que vienen de las visitas ("constructor", "toString"…): solo las propias del objeto
+const inc = (o, k, n = 1) => { o[k] = (Object.prototype.hasOwnProperty.call(o, k) ? Number(o[k]) || 0 : 0) + n; };
 const sec = (p) => (p && p.startsWith('j:') ? 'jugador' : p || '?');
 function trim(o, n) { const e = Object.entries(o); if (e.length <= n) return o; return Object.fromEntries(e.sort((a, b) => b[1] - a[1]).slice(0, n)); }
 export function emptySummary() {
@@ -182,6 +185,8 @@ export class Stats {
   constructor(state, env) {
     this.state = state; this.env = env; this.sql = state.storage.sql;
     this.lastId = 0; this.salt = null; this.rl = new Map(); this.rlAt = 0;
+    this.dayN = null;   // { day, n }: eventos guardados hoy
+    this.fb = new Map(); this.fbDay = '';   // buzón: conexión -> { last, n }
     this.now = () => Date.now();
     state.blockConcurrencyWhile(async () => this.init());
   }
@@ -202,6 +207,7 @@ export class Stats {
     try {
       if (request.method === 'POST' && u.pathname === '/hit') { await this.hit(await request.json()); return new Response(null, { status: 204 }); }
       if (request.method === 'POST' && u.pathname === '/forget') return Response.json(await this.forget(String((await request.json()).id || '')));
+      if (request.method === 'POST' && u.pathname === '/fb') return Response.json(this.fbAllow(String((await request.json()).ip || '')));
       if (request.method === 'GET' && u.pathname === '/stats') return Response.json(this.stats(u.searchParams.get('range') || '7d'));
     } catch (e) { return Response.json({ error: String(e && e.message || e) }, { status: 500 }); }
     return new Response('not found', { status: 404 });
@@ -225,10 +231,17 @@ export class Stats {
   async hit(d) {
     if (!d || ![0, 1, 2].includes(d.k)) return false;
     const now = this.now();
-    if (now - this.rlAt > 600_000 || this.rl.size > 20000) { this.rl.clear(); this.rlAt = now; }
+    // límite por conexión (no por navegador: el navegador lo elige quien manda la petición)
+    if (now - this.rlAt > 600_000 || this.rl.size > 50000) { this.rl.clear(); this.rlAt = now; }
+    const rk = String(d.rk || d.id || '').slice(0, 64);
+    const c = (this.rl.get(rk) || 0) + 1; this.rl.set(rk, c);
+    if (c > PER_IP) return false;
+    // tope diario: así nunca se pasa del plan gratuito aunque alguien mande eventos falsos desde muchas conexiones
+    const today = dayOf(now);
+    if (!this.dayN || this.dayN.day !== today) this.dayN = { day: today, n: this.q('SELECT COUNT(*) AS n FROM hits WHERE id >= ?', dayStart(today) * 1000)[0].n };
+    if (this.dayN.n >= DAY_CAP) return false;
+    this.dayN.n++;
     const vh = await this.visitor(String(d.id || ''), now);
-    const c = (this.rl.get(vh) || 0) + 1; this.rl.set(vh, c);
-    if (c > PER_VISITOR) return false;
     const id = this.lastId = Math.max(this.lastId + 1, now * 1000);
     if (d.k === 0) {
       this.sql.exec('INSERT INTO hits (id, vh, k, p, ref, cc, dev, br, os, lang, sl, app) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -238,6 +251,21 @@ export class Stats {
       this.sql.exec('INSERT INTO hits (id, vh, k, p, n) VALUES (?, ?, ?, ?, ?)', id, vh, d.k, d.p ?? null, d.n ?? null);
     }
     return true;
+  }
+
+  // buzón de sugerencias: ¿se puede guardar otro mensaje de esta conexión? (de uno en uno, sin carreras)
+  fbAllow(ip) {
+    const now = this.now(), day = dayOf(now);
+    if (this.fbDay !== day) { this.fb.clear(); this.fbDay = day; }
+    const total = Number(this.meta('fb:' + day)) || 0;
+    if (total >= FB_DAY) return { ok: false, error: 'full' };
+    const x = this.fb.get(ip) || { last: 0, n: 0 };
+    if (now - x.last < FB_GAP || x.n >= FB_PER_IP) return { ok: false, error: 'wait' };
+    x.last = now; x.n++; this.fb.set(ip, x);
+    if (this.fb.size > 20000) this.fb.clear();
+    this.setMeta('fb:' + day, String(total + 1));
+    this.sql.exec("DELETE FROM meta WHERE k LIKE 'fb:%' AND k < ?", 'fb:' + addDays(day, -3));
+    return { ok: true };
   }
 
   // quita los eventos de hoy de una persona (el administrador, para borrar sus propias visitas)
