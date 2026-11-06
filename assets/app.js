@@ -495,6 +495,14 @@ function navTo(hash, replace = false) {
   onNav();
 }
 const ADMIN_ENTRY = 'entrada-ibai';
+// Entrada escondida para la app instalada (no tiene barra de direcciones): 5 toques seguidos al logo de SlapScore
+// abren la entrada del administrador (o el panel, con la sesión iniciada). Solo pide el token; no da acceso por sí sola.
+let brandTaps = [];
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.brand')) return;
+  const now = Date.now(); brandTaps = brandTaps.filter((x) => now - x < 3000); brandTaps.push(now);
+  if (brandTaps.length >= 5) { brandTaps = []; e.preventDefault(); e.stopPropagation(); navTo(isAdmin() ? '#admin' : '#' + ADMIN_ENTRY); }
+}, true);
 function route() {
   const h = decodeURIComponent(curHash().slice(1));
   if (h.startsWith('m-')) return { view: 'match', ...(parseMatch(h) || {}) };

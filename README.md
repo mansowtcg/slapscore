@@ -62,7 +62,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `supporters`: IDs con la insignia ♥ puestos a mano. Los de **Ko-fi** van aparte y solos: Ko-fi avisa al Worker de cada apoyo (`/api/kofi`, con la clave de verificación que se pega en el panel); si el mensaje lleva el ID o el enlace del perfil, la insignia se pone sola, y si no, se asigna desde el panel. El robot baja esa lista en cada pasada.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
 
-Se pueden cambiar desde el panel de administrador, que usa un token de GitHub de grano fino con permisos de **Actions** y **Contents** en lectura y escritura sobre este repositorio. El token solo se guarda en el navegador de quien lo usa.
+Se pueden cambiar desde el panel de administrador, que usa un token de GitHub de grano fino con permisos de **Actions** y **Contents** en lectura y escritura sobre este repositorio. El token solo se guarda en el navegador de quien lo usa. El panel no se enlaza en la web: se entra por `/entrada-ibai` o, en la app instalada (que no tiene barra de direcciones), tocando 5 veces seguidas el logo de SlapScore. Con la sesión iniciada sale el botón del panel en la cabecera.
 
 ## Publicación en Cloudflare (gratis)
 
