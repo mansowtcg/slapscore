@@ -4,7 +4,8 @@
 //  2) recibe el buzón de sugerencias (/api/feedback) y se lo enseña al administrador,
 //  3) cuenta las visitas (/api/v) y le enseña las estadísticas al administrador (/api/stats), y
 //  4) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
-//     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar.
+//     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar, y
+//  5) si la web deja de actualizarse, avisa al administrador por email (alerts.js).
 //
 // Buzón: los mensajes se guardan en el KV "FEEDBACK" (lo crea el flujo de GitHub al publicar).
 // No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle.
@@ -14,6 +15,7 @@
 // Visitas: se guardan en el Durable Object "Stats" (stats.js), sin cookies ni IP. Ver la explicación allí.
 
 import { Stats, cleanHit, BOT } from './stats.js';
+import { checkHealth, getAlerts, putAlerts, okEmail, sendMail } from './alerts.js';
 export { Stats };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
@@ -175,6 +177,33 @@ async function stats(request, env) {
   return new Response(await r.text(), { status: r.status, headers: h });
 }
 
+// Avisos por email (solo el administrador): dirección, estado y email de prueba
+async function alerts(request, env, path) {
+  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, POST, OPTIONS', 'authorization, content-type');
+  if (!env.FEEDBACK) return json({ error: 'unavailable' }, 503, request, env);
+  if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
+  const s = await getAlerts(env);
+  const view = (x) => ({ email: x.email || '', checked: x.checked || 0, problem: x.problem || '', down: x.down || 0, sent: x.sent || 0, err: x.err || '', mail: !!env.MAIL });
+  if (request.method === 'GET' && path === '/api/alerts') return json(view(s), 200, request, env);
+  if (request.method !== 'POST' || tooBig(request)) return json({ error: 'method' }, 405, request, env);
+  if (path === '/api/alerts') {
+    let b = null; try { b = JSON.parse(await request.text()); } catch {}
+    const email = clean(b && b.email, 254).toLowerCase();
+    if (email && !okEmail(email)) return json({ error: 'email' }, 400, request, env);
+    s.email = email; s.err = '';
+    await putAlerts(env, s);
+    return json(view(s), 200, request, env);
+  }
+  if (path === '/api/alerts/test') {
+    if (!s.email) return json({ error: 'Primero guarda una dirección.' }, 400, request, env);
+    try {
+      await sendMail(env, s.email, 'Prueba de avisos de SlapScore', 'Si lees esto, los avisos funcionan: si la web deja de actualizarse, te llegará un email como este.');
+      return json({ ok: true }, 200, request, env);
+    } catch (e) { return json({ error: String(e && e.message || e).slice(0, 200) }, 502, request, env); }
+  }
+  return json({ error: 'not found' }, 404, request, env);
+}
+
 export default {
   async fetch(request, env, ctx) {
     let path = '';
@@ -182,9 +211,12 @@ export default {
     if (path === '/api/v') return visit(request, env, ctx);
     if (path === '/api/stats') return stats(request, env);
     if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);
+    if (path === '/api/alerts' || path === '/api/alerts/test') return alerts(request, env, path);
     return env.ASSETS.fetch(request);
   },
-  async scheduled(event, env) {
+  async scheduled(event, env, ctx) {
+    const health = checkHealth(env).catch((e) => console.log('avisos: ' + (e && e.message)));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(health); else await health;
     if (!env.GH_DISPATCH_TOKEN || !env.GH_REPO) return;
     const api = `https://api.github.com/repos/${env.GH_REPO}/actions/workflows/crawl.yml`;
     const headers = {

@@ -1091,3 +1091,5 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 :root[data-theme="dark"] .sup{color:#F06595}
 :root[data-theme="dark"] .pill.sup-pill{background:rgba(240,101,149,.16);color:#F783AC}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sup{color:#F06595}:root:not([data-theme="light"]) .pill.sup-pill{background:rgba(240,101,149,.16);color:#F783AC}}
+.al-form{display:flex;flex-wrap:wrap;gap:8px}
+.al-form .input{flex:1 1 220px;min-width:0}

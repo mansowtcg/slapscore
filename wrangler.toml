@@ -13,6 +13,10 @@ not_found_handling = "none"
 [vars]
 GH_REPO = "mansowtcg/slapscore"
 
+# Avisos por email al administrador (alerts.js): solo puede escribir a direcciones verificadas en Email Routing
+[[send_email]]
+name = "MAIL"
+
 [triggers]
 crons = ["7,37 * * * *"]
 

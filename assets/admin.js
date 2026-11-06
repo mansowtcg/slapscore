@@ -96,6 +96,7 @@ export async function mount(root, ctx) {
         <button class="btn primary" type="button" id="go-now">Traer partidos ahora</button></div>
         <div id="prog"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Estado del robot</h3><span id="wf-pill"></span></div><div class="card-b" id="wf"><div class="sk" style="height:90px"></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Avisos por email</h3><small>si la web deja de actualizarse</small></div><div class="card-b" id="alerts"><div class="sk" style="height:60px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Últimas pasadas</h3><a href="https://github.com/${esc(REPO)}/actions" target="_blank" rel="noopener">Ver en GitHub</a></div><div class="runs" id="runs"><div class="card-b"><div class="sk" style="height:120px"></div></div></div></div>
     </div>
     <div class="col">
@@ -130,7 +131,7 @@ export async function mount(root, ctx) {
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
-  loadWorkflow(); loadRuns(); drawRanks(); loadInbox();
+  loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
   try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawExtra(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'sups', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
@@ -154,6 +155,44 @@ function login(root) {
       X.renderChrome(); X.toast('Sesión de administrador iniciada');
       if (location.hash === '#admin') mount(root, X); else location.replace('#admin');   // la dirección de entrada no se queda en la barra
     } catch (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar'; }
+  });
+}
+
+// ---------- Worker de Cloudflare (rutas del administrador) ----------
+async function workerApi(path, opts = {}) {
+  let r;
+  try { r = await fetch(X.apiBase() + path, { ...opts, cache: 'no-store', headers: { Authorization: `Bearer ${token()}`, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) } }); }
+  catch { throw new Error('No se pudo conectar con el servidor de Cloudflare.'); }
+  let j = null; try { j = await r.json(); } catch {}
+  if (r.status === 401) throw new Error('Cloudflare no ha aceptado tu token: tiene que ser de una cuenta con permiso de escritura en el repositorio.');
+  if (r.status === 503) throw new Error('Aún no está activo en Cloudflare. Se activa solo con la siguiente pasada del robot.');
+  if (!r.ok) throw new Error((j && typeof j.error === 'string' && j.error.length > 8 ? j.error : `El servidor respondió con un error ${r.status}.`));
+  return j;
+}
+
+// ---------- avisos por email ----------
+async function loadAlerts() {
+  const el = $('#alerts'); if (!el) return;
+  const { esc, ago } = X;
+  let a;
+  try { a = await workerApi('/api/alerts'); } catch (e) { el.innerHTML = `<p class="err" style="margin:0">${esc(e.message)}</p>`; return; }
+  const status = a.problem ? `<b class="err">Problema:</b> ${esc(a.problem)}` : a.checked ? `Todo bien · última comprobación ${esc(ago(a.checked))}` : 'Se comprueba dos veces por hora.';
+  el.innerHTML = `<p class="muted" style="margin-top:0">Te escribe si los partidos llevan más de 45 minutos sin actualizarse, te lo recuerda cada 12 horas y te avisa cuando se arregla. La dirección tiene que estar verificada en el reenvío de correo de Cloudflare.</p>
+    <form id="al-form" class="al-form"><input class="input" id="al-email" type="email" inputmode="email" autocomplete="email" aria-label="Email para los avisos" placeholder="tu@email.com" value="${esc(a.email)}">
+    <button class="btn primary" type="submit">Guardar</button><button class="btn" type="button" id="al-test"${a.email ? '' : ' disabled'}>Enviar prueba</button></form>
+    <p class="muted" id="al-st" style="margin:10px 0 0">${status}</p>
+    ${!a.mail ? '<p class="err" style="margin:6px 0 0">El envío de emails aún no está activo en Cloudflare: se activa con la siguiente pasada del robot.</p>' : a.err ? `<p class="err" style="margin:6px 0 0">Último intento de envío: ${esc(a.err)}</p>` : ''}`;
+  $('#al-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.submitter || $('#al-form button[type=submit]'); btn.disabled = true;
+    try { await workerApi('/api/alerts', { method: 'POST', body: JSON.stringify({ email: $('#al-email').value.trim() }) }); X.toast('Dirección guardada'); loadAlerts(); }
+    catch (ex) { X.toast(ex.message); btn.disabled = false; }
+  });
+  $('#al-test').addEventListener('click', async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'Enviando…';
+    try { await workerApi('/api/alerts/test', { method: 'POST' }); X.toast('Email de prueba enviado: mira tu bandeja de entrada (y Spam)'); }
+    catch (ex) { X.toast(ex.message); }
+    b.disabled = false; b.textContent = 'Enviar prueba';
   });
 }
 

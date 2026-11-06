@@ -131,7 +131,12 @@ jobs:
           else echo "::warning::No se pudo preparar el almacén del buzón: el token de Cloudflare necesita el permiso Workers KV Storage (Edit)."; fi
           SEC=""
           if [ -n "$DISPATCH_TOKEN" ]; then SEC="$RUNNER_TEMP/cf.env"; printf 'GH_DISPATCH_TOKEN=%s\n' "$DISPATCH_TOKEN" > "$SEC"; fi
-          $WR deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
+          if ! $WR deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}; then
+            # si Cloudflare no deja usar el envío de emails (avisos), se publica sin él para que la web no se quede atrás
+            echo "::warning::No se pudo publicar con el envío de emails (avisos al administrador). Se publica sin él."
+            node -e 'const f="wrangler.toml",fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace(/\[\[send_email\]\][^\[]*/,""))'
+            $WR deploy --var "GH_REPO:$GITHUB_REPOSITORY" ${SEC:+--secrets-file "$SEC"}
+          fi
           rm -f "$RUNNER_TEMP/cf.env"
       - name: Programar la siguiente pasada
         if: always()
