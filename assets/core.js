@@ -224,6 +224,9 @@ export const PER_COLS = ['goals', 'assists', 'shots', 'saves', 'passes', 'score'
 // Ordinal del periodo para mostrar: 1.er, 2.º, 3.er (en inglés 1st, 2nd…)
 export function periodOrd(n, lang) {
   if (lang === 'en') return n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+  if (lang === 'fr') return n + (n === 1 ? 're' : 'e');
+  if (lang === 'de') return n + '.';
+  if (lang === 'pt') return n + 'º';
   return n + (n === 1 || n === 3 ? '.er' : '.º');
 }
 // Partida completa a partir de sus periodos (registros de slapshot.gg, en orden). Devuelve lo mismo que normalize()

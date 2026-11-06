@@ -56,7 +56,7 @@ export async function matchImage(m, X) {
   fit(c, `${X.typeLabel(m.type)} · ${X.region(m.region)} · ${m.arena}`, W / 2, 196, 900, 700, 34, 'center', 'rgba(255,255,255,.8)');
   // marcador
   const win = m.winner;
-  crest(c, 140, 250, 150, COL.home, X.lang === 'en' ? 'H' : 'L'); crest(c, W - 290, 250, 150, COL.away, X.lang === 'en' ? 'A' : 'V');
+  crest(c, 140, 250, 150, COL.home, X.teamL[0]); crest(c, W - 290, 250, 150, COL.away, X.teamL[1]);
   c.textAlign = 'center'; c.font = F(win === 'home' ? 800 : 600, 36); c.fillStyle = win === 'away' ? COL.muted : '#fff'; c.fillText(X.t('Local'), 215, 450);
   c.font = F(win === 'away' ? 800 : 600, 36); c.fillStyle = win === 'home' ? COL.muted : '#fff'; c.fillText(X.t('Visitante'), W - 215, 450);
   c.font = F(800, 200, true);
@@ -73,7 +73,7 @@ export async function matchImage(m, X) {
   let y = top;
   for (const [k, tm] of ['home', 'away'].entries()) {
     c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, y, W - 120, 56, 14); c.fill();
-    crest(c, 78, y + 12, 32, tm === 'home' ? COL.home : COL.away, X.lang === 'en' ? (tm === 'home' ? 'H' : 'A') : (tm === 'home' ? 'L' : 'V'));
+    crest(c, 78, y + 12, 32, tm === 'home' ? COL.home : COL.away, tm === 'home' ? X.teamL[0] : X.teamL[1]);
     c.font = F(800, 30); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(`${tm === 'home' ? X.t('Local') : X.t('Visitante')} · ${m.score[tm]}`, 124, y + 39);
     if (win === tm) { c.font = F(800, 24); c.fillStyle = COL.win; c.textAlign = 'right'; c.fillText(X.t('Ganador').toUpperCase(), W - 84, y + 37); }
     y += 64;

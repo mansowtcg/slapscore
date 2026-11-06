@@ -96,8 +96,8 @@ const EN = {
 };
 
 export function render(lang) {
-  const L = lang === 'en' ? EN : ES;
+  const L = lang === 'es' ? ES : EN;   // en francés, alemán y portugués, la versión inglesa
   return `<h1 class="h1 in">${L.title}</h1><p class="lead">${L.lead}</p>
-    <nav class="legal-toc in" aria-label="${lang === 'en' ? 'Contents' : 'Contenido'}">${L.sections.map(([id, h]) => `<a href="#legal" data-legal-go="${id}">${h}</a>`).join('')}</nav>
+    <nav class="legal-toc in" aria-label="${lang === 'es' ? 'Contenido' : 'Contents'}">${L.sections.map(([id, h]) => `<a href="#legal" data-legal-go="${id}">${h}</a>`).join('')}</nav>
     <div class="legal">${L.sections.map(([id, h, body]) => `<section class="card in" id="lg-${id}"><div class="card-h"><h2>${h}</h2></div><div class="card-b">${body}</div></section>`).join('')}</div>`;
 }

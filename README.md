@@ -30,7 +30,7 @@ La web se sirve desde Cloudflare (Worker `slapscore` con los dominios slapscore.
 - **Buzón de sugerencias** (icono de bocadillo en la cabecera, enlace en el pie y recuadro en la portada): ideas, errores u otros, con contacto opcional. Los mensajes se guardan en Cloudflare y se leen y borran desde el panel de administrador.
 - **Panel de tráfico** (pestaña «Tráfico» del administrador): personas conectadas ahora mismo, visitantes, visitas, páginas vistas, páginas por visita, tiempo medio y rebote comparados con el periodo anterior, gráfico por horas, días o meses, páginas y jugadores más vistos, de dónde vienen (también enlaces con `?ref=`), países, dispositivos, navegadores, sistemas, idiomas, páginas de entrada, fidelidad, acciones (compartir, favoritos, sugerencias, instalar la app) y cuándo entra la gente. Periodos: hoy, ayer, 7, 30 y 90 días y 12 meses; tabla y CSV.
 - **Enlaces con vista previa**: los jugadores y los partidos tienen dirección propia (`/j/<id>`, `/m/<día+hora>-<id>`). El Worker sirve la web con el título, la descripción y la imagen de esa página, para que al compartirlos en Discord, WhatsApp o Google salgan con sus datos (los enlaces antiguos con `#` siguen funcionando).
-- Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
+- Inglés por defecto, y también español, francés, alemán y portugués (menú de idioma en la cabecera y lista en el pie). Tema claro y oscuro. Se instala como app en el móvil.
 
 ## Datos (rama `data`)
 
@@ -87,7 +87,7 @@ SlapScore se puede instalar en la pantalla de inicio (Android: botón «Instalar
 
 ## Idioma
 
-La web sale en inglés por defecto; el botón ES/EN de la cabecera (o el enlace del pie) cambia a español y se recuerda en ese navegador. Los textos se escriben en español en el código y se traducen con `t()` (`assets/i18n.js`, diccionario en `assets/en.js`).
+Los textos se escriben en español en el código y se traducen con `t()` (`assets/i18n.js`). Diccionarios: `assets/en.js` (inglés), `assets/fr.js`, `assets/de.js` y `assets/pt.js` (portugués de Brasil). Las claves son los textos en español; en francés, alemán y portugués, lo que falte sale en inglés. El aviso legal está en español y en inglés (los demás idiomas ven el inglés). Si añades un texto nuevo, ponlo al menos en `en.js`.
 
 ## Código
 

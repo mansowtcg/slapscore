@@ -1,7 +1,7 @@
 // SlapScore — aplicación web
 import * as C from './core.js';
 import { emblem, emblemDefs, setOfficial, hasOfficial, officialSrc, RANK_KEYS } from './emblems.js';
-import { t, LANG, LOC, setLang } from './i18n.js';
+import { t, LANG, LOC, setLang, LANGS, TEAM_LETTER } from './i18n.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -82,7 +82,7 @@ async function pushDisable() {
 let pushT = 0;
 function pushResync() { if (!pushOn || !pushOk()) return; clearTimeout(pushT); pushT = setTimeout(() => pushSync(false).catch(() => {}), 800); }
 // botón de campana: activa o desactiva los avisos de todos los favoritos
-const pushBtn = (cls = 'btn sm') => (pushOk() || isIOS() ? `<button type="button" class="${cls} push-btn" data-push aria-pressed="${pushOn}" title="${esc(t('Avisos de tus favoritos'))}">${ICON.bell}<span>${esc(t('Avisos'))}</span></button>` : '');
+const pushBtn = (cls = 'btn sm') => (pushOk() || isIOS() ? `<button type="button" class="${cls} push-btn" data-push aria-pressed="${pushOn}" title="${esc(t('Avisos de tus favoritos'))}" aria-label="${esc(t('Avisos de tus favoritos'))}">${ICON.bell}<span>${esc(t('Avisos'))}</span></button>` : '');
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-push]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
@@ -188,7 +188,7 @@ const NF0 = new Intl.NumberFormat(LOC), NF1 = nf(1), NF2 = nf(2);
 const fmtR = (r) => NF1.format(Math.round(r * 10) / 10);
 const dec = (x, d = 1) => (d === 2 ? NF2 : NF1).format(x || 0);
 const int = (x) => NF0.format(x || 0);
-const pct = (x) => Math.round((x || 0) * 100) + (LANG === 'en' ? '%' : ' %');
+const pct = (x) => Math.round((x || 0) * 100) + (LANG === 'en' || LANG === 'pt' ? '%' : ' %');
 const pl = (n, one, many) => `${int(n)} ${t(n === 1 ? one : many)}`;
 const rcls = (r) => r >= 9 ? 'elite' : r >= 8 ? 'great' : r >= 7 ? 'good' : r >= 6.5 ? 'ok' : r >= 6 ? 'meh' : 'bad';
 const badge = (r, size) => `<span class="rt ${rcls(r)}${size ? ' ' + size : ''}">${fmtR(r)}</span>`;
@@ -200,7 +200,7 @@ const HOME = () => t('Local'), AWAY = () => t('Visitante');
 const teamName = (tm) => (tm === 'home' || tm === 0 ? HOME() : AWAY());
 function crest(team, size = 20) {
   const col = team === 'home' || team === 0 ? 'var(--home)' : 'var(--away)';
-  const letter = team === 'home' || team === 0 ? (LANG === 'en' ? 'H' : 'L') : (LANG === 'en' ? 'A' : 'V');
+  const letter = team === 'home' || team === 0 ? TEAM_LETTER[0] : TEAM_LETTER[1];
   return `<svg class="crest" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.8 21 5v6.4c0 5.3-3.7 9.4-9 11-5.3-1.6-9-5.7-9-11V5Z" fill="${col}"/><path d="M12 3.6 19.3 6.2v5.2c0 4.3-2.9 7.7-7.3 9.1Z" fill="#fff" fill-opacity=".14"/><text x="12" y="15.6" text-anchor="middle" font-size="10" font-weight="800" fill="#fff" font-family="Sofia Sans, sans-serif">${letter}</text></svg>`;
 }
 const rank = (rk, size = 18, o = {}) => rk ? emblem(rk, size, { ...o, approxLabel: t('aproximado') }) : '';
@@ -276,7 +276,7 @@ APP.innerHTML = `
       <button class="ibtn" id="btn-install" type="button" aria-label="${esc(t('Instalar SlapScore'))}" title="${esc(t('Instalar la app'))}" hidden>${ICON.install}</button>
       <button class="ibtn" id="btn-fb" type="button" data-fb aria-label="${esc(t('Enviar una sugerencia'))}" title="${esc(t('Sugerencias y errores'))}">${ICON.chat}</button>
       <button class="ibtn" id="btn-refresh" type="button" aria-label="${esc(t('Actualizar datos'))}" title="${esc(t('Actualizar datos'))}">${ICON.refresh}</button>
-      <button class="ibtn lang" id="btn-lang" type="button" aria-label="${LANG === 'en' ? 'Ver en español' : 'View in English'}" title="${LANG === 'en' ? 'Español' : 'English'}">${LANG === 'en' ? 'ES' : 'EN'}</button>
+      <button class="ibtn lang" id="btn-lang" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language · Idioma" title="Language · Idioma">${LANG.toUpperCase()}</button>
       <button class="ibtn" id="btn-theme" type="button" aria-label="${esc(t('Cambiar tema claro u oscuro'))}" title="${esc(t('Tema claro / oscuro'))}">${ICON.theme}</button>
       <a class="ibtn" id="btn-admin" href="#admin" aria-label="${esc(t('Panel de administrador'))}" title="${esc(t('Administrador'))}" hidden>${ICON.admin}</a>
     </div>
@@ -294,8 +294,23 @@ APP.innerHTML = `
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
 const MAIN = $('#main');
-$('#btn-lang').addEventListener('click', () => setLang(LANG === 'en' ? 'es' : 'en'));
-document.addEventListener('click', (e) => { if (e.target.closest('[data-lang]')) setLang(LANG === 'en' ? 'es' : 'en'); });
+// idioma: menú bajo el botón de la cabecera y lista en el pie
+function langMenu(open) {
+  const btn = $('#btn-lang'); let m = $('#lang-menu');
+  if (!open) { if (m) m.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+  m = document.createElement('div'); m.id = 'lang-menu'; m.className = 'lang-menu'; m.setAttribute('role', 'menu');
+  m.innerHTML = LANGS.map(([k, n]) => `<button type="button" role="menuitemradio" aria-checked="${k === LANG}" data-setlang="${k}"><b>${k.toUpperCase()}</b>${esc(n)}</button>`).join('');
+  document.body.appendChild(m);
+  const r = btn.getBoundingClientRect(); m.style.top = `${r.bottom + 6}px`; m.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+  btn.setAttribute('aria-expanded', 'true'); $('[aria-checked="true"]', m).focus();
+}
+$('#btn-lang').addEventListener('click', (e) => { e.stopPropagation(); langMenu(!$('#lang-menu')); });
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-setlang]'); if (b) { e.preventDefault(); const l = b.getAttribute('data-setlang'); if (l !== LANG) setLang(l); else langMenu(false); return; }
+  if ($('#lang-menu') && !e.target.closest('#lang-menu')) langMenu(false);
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#lang-menu')) { langMenu(false); $('#btn-lang').focus(); } });
+addEventListener('resize', () => langMenu(false));
 
 function toast(msg, ms = 3800) {
   const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
@@ -310,7 +325,7 @@ function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
   const sup = supportUrl();
-  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><button type="button" class="linkbtn" data-lang>${LANG === 'en' ? 'Español' : 'English'}</button></span>`;
+  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><span class="foot-langs">${LANGS.map(([k, n]) => k === LANG ? `<b>${esc(n)}</b>` : `<a href="#" data-setlang="${k}" lang="${k}">${esc(n)}</a>`).join('')}</span></span>`;
 }
 // Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
 function quiet(tr) { if (tr) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (tr[k]) tr[k].catch(() => {}); return tr; }
@@ -598,7 +613,8 @@ const dayAdd = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toIS
 const DF_WD1 = new Intl.DateTimeFormat(LOC, { weekday: 'short', timeZone: 'UTC' });
 const DF_MON = new Intl.DateTimeFormat(LOC, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const wdShort = (d) => DF_WD1.format(dayDate(d)).replace('.', '').toUpperCase();
-const countShort = (n) => n >= 10000 ? Math.round(n / 1000) + (LANG === 'en' ? 'k' : ' mil') : n >= 1000 ? NF1.format(Math.round(n / 100) / 10) + (LANG === 'en' ? 'k' : ' mil') : String(n);
+const K_SUF = { en: 'k', es: ' mil', fr: ' k', de: ' Tsd.', pt: ' mil' }[LANG];
+const countShort = (n) => n >= 10000 ? Math.round(n / 1000) + K_SUF : n >= 1000 ? NF1.format(Math.round(n / 100) / 10) + K_SUF : String(n);
 const dayN = (d) => { const x = S.dayMap.get(d); return x ? x.n : 0; };
 const dmShort = (d) => DF_DM.format(dayDate(d)).replace('.', '');
 // días con partidos, de más antiguo a más nuevo
@@ -659,7 +675,8 @@ function openCal(day) {
   setTimeout(() => document.addEventListener('click', calOutside, true), 0);
   const f = $('#cal .cd[aria-pressed="true"]') || $('#cal .cd:not([disabled])'); if (f) f.focus({ preventScroll: true });
 }
-const WEEK_ES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'], WEEK_EN = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+// iniciales de los días de la semana, de lunes a domingo (5-11 ene 2026 es de lunes a domingo)
+const WEEK = LANG === 'es' ? ['L', 'M', 'X', 'J', 'V', 'S', 'D'] : Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(LOC, { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 0, 5 + i))));
 function drawCal(day) {
   const el = $('#cal'); if (!el) return;
   const [y, m] = calMonth.split('-').map(Number);
@@ -679,7 +696,7 @@ function drawCal(day) {
   const title = DF_MON.format(new Date(Date.UTC(y, m - 1, 15)));
   const last = all[all.length - 1];
   el.innerHTML = `<div class="cal-h"><button class="ibtn" type="button" data-cm="${pm}" ${pm ? '' : 'disabled'} aria-label="${esc(t('Mes anterior con partidos'))}">${ICON.left}</button><b>${esc(cap(title))}</b><button class="ibtn" type="button" data-cm="${nm}" ${nm ? '' : 'disabled'} aria-label="${esc(t('Mes siguiente con partidos'))}">${ICON.right}</button></div>
-    <div class="cal-w">${(LANG === 'en' ? WEEK_EN : WEEK_ES).map((x) => `<span>${x}</span>`).join('')}</div>
+    <div class="cal-w">${WEEK.map((x) => `<span>${x}</span>`).join('')}</div>
     <div class="cal-g">${cells}</div>
     <div class="cal-f"><span class="muted">${esc(t('Más color, más partidos'))}</span>${last ? `<button class="btn sm" type="button" data-cd="${last}">${esc(last === td ? t('Hoy') : t('Último día'))}</button>` : ''}</div>`;
   el.onclick = (e) => {
@@ -918,7 +935,7 @@ function evBox(m) {
 }
 function leadersCard(meta, day, cls = '') {
   const L = (meta && meta.lead) || []; if (!L.length) return '';
-  return `<div class="card in ${cls}"><div class="card-h"><h3>${esc(t('Líderes del día'))}</h3><small>${esc(dayLong(day))}</small></div><div class="tscroll"><table class="tbl lead"><thead><tr><th>${esc(t('Jugador'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">G</th><th title="${esc(t('Asistencias'))}">A</th><th title="${esc(t('Goles más asistencias'))}">G+A</th><th>${esc(t('Nota'))}</th></tr></thead><tbody>
+  return `<div class="card in ${cls}"><div class="card-h"><h3>${esc(t('Líderes del día'))}</h3><small>${esc(dayLong(day))}</small></div><div class="tscroll"><table class="tbl lead"><thead><tr><th>${esc(t('Jugador'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">${esc(t('G'))}</th><th title="${esc(t('Asistencias'))}">${esc(t('A'))}</th><th title="${esc(t('Goles más asistencias'))}">${esc(t('G+A'))}</th><th>${esc(t('Nota'))}</th></tr></thead><tbody>
     ${L.map((x, i) => `<tr class="${i >= 5 ? 'xtra' : ''}"><td><a class="pc" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${rank(x.rk, 20)}<span class="nm">${pname([x.id, x.n])}</span></a></td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${badge(x.rs / x.gp)}</td></tr>`).join('')}
   </tbody></table></div></div>`;
 }
@@ -1087,7 +1104,7 @@ function teamWeekCard(top) {
   const W = (top && top.week) || []; if (W.length < 3) return '';
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
     ${podium(W, 'avg')}
-    ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} G · ${x.as} A</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
+    ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} ${t('G')} · ${x.as} ${t('A')}</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
 }
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
@@ -1104,7 +1121,7 @@ function drawRight(st, top) {
   }
   const perf = (meta.perf || []).filter((p) => !S.hidden.has(p.i)).slice(0, 6);
   if (perf.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores actuaciones'))}</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.map((p, i) =>
-    `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} G · ${p.as} A · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
+    `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} ${t('G')} · ${p.as} ${t('A')} · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
   html += teamWeekCard(top);
   html += supportCard();
   html += feedbackCard();
@@ -1414,7 +1431,7 @@ async function shareImage(kind, obj, fname) {
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
   try {
     const Sh = await import('./share.js');
-    const X = { t, lang: LANG, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
+    const X = { t, lang: LANG, teamL: TEAM_LETTER, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
     const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : await Sh.profileImage(obj, X);
@@ -1596,7 +1613,7 @@ function bestGamesCard(P, games) {
   if (best.length < 3) return '';
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores partidos'))}</h3><small>${esc(t('por nota'))}</small></div>${best.map((g) => {
     const opp = g.op.map((id) => (P.names && P.names[id]) || id).join(', ');
-    return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} G · ${g.st.assists || 0} A${g.mv ? ' · MVP' : ''}</span>${badge(g.rt)}</a>`;
+    return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} ${t('G')} · ${g.st.assists || 0} ${t('A')}${g.mv ? ' · MVP' : ''}</span>${badge(g.rt)}</a>`;
   }).join('')}<div style="height:6px"></div></div>`;
 }
 function playerStats(a, mode) {
@@ -1648,7 +1665,7 @@ function drawHist(P, games, a) {
   if (!list.length) { el.innerHTML = `<div class="empty">${esc(t('No hay partidos con este filtro.'))}</div>`; return; }
   el.innerHTML = list.slice(0, PV.histN).map((g) => {
     const opp = g.op.map((id) => (P.names && P.names[id]) || id).join(', ');
-    return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} G · ${g.st.assists || 0} A</span>${badge(g.rt)}</a>`;
+    return `<a class="hrow" href="${matchHref(g.k, g.i)}"><span class="d">${esc(shortDate(g.t))}<br>${DF_TIME.format(new Date(g.t))}</span><span class="res ${g.r}">${resLetter(g.r)}</span><span class="vs"><span class="sc">${g.gf}-${g.ga}</span> vs ${esc(opp)}</span><span class="ga">${g.st.goals || 0} ${t('G')} · ${g.st.assists || 0} ${t('A')}</span>${badge(g.rt)}</a>`;
   }).join('') + (list.length > PV.histN ? `<div class="more"><button class="btn" type="button" id="h-more">${esc(t('Ver más ({n})', { n: list.length - PV.histN }))}</button></div>`
     : a.gp > games.length && PV.hist === 'all' ? `<p class="muted hnote">${esc(t('Aquí salen sus últimos {a} partidos. Las estadísticas cuentan los {b} de su carrera.', { a: int(games.length), b: int(a.gp) }))}</p>` : '');
   const b = $('#h-more'); if (b) b.addEventListener('click', () => { PV.histN += 20; drawHist(P, games, a); });
@@ -1910,7 +1927,7 @@ function drawRecords(R0) {
   const card = (title, note, list, fn) => list && list.length ? `<div class="card in"><div class="card-h"><h3>${esc(t(title))}</h3>${note ? `<small>${esc(t(note))}</small>` : ''}</div><div style="padding-bottom:8px">${list.map(fn).join('')}</div></div>` : '';
   const v = (n) => `<span class="v">${int(n)}</span>`;
   const sc = (x) => x.s ? ` · ${x.s[0]}-${x.s[1]}` : '';
-  const html = card('Mejor nota en un partido', 'nota', R.rt, (x, i) => mrow(x, i, badge(x.rt), `${when(x)}${sc(x)} · ${x.g} G · ${x.as} A`))
+  const html = card('Mejor nota en un partido', 'nota', R.rt, (x, i) => mrow(x, i, badge(x.rt), `${when(x)}${sc(x)} · ${x.g} ${t('G')} · ${x.as} ${t('A')}`))
     + card('Más goles en un partido', '', R.g, (x, i) => mrow(x, i, v(x.v), `${when(x)}${sc(x)}`))
     + card('Más asistencias en un partido', '', R.as, (x, i) => mrow(x, i, v(x.v), `${when(x)}${sc(x)}`))
     + card('Más paradas en un partido', '', R.sv, (x, i) => mrow(x, i, v(x.v), `${when(x)}${sc(x)}`))
@@ -1930,7 +1947,7 @@ async function viewAwards(tok) {
   let A; try { A = await loadAwards(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#aw').innerHTML = `<div class="card empty">${esc(t('Los premios aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
   if (!live(tok)) return;
   const W = A.week || {}, M = A.month || {};
-  const line = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')} · ${x.g} G · ${x.as} A`;
+  const line = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')} · ${x.g} ${t('G')} · ${x.as} ${t('A')}`;
   const short = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')}`;
   const lrow = (x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(short(x))}</span></span>${badge(x.rt)}</a>`;
   const list = (l, empty) => (l && l.length ? `<div style="padding-bottom:8px">${l.map(lrow).join('')}</div>` : `<div class="card-b muted">${esc(empty)}</div>`);
@@ -2002,7 +2019,7 @@ async function viewEusl(tok) {
           <div class="ev-score">${g.s ? `<span class="${w === 0 ? 'won' : ''}">${g.s[0]}</span><span class="${w === 1 ? 'won' : ''}">${g.s[1]}</span>` : ''}</div><div class="ev-mvp"><span class="region" title="${esc(lg(g.league))}">${esc(/playoff/i.test(lg(g.league)) ? 'PO' : lg(g.league).slice(0, 3).toUpperCase())}</span></div></a>`;
       }).join('') : `<div class="empty"><strong>${esc(EU.tab === 'res' ? t('Sin resultados todavía.') : t('No hay partidos programados.'))}</strong>${EU.tab === 'prox' ? esc(t('Cuando la liga publique el calendario, aparecerá aquí.')) : ''}</div>`;
     } else {
-      const block = (title, rows) => rows.length ? `<div class="sgrp-h eu-sh">${esc(title)}</div><div class="tscroll"><table class="tbl eu-tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Equipo'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">G</th><th title="${esc(t('Asistencias'))}">A</th><th title="${esc(t('Goles más asistencias'))}">G+A</th><th title="${esc(t('Paradas'))}">${esc(t('PAR'))}</th></tr></thead><tbody>
+      const block = (title, rows) => rows.length ? `<div class="sgrp-h eu-sh">${esc(title)}</div><div class="tscroll"><table class="tbl eu-tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Equipo'))}</th><th title="${esc(t('Partidos jugados'))}">${esc(t('PJ'))}</th><th title="${esc(t('Goles'))}">${esc(t('G'))}</th><th title="${esc(t('Asistencias'))}">${esc(t('A'))}</th><th title="${esc(t('Goles más asistencias'))}">${esc(t('G+A'))}</th><th title="${esc(t('Paradas'))}">${esc(t('PAR'))}</th></tr></thead><tbody>
         ${rows.map((x, i) => `<tr><td><span class="pc"><span class="i">${i + 1}</span>${x.sid ? `<a href="#j-${esc(x.sid)}">${esc(x.n)}</a>` : esc(x.n)}</span></td><td>${team(x.team, 18, true)}</td><td>${x.gp}</td><td>${x.g}</td><td>${x.a}</td><td><b>${x.g + x.a}</b></td><td>${x.sv}</td></tr>`).join('')}</tbody></table></div>` : '';
       el.innerHTML = (block('Pro', E.scorers.pro || []) + block('Challenger', E.scorers.challenger || [])) || `<div class="empty">${esc(t('Sin estadísticas todavía.'))}</div>`;
       el.insertAdjacentHTML('beforeend', `<p class="muted hnote">${esc(t('Los nombres enlazados llevan a su perfil de SlapScore.'))}</p>`);
