@@ -2,6 +2,7 @@
 import * as C from './core.js';
 import { emblem, emblemDefs, setOfficial, hasOfficial, officialSrc, RANK_KEYS } from './emblems.js';
 import { t, LANG, LOC, setLang, LANGS, TEAM_LETTER } from './i18n.js';
+import { FEATURES, GROUPS, NEWS_DATE, NEWS_HEADLINE } from './news.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -266,7 +267,12 @@ const ICON = {
 // ---------- interfaz base ----------
 document.body.insertAdjacentHTML('afterbegin', emblemDefs());
 const APP = $('#app');
-const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings'], ['records', 'Récords'], ['premios', 'Premios'], ['eusl', 'EUSL'], ['notas', 'Cómo puntuamos']];
+const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings'], ['records', 'Récords'], ['premios', 'Premios'], ['eusl', 'EUSL'], ['notas', 'Cómo puntuamos'], ['novedades', 'Novedades']];
+// Novedades: punto en el menú y aviso en la portada hasta que se vean (news.js)
+const NEWS_KEY = 'slapscore-news';
+const newsUnseen = () => { try { return (localStorage.getItem(NEWS_KEY) || '') < NEWS_DATE; } catch { return false; } };
+function newsSeen() { try { localStorage.setItem(NEWS_KEY, NEWS_DATE); } catch {} $$('.news-dot, #news-banner').forEach((e) => e.remove()); }
+const newsDot = () => (newsUnseen() ? '<span class="news-dot" aria-hidden="true"></span>' : '');
 APP.innerHTML = `
 <header class="hdr">
   <div class="wrap hdr-top">
@@ -282,14 +288,14 @@ APP.innerHTML = `
     </div>
   </div>
   <nav class="wrap nav" aria-label="${esc(t('Secciones'))}">
-    ${NAV.map(([k, l]) => `<a href="#${k}" data-nav="${k}">${esc(t(l))}</a>`).join('')}
+    ${NAV.map(([k, l]) => `<a href="#${k}" data-nav="${k}">${esc(t(l))}${k === 'novedades' ? newsDot() : ''}</a>`).join('')}
   </nav>
 </header>
 <div class="pbar" id="pbar" aria-hidden="true"></div>
 <div class="wrap newbar" id="newbar" hidden><button type="button" id="btn-new">${esc(t('Hay partidos nuevos · Actualizar'))}</button></div>
 <main class="wrap" id="main" tabindex="-1"></main>
 <footer class="wrap foot" id="foot"></footer>
-<nav class="bnav" aria-label="${esc(t('Menú inferior'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records,premios">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#notas" data-nav="notas">${ICON.info}${esc(t('Info'))}</a></nav>
+<nav class="bnav" aria-label="${esc(t('Menú inferior'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records,premios">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#novedades" data-nav="novedades" data-also="notas,legal">${ICON.info}${esc(t('Info'))}${newsDot()}</a></nav>
 <div id="itip"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
@@ -490,6 +496,7 @@ function route() {
   if (h.startsWith('cmp-')) { const [a, b] = h.slice(4).split('-'); return { view: 'compare', a, b: b || '' }; }
   if (h === 'records' || h === 'récords') return { view: 'records' };
   if (h === 'premios' || h === 'awards') return { view: 'premios' };
+  if (h === 'novedades' || h === 'news' || h === 'whatsnew') return { view: 'novedades' };
   // panel de administrador: #admin solo existe con la sesión iniciada (si no, es una dirección cualquiera);
   // para entrar desde otro navegador hay una dirección que no se enlaza en ningún sitio
   if (h === 'admin') return { view: isAdmin() ? 'admin' : 'matches' };
@@ -497,10 +504,10 @@ function route() {
   return { view: ['jugadores', 'rankings', 'notas', 'eusl', 'legal'].includes(h) ? h : 'matches' };
 }
 function setNav(view) {
-  const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', premios: 'premios', eusl: 'eusl', notas: 'notas' };
+  const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', premios: 'premios', eusl: 'eusl', notas: 'notas', novedades: 'novedades' };
   const k = map[view];
   $$('[data-nav]').forEach((a) => (a.getAttribute('data-nav') === k || (a.dataset.also || '').split(',').includes(k)) ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
-  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', premios: 'Premios', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
+  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', premios: 'Premios', novedades: 'Novedades', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
   document.title = tt ? `${t(tt)} · SlapScore` : 'SlapScore';
 }
 let lastPath = null, lastHash = curHash() || '#', lastView = '';
@@ -592,6 +599,7 @@ function render(r, tok) {
   if (r.view === 'premios') return viewAwards(tok);
   if (r.view === 'eusl') return viewEusl(tok);
   if (r.view === 'notas') return viewMethod();
+  if (r.view === 'novedades') return viewNews();
   if (r.view === 'legal') return viewLegal(tok);
   if (r.view === 'admin') { if (r.entry && isAdmin()) { location.replace('#admin'); return; } return viewAdmin(tok); }
   return viewMatches(r.day, tok);
@@ -731,7 +739,7 @@ async function viewMatches(dayArg, tok) {
     <h1 class="sr-only">${esc(t('Partidos'))} · ${esc(dayLong(day))}</h1>
     <aside class="col col-left" id="m-left" aria-label="${esc(t('Filtros'))}">${skeletonList(4)}</aside>
     <section class="col" aria-label="${esc(t('Partidos'))}">
-      <div class="card">
+      ${newsBanner()}<div class="card">
         ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
         <div class="upd" id="m-upd" hidden></div>
@@ -973,7 +981,7 @@ function pageKey(r) {
     case 'match': return 'partido';
     case 'compare': return 'cmp';
     case 'jugadores': return 'tabla';
-    case 'rankings': case 'records': case 'premios': case 'eusl': case 'notas': case 'legal': return r.view;
+    case 'rankings': case 'records': case 'premios': case 'eusl': case 'notas': case 'legal': case 'novedades': return r.view;
     case 'admin': return null;
     default: return r.day && r.day !== today() ? 'dia' : 'home';
   }
@@ -2048,11 +2056,38 @@ async function viewLegal(tok) {
     if (el) el.scrollIntoView({ behavior: REDUCED.matches ? 'auto' : 'smooth', block: 'start' });
   };
 }
+// =====================================================================
+// NOVEDADES: todo lo que hace SlapScore y lo último que ha llegado (news.js)
+// =====================================================================
+const infoTabs = (on) => `<div class="seg seg-links in" role="navigation" aria-label="${esc(t('Secciones'))}"><a href="#novedades" aria-current="${on === 'novedades' ? 'page' : 'false'}">${esc(t('Novedades'))}</a><a href="#notas" aria-current="${on === 'notas' ? 'page' : 'false'}">${esc(t('Cómo puntuamos'))}</a></div>`;
+function newsBanner() {
+  if (!newsUnseen()) return '';
+  return `<div class="news-banner in" id="news-banner" role="status"><span class="nb-ic">${ICON.bolt}</span><p><b>${esc(t('Novedades'))}</b> ${esc(t(NEWS_HEADLINE))}</p><a class="btn sm primary" href="#novedades">${esc(t('Ver novedades'))}</a><button type="button" class="nb-x" data-news-x aria-label="${esc(t('Cerrar'))}" title="${esc(t('Cerrar'))}">✕</button></div>`;
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-news-x]')) { e.preventDefault(); newsSeen(); } });
+const DF_NEWS = new Intl.DateTimeFormat(LOC, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+function viewNews() {
+  const now = Date.parse(today() + 'T12:00:00Z');
+  const isNew = (f) => f.nuevo && now - Date.parse(f.nuevo + 'T12:00:00Z') <= 45 * 86400000;
+  const go = (f) => (f.action === 'feedback' ? `<button type="button" class="tbtn nw-go" data-fb>${esc(t('Abrir el buzón'))}${ICON.right}</button>`
+    : f.action === 'support' ? (supportUrl() ? `<a class="tbtn nw-go" href="${esc(supportUrl())}" target="_blank" rel="noopener">${esc(t('Ir a Ko-fi'))}${ICON.ext}</a>` : '')
+    : f.href ? `<a class="tbtn nw-go" href="${esc(f.href)}">${esc(t('Abrir'))}${ICON.right}</a>` : '');
+  const tile = (f, big) => `<div class="nw-item${big ? ' big' : ''}"><span class="nw-ic">${ICON[f.icon] || ICON.info}</span><div class="nw-b"><h3>${esc(t(f.title))}${!big && isNew(f) ? ` <span class="pill nw-new">${esc(t('Nuevo'))}</span>` : ''}</h3><p>${esc(t(f.text))}</p>${go(f)}</div></div>`;
+  const recent = FEATURES.filter(isNew).sort((a, b) => (b.nuevo > a.nuevo) - (b.nuevo < a.nuevo));
+  const byDay = [...new Set(recent.map((f) => f.nuevo))];
+  const latest = recent.length ? `<section class="card in nw-latest"><div class="card-h"><h2>${esc(t('Lo último'))}</h2></div>${byDay.map((d) => `<div class="nw-day"><span class="nw-d">${esc(DF_NEWS.format(new Date(d + 'T12:00:00Z')))}</span>${recent.filter((f) => f.nuevo === d).map((f) => tile(f, true)).join('')}</div>`).join('')}</section>` : '';
+  const all = GROUPS.map(([g, label]) => `<section class="nw-group"><h2 class="nw-gh">${esc(t(label))}</h2><div class="nw-grid">${FEATURES.filter((f) => f.g === g).map((f) => `<div class="card in">${tile(f, false)}</div>`).join('')}</div></section>`).join('');
+  MAIN.innerHTML = `${infoTabs('novedades')}<h1 class="h1 in">${esc(t('Novedades'))}</h1><p class="lead">${esc(t('Todo lo que puedes hacer en SlapScore, y lo último que ha llegado.'))}</p>
+    ${latest}<h2 class="nw-all">${esc(t('Todo lo que puedes hacer'))}</h2>${all}
+    <p class="muted nw-foot">${esc(t('¿Echas algo en falta?'))} <button type="button" class="tbtn" data-fb>${esc(t('Cuéntanoslo'))}</button></p>`;
+  newsSeen();
+}
+
 function viewMethod() {
   const W = S.W, D = C.DEFAULT_WEIGHTS;
   const tt = (S.index && S.index.totals) || {}, lr = (S.index && S.index.lastRun) || {};
   const sign = (x) => (x > 0 ? '+' : x < 0 ? '−' : '') + dec(Math.abs(x), Math.abs(x) < 0.1 ? 3 : 2).replace(/[.,]?0+$/, '');
-  MAIN.innerHTML = `<h1 class="h1 in">${esc(t('Cómo puntuamos'))}</h1><p class="lead">${esc(t('Cada jugador recibe en cada partido una nota de 3 a 10 calculada solo con las estadísticas del partido.'))}</p>
+  MAIN.innerHTML = `${infoTabs('notas')}<h1 class="h1 in">${esc(t('Cómo puntuamos'))}</h1><p class="lead">${esc(t('Cada jugador recibe en cada partido una nota de 3 a 10 calculada solo con las estadísticas del partido.'))}</p>
     <div class="layout half"><div class="col">
       <div class="card in"><div class="card-h"><h3>${esc(t('La nota'))}</h3></div><div class="card-b">
         <p>${t('Todos empiezan en {b}. Cada acción suma o resta según su peso; después se añade el resultado y se resta un poco por cada gol que encaja su equipo, porque en Slapshot defienden todos.', { b: `<b>${dec(W.base)}</b>` })}</p>
