@@ -7,7 +7,8 @@
 //     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar, y
 //  5) si la web deja de actualizarse, avisa al administrador por email (alerts.js), y
 //  6) sirve las direcciones /j/<id> y /m/<id> con la vista previa de ese jugador o partido (preview.js), y
-//  7) recibe los avisos de Ko-fi para poner la insignia ♥ Supporter (kofi.js).
+//  7) recibe los avisos de Ko-fi para poner la insignia ♥ Supporter (kofi.js), y
+//  8) manda los avisos en el móvil de los jugadores favoritos (push.js, cada 3 minutos).
 //
 // Buzón: los mensajes se guardan en el KV "FEEDBACK" (lo crea el flujo de GitHub al publicar).
 // No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle.
@@ -20,7 +21,8 @@ import { Stats, cleanHit, BOT } from './stats.js';
 import { checkHealth, getAlerts, putAlerts, okEmail, sendMail } from './alerts.js';
 import { preview, playerExists } from './preview.js';
 import { webhook as kofiHook, admin as kofiAdmin } from './kofi.js';
-export { Stats };
+import { Push } from './push.js';
+export { Stats, Push };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
 const MAX_TEXT = 2000, MAX_CONTACT = 120, MAX_PAGE = 300, LIST_LIMIT = 300;
@@ -208,6 +210,35 @@ async function alerts(request, env, path) {
   return json({ error: 'not found' }, 404, request, env);
 }
 
+// Avisos en el móvil: clave pública, alta, baja y aviso de prueba (lo demás lo hace el reloj)
+const pushStub = (env) => env.PUSH.get(env.PUSH.idFromName('main'));
+async function push(request, env, path) {
+  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, POST, OPTIONS', 'content-type');
+  if (!env.PUSH) return json({ error: 'unavailable' }, 503, request, env);
+  if (path === '/api/push/key' && request.method === 'GET') {
+    const r = await pushStub(env).fetch('https://push/key');
+    return json(await r.json(), r.status, request, env, { 'cache-control': 'public, max-age=3600' });
+  }
+  const op = { '/api/push/sub': '/sub', '/api/push/unsub': '/unsub', '/api/push/test': '/test' }[path];
+  if (!op || request.method !== 'POST') return json({ error: 'not found' }, 404, request, env);
+  if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403, request, env);
+  if (Number(request.headers.get('content-length') || 0) > 4096) return json({ error: 'bad' }, 413, request, env);
+  let b = null; try { b = JSON.parse((await request.text()).slice(0, 4096)); } catch {}
+  if (!b || typeof b !== 'object') return json({ error: 'bad' }, 400, request, env);
+  const body = op === '/sub' ? { sub: b.sub, ids: b.ids, lang: b.lang, ip: ipKey(request.headers.get('cf-connecting-ip') || '') } : { endpoint: b.endpoint };
+  const r = await pushStub(env).fetch('https://push' + op, { method: 'POST', body: JSON.stringify(body) });
+  return json(await r.json().catch(() => ({})), r.status, request, env);
+}
+async function pushTick(env) {
+  if (!env.PUSH) return;
+  const r = await env.ASSETS.fetch(new Request('https://slapscore.app/data/events.json'));
+  if (!r.ok) return;
+  const ev = await r.json().catch(() => null); if (!ev) return;
+  const res = await pushStub(env).fetch('https://push/tick', { method: 'POST', body: JSON.stringify({ m: ev.m || [], r: ev.r || [] }) });
+  const st = await res.json().catch(() => ({}));
+  if (st.jobs) console.log(`avisos: ${st.jobs} pendientes, ${st.ok} enviados, ${st.gone} caducados, ${st.fail} fallidos`);
+}
+
 // Ko-fi: el webhook (POST /api/kofi, lo manda Ko-fi) y el panel del administrador (lo demás)
 async function kofi(request, env, path) {
   const exists = (pid) => playerExists(env, pid);
@@ -227,11 +258,14 @@ export default {
     if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);
     if (path === '/api/alerts' || path === '/api/alerts/test') return alerts(request, env, path);
     if (path === '/api/kofi' || path.startsWith('/api/kofi/')) return kofi(request, env, path);
+    if (path.startsWith('/api/push/')) return push(request, env, path);
     // /j/<id> y /m/<id>: la web con el título, la descripción y la imagen de ese jugador o partido (vista previa de los enlaces)
     if (path.startsWith('/j/') || path.startsWith('/m/')) { const r = await preview(request, env, ctx, path); if (r) return r; }
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {
+    // cada 3 minutos: avisos en el móvil; a las y 7 y a las y 37: estado de la web y del robot
+    if (event && event.cron === '*/3 * * * *') { await pushTick(env).catch((e) => console.log('avisos móvil: ' + (e && e.message))); return; }
     const health = checkHealth(env).catch((e) => console.log('avisos: ' + (e && e.message)));
     if (ctx && ctx.waitUntil) ctx.waitUntil(health); else await health;
     if (!env.GH_DISPATCH_TOKEN || !env.GH_REPO) return;

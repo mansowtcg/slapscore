@@ -177,6 +177,7 @@ function gamesOf(m, key) {
 }
 // Periodos de partidas custom: se juntan al final de la pasada (pueden llegar en cualquier orden)
 const perPend = new Map();   // id del registro -> momento en que acabó ese periodo
+const freshEvents = [];      // partidos recién acabados de esta pasada (data/events.json)
 // Añade un partido (ya guardado en bruto) a los resúmenes y perfiles
 async function ingest(raw, key) {
   const id = String(raw.id);
@@ -187,6 +188,9 @@ async function ingest(raw, key) {
   const ch = await chunk(day, await chunkId(key));
   if (ch.list.some((e) => e.i === m.id)) return false;
   ch.list.push(summaryOf(m, key)); ch.dirty = true; dirtyDays.add(day);
+  // partido recién acabado: suceso para los avisos de los favoritos (los antiguos que se descubren tarde no avisan)
+  if (m.t && NOW - m.t < 90 * MIN) freshEvents.push({ i: m.id, k: key, t: m.t, y: m.type, a: m.arena, s: [m.score.home, m.score.away], w: m.winner === 'home' ? 0 : m.winner === 'away' ? 1 : -1,
+    p: m.players.filter((p) => p.pid).map((p) => [p.pid, p.name, p.team === 'home' ? 0 : 1, p.rating, p.st.goals || 0, p.st.assists || 0]) });
   for (const p of m.players) if (p.pid) seenNames.set(p.pid, p.name);
   for (const [pid, g] of gamesOf(m, key)) if (pid) touch(pid).add.push(g);
   return true;
@@ -258,10 +262,15 @@ function pick(scoreFn, ids) {
   return [best, bestScore];
 }
 const rhChanged = new Set();
+const rankUps = [];   // subidas de rango de esta pasada (para los avisos en el móvil: data/events.json)
 function snapshot(pid, p, mmr, rk, t) {
   p.rh = p.rh || [];
   const last = p.rh[p.rh.length - 1];
   if (last && last[1] === mmr && last[2] === rk) return;
+  if (last && last[2] && rk && last[2] !== rk && !hidP.has(String(pid))) {
+    const a = C.parseRank(last[2]), b = C.parseRank(rk);
+    if (a && b && b.order > a.order) rankUps.push({ id: String(pid), n: p.n || String(pid), from: last[2], to: rk, t });
+  }
   p.rh.push([t, mmr, rk]);
   if (p.rh.length > 80) p.rh.splice(0, p.rh.length - 80);
   rhChanged.add(pid);
@@ -919,6 +928,14 @@ const lastRun = {
 };
 const runs = [lastRun, ...((prevIdx.runs || []).filter((r) => r.at !== nowIso))].slice(0, 20);
 const repo = process.env.GITHUB_REPOSITORY || 'mansowtcg/slapscore';
+// Sucesos recientes para los avisos en el móvil (los lee el Worker cada 3 minutos): partidos de la última hora y media y subidas de rango
+{
+  const prevEv = await readJSON(path.join(DATA, 'events.json'), {});
+  const seenEv = new Set(freshEvents.map((e) => e.i));
+  const evM = [...freshEvents, ...(Array.isArray(prevEv.m) ? prevEv.m : []).filter((e) => !seenEv.has(e.i))].filter((e) => e.t >= NOW - 90 * MIN).slice(0, 400);
+  const evR = [...rankUps, ...(Array.isArray(prevEv.r) ? prevEv.r : [])].filter((r) => r.t >= NOW - 6 * 60 * MIN && !hidP.has(String(r.id))).slice(0, 200);
+  await fs.writeFile(path.join(DATA, 'events.json'), JSON.stringify({ v: 1, at: new Date(NOW).toISOString(), m: evM, r: evR }));
+}
 await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
   updated: nowIso, source: 'slapshot.gg', v: 3, retain: RETAIN,
   archive: { repo, tag: 'archivo-', file: 'partidos-' },

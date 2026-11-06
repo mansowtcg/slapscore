@@ -200,6 +200,16 @@ export default {
   'La mejor nota media en partidas públicas (las custom no cuentan), con un mínimo de {w} partidos en la semana y {m} en el mes. Semanas de lunes a domingo, en hora de Madrid.': 'Best average rating in public matches (custom games don\'t count), with at least {w} matches in the week and {m} in the month. Weeks run Monday to Sunday, Madrid time.',
   'Esta semana, de momento': 'This week so far', 'Este mes, de momento': 'This month so far',
   'Aún nadie llega a {n} partidos esta semana.': 'Nobody has reached {n} matches this week yet.', 'Aún nadie llega a {n} partidos este mes.': 'Nobody has reached {n} matches this month yet.',
+  // avisos
+  'Avisos': 'Alerts', 'Avisos de tus favoritos': 'Alerts for your favourites', 'Avisarme de sus partidos': 'Alert me about their matches',
+  'En iPhone, los avisos funcionan con la app instalada: Compartir → «Añadir a pantalla de inicio».': 'On iPhone, alerts work with the installed app: Share → "Add to Home Screen".',
+  'Este navegador no admite avisos.': "This browser doesn't support alerts.",
+  'Los avisos están bloqueados: actívalos en los ajustes del navegador para esta web.': 'Alerts are blocked: allow them for this site in your browser settings.',
+  'Avisos activados: te avisaremos cuando tus favoritos terminen un partido o suban de rango': "Alerts on: we'll let you know when your favourites finish a match or rank up",
+  'Avisos activados. Añade jugadores a favoritos con la estrella para recibir sus avisos.': 'Alerts on. Add players to your favourites with the star to get their alerts.',
+  'No se pudieron activar los avisos. Inténtalo otra vez.': "Couldn't turn alerts on. Please try again.", 'Avisos desactivados': 'Alerts off',
+  'Ya te avisamos de sus partidos. Para dejarlo, quítalo de favoritos o desactiva los avisos en «Tus favoritos».': 'You already get alerts for their matches. To stop, remove them from favourites or turn alerts off in "Your favourites".',
+  'Te avisaremos cuando {n} termine un partido o suba de rango': "We'll let you know when {n} finishes a match or ranks up",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

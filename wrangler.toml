@@ -18,13 +18,22 @@ GH_REPO = "mansowtcg/slapscore"
 name = "MAIL"
 
 [triggers]
-crons = ["7,37 * * * *"]
+crons = ["7,37 * * * *", "*/3 * * * *"]
 
-# Estadísticas de visitas: Durable Object con SQLite (incluido en el plan gratuito)
+# Durable Objects con SQLite (incluidos en el plan gratuito):
+# Stats: estadísticas de visitas. Push: avisos en el móvil (suscripciones, claves VAPID y avisos ya enviados)
 [[durable_objects.bindings]]
 name = "STATS"
 class_name = "Stats"
 
+[[durable_objects.bindings]]
+name = "PUSH"
+class_name = "Push"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Stats"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Push"]

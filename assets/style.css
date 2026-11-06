@@ -1130,4 +1130,14 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .pill.aw-pill svg{width:13px;height:13px}
 [data-theme="dark"] .pill.aw-pill{color:#F5C842}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.aw-pill{color:#F5C842}}
+/* ---------- avisos (campana) ---------- */
+.fav-acts{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.push-btn{display:inline-flex;align-items:center;gap:5px}
+.push-btn svg{width:14px;height:14px}
+.push-btn[aria-pressed="true"]{color:var(--primary);border-color:color-mix(in srgb,var(--primary) 55%,transparent);background:color-mix(in srgb,var(--primary) 10%,var(--surface))}
+.push-btn[aria-pressed="true"] svg{fill:currentColor}
+.bell-btn{margin-left:6px}
+.bell-btn:hover{color:var(--primary);border-color:var(--primary)}
+.bell-btn[aria-pressed="true"]{color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,var(--surface));border-color:color-mix(in srgb,var(--primary) 55%,transparent)}
+.bell-btn[aria-pressed="true"] svg{fill:var(--primary)}
 

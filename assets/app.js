@@ -39,8 +39,55 @@ function toggleFav(id, name) {
   if (FAVS.has(id)) FAVS.delete(id);
   else { if (FAVS.size >= FAV_MAX) { toast(t('Como mucho {n} favoritos', { n: FAV_MAX })); return false; } FAVS.set(id, name || id); trackEvent('fav'); }
   try { localStorage.setItem(FAV_KEY, JSON.stringify([...FAVS])); } catch {}
+  pushResync();
   return FAVS.has(id);
 }
+
+// ---------- avisos en el móvil de los favoritos (Web Push) ----------
+// El navegador se suscribe con la clave pública del Worker y le pasa los IDs de sus favoritos; el Worker avisa cuando
+// uno termina un partido o sube de rango (cloudflare/push.js). En iPhone solo funciona con la app instalada.
+const PUSH_KEY = 'slapscore-push';
+let pushOn = (() => { try { return localStorage.getItem(PUSH_KEY) === '1'; } catch { return false; } })();
+const pushOk = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:';
+const b64uBytes = (s) => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4)), (c) => c.charCodeAt(0));
+const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+async function pushSub(create) {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub && create) {
+    const r = await fetch('/api/push/key'); if (!r.ok) throw new Error('key');
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uBytes((await r.json()).key) });
+  }
+  return sub;
+}
+async function pushSync(test) {
+  const sub = await pushSub(false); if (!sub) return false;
+  const r = await postJSON('/api/push/sub', { sub: sub.toJSON(), ids: [...FAVS.keys()], lang: LANG });
+  if (test && r.ok) postJSON('/api/push/test', { endpoint: sub.endpoint }).catch(() => {});
+  return r.ok;
+}
+function setPushOn(v) { pushOn = v; try { if (v) localStorage.setItem(PUSH_KEY, '1'); else localStorage.removeItem(PUSH_KEY); } catch {} $$('[data-push]').forEach((b) => b.setAttribute('aria-pressed', String(v))); }
+async function pushEnable() {
+  if (!pushOk()) { toast(isIOS() && !standalone() ? t('En iPhone, los avisos funcionan con la app instalada: Compartir → «Añadir a pantalla de inicio».') : t('Este navegador no admite avisos.')); return false; }
+  let perm = Notification.permission;
+  if (perm === 'default') perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast(t('Los avisos están bloqueados: actívalos en los ajustes del navegador para esta web.')); return false; }
+  try { await pushSub(true); setPushOn(true); if (!(await pushSync(true))) throw new Error('sync'); trackEvent('push'); toast(FAVS.size ? t('Avisos activados: te avisaremos cuando tus favoritos terminen un partido o suban de rango') : t('Avisos activados. Añade jugadores a favoritos con la estrella para recibir sus avisos.')); return true; }
+  catch { setPushOn(false); toast(t('No se pudieron activar los avisos. Inténtalo otra vez.')); return false; }
+}
+async function pushDisable() {
+  try { const sub = await pushSub(false); if (sub) { postJSON('/api/push/unsub', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); } } catch {}
+  setPushOn(false); toast(t('Avisos desactivados'));
+}
+let pushT = 0;
+function pushResync() { if (!pushOn || !pushOk()) return; clearTimeout(pushT); pushT = setTimeout(() => pushSync(false).catch(() => {}), 800); }
+// botón de campana: activa o desactiva los avisos de todos los favoritos
+const pushBtn = (cls = 'btn sm') => (pushOk() || isIOS() ? `<button type="button" class="${cls} push-btn" data-push aria-pressed="${pushOn}" title="${esc(t('Avisos de tus favoritos'))}">${ICON.bell}<span>${esc(t('Avisos'))}</span></button>` : '');
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-push]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (pushOn) pushDisable(); else pushEnable();
+});
 
 // ---------- datos ----------
 // Cada archivo se pide con su versión (?v=hash): si no ha cambiado, sale de la caché del navegador al instante.
@@ -208,6 +255,7 @@ const ICON = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12.5a7.5 7.5 0 0 1-10.9 6.7L4 20.5l1.4-4.3A7.5 7.5 0 1 1 20 12.5Z"/><path d="M9 11h6M9 14.5h3.5"/></svg>',
   coffee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3.5c0 1 .8 1.2.8 2.2M12 3.5c0 1 .8 1.2.8 2.2"/><path d="M5 21h10"/></svg>',
   ext: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.2 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z"/></svg>',
   flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c4 0 7-2.7 7-6.6 0-3.6-2.6-5.8-4.2-8.9-.4 2.3-1.6 3.6-2.8 4.2C12.4 6.6 10.8 4.4 8.6 3c.3 3.2-1.4 5.1-2.6 7.1A7.4 7.4 0 0 0 5 14.4C5 18.3 8 21 12 21Z"/><path d="M12 21c-1.8 0-3-1.3-3-3 0-1.9 1.5-2.9 2.3-4.4.5 1.1 1.4 1.6 2 1.9.9.5 1.7 1.3 1.7 2.5 0 1.7-1.2 3-3 3Z"/></svg>',
   vs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3"/></svg>',
@@ -1007,9 +1055,9 @@ function drawFavs(st) {
   };
   const paint = (list) => {
     if (!live(st.tok)) return;
-    if (right) right.innerHTML = `<div class="card-h"><h3>${esc(t('Tus favoritos'))}</h3><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div><div style="padding-bottom:8px">${list.map((x) =>
+    if (right) right.innerHTML = `<div class="card-h"><h3>${esc(t('Tus favoritos'))}</h3><span class="fav-acts">${pushBtn()}<button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></span></div><div style="padding-bottom:8px">${list.map((x) =>
       `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.star}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(x.sub)}</span></span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
-    if (strip) strip.innerHTML = `<div class="favs-h"><b>${ICON.star}${esc(t('Tus favoritos'))}</b><button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></div>
+    if (strip) strip.innerHTML = `<div class="favs-h"><b>${ICON.star}${esc(t('Tus favoritos'))}</b><span class="fav-acts">${pushBtn()}<button class="btn sm" type="button" data-favf aria-pressed="${MF.fav}">${esc(MF.fav ? t('Ver todos') : t('Ver sus partidos'))}</button></span></div>
       <div class="favs" role="list">${list.map((x) => `<a role="listitem" href="#j-${esc(x.id)}" class="fav-i">${avatar(x.n, x.id, 'sm')}<span class="t">${esc(x.n)}</span>${x.g ? badge(x.g.rt) : ''}</a>`).join('')}</div>`;
     $$('[data-favf]').forEach((b) => b.addEventListener('click', () => { MF.fav = !MF.fav; MF.limit = 120; const c = $('[data-x="fav"]'); if (c) c.setAttribute('aria-pressed', String(MF.fav)); drawFavs(st); refreshList(st); }));
   };
@@ -1043,7 +1091,7 @@ function teamWeekCard(top) {
 }
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
-  if (!S.awards) loadAwards().then(() => { if (el.isConnected) drawRight(st, top); }).catch(() => {});
+  if (!S.awards) loadAwards().then(() => { if (el.isConnected && live(st.tok)) { drawRight(st, top); drawFavs(st); } }).catch(() => {});
   const { meta, day } = st;
   let html = liveCard(day, 'hide-mobile') + `<div class="card in hide-mobile" id="fav-card"></div>` + leadersCard(meta, day, 'hide-mobile');
   const ml = $('#m-live'); if (ml) ml.innerHTML = liveStrip(day);
@@ -1402,11 +1450,22 @@ function wireModeSwitch(root = MAIN) {
 // Mejor racha de victorias entre unos partidos (del más reciente al más antiguo)
 function bestStreak(games) { let bs = 0, run = 0; for (let i = games.length - 1; i >= 0; i--) { if (games[i].r === 'W') { run++; if (run > bs) bs = run; } else run = 0; } return bs; }
 const favBtn = (id, name) => `<button type="button" class="fav-btn" data-fav="${esc(id)}" data-n="${esc(name)}" aria-pressed="${isFav(id)}" aria-label="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}" title="${esc(isFav(id) ? t('Quitar de favoritos') : t('Añadir a favoritos'))}">${ICON.star}</button>`;
+// campana del perfil: avisos de este jugador (lo añade a favoritos y activa los avisos si hace falta)
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-pbell]'); if (!b) return;
+  e.preventDefault();
+  const id = b.getAttribute('data-pbell'), name = b.getAttribute('data-n');
+  if (pushOn && isFav(id)) { toast(t('Ya te avisamos de sus partidos. Para dejarlo, quítalo de favoritos o desactiva los avisos en «Tus favoritos».')); return; }
+  if (!isFav(id)) { if (!toggleFav(id, name)) return; $$(`[data-fav="${CSS.escape(id)}"]`).forEach((x) => x.setAttribute('aria-pressed', 'true')); }
+  if (!pushOn) { if (!(await pushEnable())) return; } else toast(t('Te avisaremos cuando {n} termine un partido o suba de rango', { n: name }));
+  b.setAttribute('aria-pressed', 'true');
+});
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-fav]'); if (!b) return;
   e.preventDefault();
   const on = toggleFav(b.getAttribute('data-fav'), b.getAttribute('data-n'));
   $$(`[data-fav="${CSS.escape(b.getAttribute('data-fav'))}"]`).forEach((x) => { x.setAttribute('aria-pressed', String(on)); x.setAttribute('aria-label', on ? t('Quitar de favoritos') : t('Añadir a favoritos')); x.title = x.getAttribute('aria-label'); });
+  $$(`[data-pbell="${CSS.escape(b.getAttribute('data-fav'))}"]`).forEach((x) => x.setAttribute('aria-pressed', String(on && pushOn)));
   toast(on ? t('Añadido a favoritos: verás sus partidos en la portada') : t('Quitado de favoritos'));
 });
 // Racha actual: +n victorias seguidas / −n derrotas seguidas
@@ -1457,7 +1516,7 @@ async function viewPlayer(pid, tok) {
   MAIN.innerHTML = `
     <nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(P.n)}</span></nav>
     <section class="card in">
-      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${((aw) => aw ? `${aw.months.length ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Jugador del mes'))} · ${esc(awMonth(aw.months[0]))}</a>` : ''}${aw.weeks ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Equipo de la semana'))}${aw.weeks > 1 ? ' ×' + aw.weeks : ''}</a>` : ''}` : '')(awardsOf(String(P.id)))}${favBtn(P.id, P.n)}</h1>
+      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${((aw) => aw ? `${aw.months.length ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Jugador del mes'))} · ${esc(awMonth(aw.months[0]))}</a>` : ''}${aw.weeks ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Equipo de la semana'))}${aw.weeks > 1 ? ' ×' + aw.weeks : ''}</a>` : ''}` : '')(awardsOf(String(P.id)))}${favBtn(P.id, P.n)}${pushOk() || isIOS() ? `<button type="button" class="fav-btn bell-btn" data-pbell="${esc(P.id)}" data-n="${esc(P.n)}" aria-pressed="${pushOn && isFav(P.id)}" aria-label="${esc(t('Avisarme de sus partidos'))}" title="${esc(t('Avisarme de sus partidos'))}">${ICON.bell}</button>` : ''}</h1>
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
@@ -2150,3 +2209,10 @@ addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt 
 addEventListener('appinstalled', () => { trackEvent('install'); installEvt = null; $('#btn-install').hidden = true; hideTip(true); toast(t('SlapScore instalada en tu dispositivo')); });
 if (isIOS() && !standalone()) { $('#btn-install').hidden = false; setTimeout(showTip, 3500); }
 if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+// avisos: si el permiso se quitó o la suscripción caducó, el botón vuelve a «apagado»; si siguen, se renuevan los favoritos
+if (pushOn) addEventListener('load', () => setTimeout(async () => {
+  try {
+    if (!pushOk() || Notification.permission !== 'granted' || !(await pushSub(false))) { setPushOn(false); return; }
+    pushResync();
+  } catch {}
+}, 3000));

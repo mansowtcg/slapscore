@@ -62,3 +62,24 @@ self.addEventListener('fetch', (e) => {
   // Todo lo demás (iconos...): red primero, copia para usar sin conexión
   e.respondWith(networkFirst(req, SHELL));
 });
+
+// Avisos de los favoritos (los manda el Worker cifrados; aquí llegan ya descifrados)
+self.addEventListener('push', (e) => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch {}
+  const url = typeof d.url === 'string' && d.url.startsWith('/') && !d.url.startsWith('//') ? d.url : '/';
+  e.waitUntil(self.registration.showNotification(String(d.title || 'SlapScore').slice(0, 120), {
+    body: String(d.body || '').slice(0, 300), icon: '/assets/icons/icon-192.png', badge: '/assets/icons/badge-96.png',
+    tag: typeof d.tag === 'string' ? d.tag.slice(0, 64) : undefined, data: { url },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const w = wins.find((c) => new URL(c.url).origin === self.location.origin);
+    if (w) { await w.focus(); if ('navigate' in w) { try { await w.navigate(url); } catch {} } return; }
+    await self.clients.openWindow(url);
+  })());
+});
+
