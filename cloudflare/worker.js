@@ -5,7 +5,8 @@
 //  3) cuenta las visitas (/api/v) y le enseña las estadísticas al administrador (/api/stats), y
 //  4) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
 //     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar, y
-//  5) si la web deja de actualizarse, avisa al administrador por email (alerts.js).
+//  5) si la web deja de actualizarse, avisa al administrador por email (alerts.js), y
+//  6) sirve las direcciones /j/<id> y /m/<id> con la vista previa de ese jugador o partido (preview.js).
 //
 // Buzón: los mensajes se guardan en el KV "FEEDBACK" (lo crea el flujo de GitHub al publicar).
 // No se guarda la IP: solo un resumen cifrado de un minuto para frenar envíos en bucle.
@@ -16,6 +17,7 @@
 
 import { Stats, cleanHit, BOT } from './stats.js';
 import { checkHealth, getAlerts, putAlerts, okEmail, sendMail } from './alerts.js';
+import { preview } from './preview.js';
 export { Stats };
 
 const TYPES = new Set(['idea', 'bug', 'other']);
@@ -212,6 +214,8 @@ export default {
     if (path === '/api/stats') return stats(request, env);
     if (path === '/api/feedback' || path.startsWith('/api/feedback/')) return feedback(request, env, path);
     if (path === '/api/alerts' || path === '/api/alerts/test') return alerts(request, env, path);
+    // /j/<id> y /m/<id>: la web con el título, la descripción y la imagen de ese jugador o partido (vista previa de los enlaces)
+    if (path.startsWith('/j/') || path.startsWith('/m/')) { const r = await preview(request, env, ctx, path); if (r) return r; }
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {

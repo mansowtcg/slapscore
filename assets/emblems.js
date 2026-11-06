@@ -63,7 +63,7 @@ export function officialSrc(rk, size = 128) {
   const big = OFFICIAL[r.key] || OFFICIAL[r.tier];
   if (!big) return null;
   const sm = size <= 32 && (SMALL[r.key] || SMALL[r.tier]);
-  return 'assets/ranks/' + encodeURI(sm || big);
+  return '/assets/ranks/' + encodeURI(sm || big);
 }
 
 // Emblema con título accesible (nombre del rango)

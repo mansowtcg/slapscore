@@ -27,6 +27,7 @@ La web se sirve desde Cloudflare (Worker `slapscore` con los dominios slapscore.
 - **Favoritos** guardados en el navegador de cada uno (con la lista de hoy abierta, sale un aviso cuando un favorito termina un partido); buscador por nombre, ID o enlace de slapshot.gg (también de partido); atajo «/».
 - **Buzón de sugerencias** (icono de bocadillo en la cabecera, enlace en el pie y recuadro en la portada): ideas, errores u otros, con contacto opcional. Los mensajes se guardan en Cloudflare y se leen y borran desde el panel de administrador.
 - **Panel de tráfico** (pestaña «Tráfico» del administrador): personas conectadas ahora mismo, visitantes, visitas, páginas vistas, páginas por visita, tiempo medio y rebote comparados con el periodo anterior, gráfico por horas, días o meses, páginas y jugadores más vistos, de dónde vienen (también enlaces con `?ref=`), países, dispositivos, navegadores, sistemas, idiomas, páginas de entrada, fidelidad, acciones (compartir, favoritos, sugerencias, instalar la app) y cuándo entra la gente. Periodos: hoy, ayer, 7, 30 y 90 días y 12 meses; tabla y CSV.
+- **Enlaces con vista previa**: los jugadores y los partidos tienen dirección propia (`/j/<id>`, `/m/<día+hora>-<id>`). El Worker sirve la web con el título, la descripción y la imagen de esa página, para que al compartirlos en Discord, WhatsApp o Google salgan con sus datos (los enlaces antiguos con `#` siguen funcionando).
 - Inglés por defecto y español (botón ES/EN). Tema claro y oscuro. Se instala como app en el móvil.
 
 ## Datos (rama `data`)

@@ -48,6 +48,7 @@ async function gunzip(buf) {
   const z = await import('./vendor/gunzip.js'); return z.strFromU8(z.gunzipSync(buf));
 }
 async function getJSON(url, ver) {
+  if (!/^(https?:)?\//.test(url)) url = '/' + url;   // siempre desde la raíz: la página puede estar en /j/... o /m/...
   const fresh = ver === true;
   const u = url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(fresh ? Date.now() : (ver || S.ver));
   const r = await fetch(u, fresh ? { cache: 'no-store' } : {});
@@ -397,10 +398,27 @@ async function pickPlayer(title, exclude, onPick) {
 }
 
 // ---------- router ----------
+// Las páginas van por #hash (#j-123, #m-..., #rankings). Jugadores y partidos se enseñan además con dirección propia
+// (/j/123, /m/...) para que al compartirlas salga su vista previa (la pone el Worker); la app entiende las dos formas.
 let TOK = 0;
+function curHash() {
+  if (location.hash.length > 1) return location.hash;
+  const p = location.pathname;
+  let m = /^\/j\/(\d{1,12})\/?$/.exec(p); if (m) return '#j-' + m[1];
+  m = /^\/m\/(\d{10}-[0-9a-zA-Z-]{8,64})\/?$/.exec(p); if (m) return '#m-' + m[1];
+  return '';
+}
+const prettyPath = (h) => { const m = /^#(j|m)-(.+)$/.exec(h || ''); return m ? `/${m[1]}/${m[2]}` : null; };
+// Deja en la barra la dirección bonita (sin recargar ni añadir historial)
+function syncUrl() {
+  const h = curHash(), pp = prettyPath(h);
+  const want = (pp || '/') + location.search + (pp || !h ? '' : h);
+  if (location.pathname + location.search + location.hash !== want) { try { history.replaceState(history.state, '', want); } catch {} }
+}
+const pageUrl = (h) => location.origin + (prettyPath(h) || '/' + (h || ''));
 const ADMIN_ENTRY = 'entrada-ibai';
 function route() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  const h = decodeURIComponent(curHash().slice(1));
   if (h.startsWith('m-')) return { view: 'match', ...(parseMatch(h) || {}) };
   if (h.startsWith('j-')) return { view: 'player', pid: h.slice(2) };
   if (h.startsWith('d-')) return { view: 'matches', day: h.slice(2) };
@@ -419,7 +437,7 @@ function setNav(view) {
   const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
   document.title = tt ? `${t(tt)} · SlapScore` : 'SlapScore';
 }
-let lastPath = null, lastHash = location.hash || '#', lastView = '';
+let lastPath = null, lastHash = curHash() || '#', lastView = '';
 const SCROLL = new Map(), STACK = [lastHash];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Barra de carga fina bajo la cabecera (solo si la espera se nota)
@@ -451,11 +469,12 @@ function prefetch(r) {
 }
 async function go(opts = {}) {
   const tok = ++TOK;
+  syncUrl();
   const r = route(); setNav(r.view);
   const path = r.view + (r.day || r.id || r.pid || (r.a ? r.a + '-' + r.b : ''));
   if (S.booted && path !== lastPath) trackView(r);
   const scroll = !opts.keepScroll && path !== lastPath; lastPath = path;
-  const y = opts.restore ? SCROLL.get(location.hash || '#') : null;
+  const y = opts.restore ? SCROLL.get(curHash() || '#') : null;
   // Con la página anterior aún visible esperamos un momento a los datos: la nueva aparece ya completa, sin esqueletos
   const pre = S.booted ? prefetch(r) : null;
   if (pre) {
@@ -482,14 +501,18 @@ function restoreScroll(y, tok) {
   const tryIt = () => { if (!live(tok)) return; window.scrollTo(0, y); if (Math.abs(window.scrollY - y) > 4 && n++ < 15) setTimeout(tryIt, 70); };
   requestAnimationFrame(tryIt);
 }
-window.addEventListener('hashchange', () => {
+// Al cambiar de página: los enlaces #... disparan hashchange; volver atrás entre /j/... y /m/... solo dispara popstate
+function onNav() {
+  const h = curHash() || '#';
+  if (h === lastHash) { syncUrl(); return; }
   SCROLL.set(lastHash, window.scrollY);
-  const h = location.hash || '#';
   const back = STACK.length > 1 && STACK[STACK.length - 2] === h;
   if (back) STACK.pop(); else { STACK.push(h); if (STACK.length > 60) STACK.shift(); }
   lastHash = h;
   go({ restore: back });
-});
+}
+window.addEventListener('hashchange', onNav);
+window.addEventListener('popstate', onNav);
 function render(r, tok) {
   if (!S.index) { MAIN.innerHTML = skeletonList(6); return; }
   if (S.index.v !== 3) { MAIN.innerHTML = `<div class="card empty in"><strong>${esc(t('Actualizando los datos…'))}</strong>${esc(t('Vuelve a cargar la página en un par de minutos.'))}</div>`; return; }
@@ -946,7 +969,7 @@ function openFeedback() {
     let r;
     try {
       r = await fetch(apiBase() + '/api/feedback', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ type: FB.type, text, contact: ct.value.trim(), page: location.hash || '#', lang: LANG, website: $('#fb-hp', ovl).value }) });
+        body: JSON.stringify({ type: FB.type, text, contact: ct.value.trim(), page: curHash() || '#', lang: LANG, website: $('#fb-hp', ovl).value }) });
     } catch { return fail(t('No se pudo enviar. Comprueba tu conexión e inténtalo otra vez.')); }
     if (!r.ok) {
       let code = ''; try { code = (await r.json()).error || ''; } catch {}
@@ -1331,7 +1354,7 @@ async function shareImage(kind, obj, fname) {
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
   try {
     const Sh = await import('./share.js');
-    const X = { t, lang: LANG, host: location.host + location.pathname.replace(/\/(index\.html)?$/, ''), fmtR, int, resLetter, typeLabel, region: regionLabel,
+    const X = { t, lang: LANG, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
     const cv = kind === 'match' ? await Sh.matchImage(obj, X) : await Sh.profileImage(obj, X);
@@ -1455,14 +1478,14 @@ async function viewPlayer(pid, tok) {
   wireModeSwitch();
   $$('[data-sm]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.statMode = b.getAttribute('data-sm'); $$('[data-sm]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawStats(); }));
   $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games, a); }));
-  const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(location.href.split('#')[0] + '#j-' + P.id, sh));
+  const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(pageUrl('#j-' + P.id), sh));
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
   $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games, _a: a, _mode: mode }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games, a);
   // su equipo de la EUSL, si su nombre en la liga coincide con este jugador
   if (S.index && S.index.files && S.index.files.eusl) loadEusl().then((E) => {
     const r = E && E.roster && E.roster[String(P.id)], tg = $('.ph-tags', MAIN);
-    if (!r || !tg || location.hash !== '#j-' + P.id || $('.eu-pill', tg)) return;
+    if (!r || !tg || curHash() !== '#j-' + P.id || $('.eu-pill', tg)) return;
     const x = (E.teams || {})[r[0]] || {}, lg = (E.leagues || {})[r[1]] || '';
     tg.insertAdjacentHTML('beforeend', `<a class="pill eu-pill" href="#eusl" title="${esc(t('Juega en la EUSL'))}">${x.logo ? `<img src="${esc(x.logo)}" width="16" height="16" alt="" referrerpolicy="no-referrer" data-fb="rm">` : ''}EUSL ${esc(lg)} · ${esc(x.n || '?')}</a>`);
   }).catch(() => {});
@@ -2070,4 +2093,4 @@ $('#btn-install').addEventListener('click', install);
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('#btn-install').hidden = false; setTimeout(showTip, 2500); });
 addEventListener('appinstalled', () => { trackEvent('install'); installEvt = null; $('#btn-install').hidden = true; hideTip(true); toast(t('SlapScore instalada en tu dispositivo')); });
 if (isIOS() && !standalone()) { $('#btn-install').hidden = false; setTimeout(showTip, 3500); }
-if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); });

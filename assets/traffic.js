@@ -452,7 +452,7 @@ function wireHeat() {
 function aboutCard() {
   let off = false; try { off = !!localStorage.getItem(X.NOTRACK_KEY); } catch {}
   const first = ST.data.first;
-  const home = location.origin + location.pathname.replace(/index\.html$/, '');
+  const home = location.origin + '/';
   return `<div class="card tr-about"><div class="card-h"><h2>Cómo se cuenta</h2>${first ? `<small>contando desde el ${fmtDay(first)}</small>` : ''}</div><div class="card-b">
     <ul class="tr-how">
       <li><b>Visitantes</b>: personas distintas. Sin cookies, así que es aproximado: el mismo móvil con otra conexión cuenta como otra persona. Se reinicia cada mes.</li>
