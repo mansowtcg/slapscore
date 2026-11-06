@@ -271,7 +271,7 @@ APP.innerHTML = `
 <header class="hdr">
   <div class="wrap hdr-top">
     <a class="brand" href="#partidos" aria-label="${esc(t('SlapScore, inicio'))}"><span class="brand-mark"><i></i></span><span class="t">SlapScore</span></a>
-    <div class="search" role="search">${ICON.search}<input id="q" type="search" placeholder="${esc(t('Buscar jugador, ID o enlace'))}" autocomplete="off" aria-label="${esc(t('Buscar jugador'))}" aria-controls="sres"><div class="sres" id="sres" role="listbox" hidden></div></div>
+    <div class="search" role="search">${ICON.search}<input id="q" type="search" placeholder="${esc(innerWidth < 560 ? t('Buscar jugador') : t('Buscar jugador, ID o enlace'))}" autocomplete="off" aria-label="${esc(t('Buscar jugador'))}" aria-controls="sres"><div class="sres" id="sres" role="listbox" hidden></div></div>
     <div class="hdr-actions">
       <button class="ibtn" id="btn-install" type="button" aria-label="${esc(t('Instalar SlapScore'))}" title="${esc(t('Instalar la app'))}" hidden>${ICON.install}</button>
       <button class="ibtn" id="btn-fb" type="button" data-fb aria-label="${esc(t('Enviar una sugerencia'))}" title="${esc(t('Sugerencias y errores'))}">${ICON.chat}</button>
@@ -1108,7 +1108,7 @@ function teamWeekCard(top) {
 }
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
-  if (!S.awards) loadAwards().then(() => { if (el.isConnected && live(st.tok)) { drawRight(st, top); drawFavs(st); } }).catch(() => {});
+  if (!S.awards) loadAwards().then(() => { const slot = $('#tw-slot'); if (slot && live(st.tok)) slot.innerHTML = teamWeekCard(top); }).catch(() => {});
   const { meta, day } = st;
   let html = liveCard(day, 'hide-mobile') + `<div class="card in hide-mobile" id="fav-card"></div>` + leadersCard(meta, day, 'hide-mobile');
   const ml = $('#m-live'); if (ml) ml.innerHTML = liveStrip(day);
@@ -1122,7 +1122,7 @@ function drawRight(st, top) {
   const perf = (meta.perf || []).filter((p) => !S.hidden.has(p.i)).slice(0, 6);
   if (perf.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores actuaciones'))}</h3><small>${esc(dayLong(day))}</small></div><div style="padding-bottom:8px">${perf.map((p, i) =>
     `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} ${t('G')} · ${p.as} ${t('A')} · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
-  html += teamWeekCard(top);
+  html += `<div id="tw-slot">${teamWeekCard(top)}</div>`;
   html += supportCard();
   html += feedbackCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>

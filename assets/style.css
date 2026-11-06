@@ -1150,3 +1150,17 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .foot-langs{display:inline-flex;flex-wrap:wrap;gap:4px 12px}
 .foot-langs b{font-weight:700;color:var(--fg)}
 @media (max-width:600px){.favs-h .push-btn span{display:none}.favs-h .push-btn{padding:0 10px}}
+/* ---------- repaso de interfaz: zonas de toque más cómodas en pantallas táctiles ---------- */
+@media (pointer:coarse){
+  .btn.sm{height:34px}
+  .seg button{height:34px}
+  .tbtn{min-width:36px;min-height:36px;justify-content:center}
+  .crumbs{margin-bottom:6px}
+  .crumbs a{padding:8px 0}
+  .card-h>a{padding:6px 0}
+  .aw-ns a,.aw-sub a{padding:4px 0}
+}
+.rank-c .k{white-space:nowrap}
+#q{text-overflow:ellipsis}
+
+#tw-slot{display:contents}
