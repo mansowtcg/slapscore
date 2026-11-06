@@ -89,6 +89,7 @@ const loadTop = () => remember('top:' + fileVer('top'), () => getJSON('data/top.
 const loadAttr = () => remember('at:' + fileVer('attr'), () => getJSON('data/attr.json', fileVer('attr')));
 const loadRecords = () => remember('rec:' + fileVer('records'), () => getJSON('data/records.json', fileVer('records')));
 const loadEusl = () => remember('eu:' + fileVer('eusl'), () => getJSON('data/eusl.json', fileVer('eusl')));
+const loadAwards = () => remember('aw:' + fileVer('awards'), () => getJSON('data/awards.json', fileVer('awards')).then((a) => { S.awards = a; return a; }));
 // Compatibilidad con el panel de administrador: { id: { n, rk, mmr, a: { gp } } }
 async function loadPlayers() { const rows = await loadSearch(); const o = {}; for (const r of rows) o[r[0]] = { n: r[1], rk: r[2], mmr: r[3], a: { gp: r[4] } }; return o; }
 // Un partido: su resumen (rangos, nota) y, si no está archivado, el JSON original de slapshot.gg
@@ -217,7 +218,7 @@ const ICON = {
 // ---------- interfaz base ----------
 document.body.insertAdjacentHTML('afterbegin', emblemDefs());
 const APP = $('#app');
-const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings'], ['records', 'Récords'], ['eusl', 'EUSL'], ['notas', 'Cómo puntuamos']];
+const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings'], ['records', 'Récords'], ['premios', 'Premios'], ['eusl', 'EUSL'], ['notas', 'Cómo puntuamos']];
 APP.innerHTML = `
 <header class="hdr">
   <div class="wrap hdr-top">
@@ -240,7 +241,7 @@ APP.innerHTML = `
 <div class="wrap newbar" id="newbar" hidden><button type="button" id="btn-new">${esc(t('Hay partidos nuevos · Actualizar'))}</button></div>
 <main class="wrap" id="main" tabindex="-1"></main>
 <footer class="wrap foot" id="foot"></footer>
-<nav class="bnav" aria-label="${esc(t('Menú inferior'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#notas" data-nav="notas">${ICON.info}${esc(t('Info'))}</a></nav>
+<nav class="bnav" aria-label="${esc(t('Menú inferior'))}"><a href="#partidos" data-nav="partidos">${ICON.games}${esc(t('Partidos'))}</a><a href="#jugadores" data-nav="jugadores">${ICON.users}${esc(t('Jugadores'))}</a><a href="#rankings" data-nav="rankings" data-also="records,premios">${ICON.trophy}${esc(t('Rankings'))}</a><a href="#eusl" data-nav="eusl">${ICON.league}EUSL</a><a href="#notas" data-nav="notas">${ICON.info}${esc(t('Info'))}</a></nav>
 <div id="itip"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
@@ -425,6 +426,7 @@ function route() {
   if (h.startsWith('d-')) return { view: 'matches', day: h.slice(2) };
   if (h.startsWith('cmp-')) { const [a, b] = h.slice(4).split('-'); return { view: 'compare', a, b: b || '' }; }
   if (h === 'records' || h === 'récords') return { view: 'records' };
+  if (h === 'premios' || h === 'awards') return { view: 'premios' };
   // panel de administrador: #admin solo existe con la sesión iniciada (si no, es una dirección cualquiera);
   // para entrar desde otro navegador hay una dirección que no se enlaza en ningún sitio
   if (h === 'admin') return { view: isAdmin() ? 'admin' : 'matches' };
@@ -432,10 +434,10 @@ function route() {
   return { view: ['jugadores', 'rankings', 'notas', 'eusl', 'legal'].includes(h) ? h : 'matches' };
 }
 function setNav(view) {
-  const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', eusl: 'eusl', notas: 'notas' };
+  const map = { matches: 'partidos', match: 'partidos', player: 'jugadores', compare: 'jugadores', jugadores: 'jugadores', rankings: 'rankings', records: 'records', premios: 'premios', eusl: 'eusl', notas: 'notas' };
   const k = map[view];
   $$('[data-nav]').forEach((a) => (a.getAttribute('data-nav') === k || (a.dataset.also || '').split(',').includes(k)) ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
-  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
+  const tt = { player: '', match: '', matches: '', jugadores: 'Jugadores', rankings: 'Rankings', records: 'Récords', premios: 'Premios', eusl: 'EUSL', notas: 'Cómo puntuamos', compare: 'Comparar jugadores', admin: 'Administrador', legal: 'Aviso legal y privacidad' }[view];
   document.title = tt ? `${t(tt)} · SlapScore` : 'SlapScore';
 }
 let lastPath = null, lastHash = curHash() || '#', lastView = '';
@@ -459,13 +461,14 @@ function pickDay(dayArg) {
 function prefetch(r) {
   if (!S.index) return null;
   if (r.view === 'match' && r.id) return loadMatch(r.key, r.id);
-  if (r.view === 'player') return Promise.all([loadP(r.pid), loadAttr()]);
+  if (r.view === 'player') return Promise.all([loadP(r.pid), loadAttr(), loadAwards().catch(() => null)]);
+  if (r.view === 'premios') return loadAwards();
   if (r.view === 'compare') return Promise.all([loadP(r.a), r.b ? loadP(r.b) : null, loadAttr()]);
   if (r.view === 'jugadores') return loadTable(PF.win);
   if (r.view === 'rankings') return loadRankings();
   if (r.view === 'records') return loadRecords();
   if (r.view === 'eusl') return loadEusl();
-  if (r.view === 'matches') { const d = pickDay(r.day); return d ? Promise.all([loadMeta(d).then((m) => firstChunks(d, m)), loadTop()]) : null; }
+  if (r.view === 'matches') { const d = pickDay(r.day); return d ? Promise.all([loadMeta(d).then((m) => firstChunks(d, m)), loadTop(), loadAwards().catch(() => null)]) : null; }
   return null;
 }
 async function go(opts = {}) {
@@ -523,6 +526,7 @@ function render(r, tok) {
   if (r.view === 'jugadores') return viewPlayers(tok);
   if (r.view === 'rankings') return viewRankings(tok);
   if (r.view === 'records') return viewRecords(tok);
+  if (r.view === 'premios') return viewAwards(tok);
   if (r.view === 'eusl') return viewEusl(tok);
   if (r.view === 'notas') return viewMethod();
   if (r.view === 'legal') return viewLegal(tok);
@@ -904,7 +908,7 @@ function pageKey(r) {
     case 'match': return 'partido';
     case 'compare': return 'cmp';
     case 'jugadores': return 'tabla';
-    case 'rankings': case 'records': case 'eusl': case 'notas': case 'legal': return r.view;
+    case 'rankings': case 'records': case 'premios': case 'eusl': case 'notas': case 'legal': return r.view;
     case 'admin': return null;
     default: return r.day && r.day !== today() ? 'dia' : 'home';
   }
@@ -1025,14 +1029,21 @@ function liveStrip(day) {
   return `<div class="live-strip"><span class="lbl"><span class="dot pulse"></span>${esc(t('Jugando ahora'))}</span>${L.slice(0, 10).map((x) => `<a href="#j-${esc(x.id)}">${rank(x.rk, 18)}<span>${esc(x.n)}${supMark(x.id)}</span></a>`).join('')}</div>`;
 }
 // Equipo de la semana: las mejores medias de los últimos 7 días
+// Premios (awards.json): equipo de la semana (lunes a domingo) y jugador del mes. Si aún no hay, los mejores de los últimos 7 días.
+const awRange = (f, to) => `${DF_DM.format(dayDate(f)).replace('.', '')} – ${DF_DM.format(dayDate(to)).replace('.', '')}`;
+const awMonth = (m) => { const s = DF_MON.format(new Date(m + '-15T12:00:00Z')); return s[0].toUpperCase() + s.slice(1); };
+const podium = (W, avgKey) => `<div class="podium">${[1, 0, 2].filter((i) => W[i]).map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 18)}</span>${badge(x[avgKey], 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>`;
 function teamWeekCard(top) {
+  const A = S.awards, L = A && A.week && A.week.last && A.week.last.list;
+  if (L && L.length >= 3) return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><a href="#premios">${esc(awRange(A.week.last.f, A.week.last.t))}</a></div>${podium(L, 'rt')}</div>`;
   const W = (top && top.week) || []; if (W.length < 3) return '';
-  return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
-    <div class="podium">${[1, 0, 2].map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 18)}</span>${badge(x.avg, 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>
+  return `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
+    ${podium(W, 'avg')}
     ${W.slice(3).map((x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 4}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.gp, 'partido', 'partidos'))} · ${x.g} G · ${x.as} A</span></span>${badge(x.avg)}</a>`).join('')}<div style="height:8px"></div></div>`;
 }
 function drawRight(st, top) {
   const el = $('#m-right'); if (!el) return;
+  if (!S.awards) loadAwards().then(() => { if (el.isConnected) drawRight(st, top); }).catch(() => {});
   const { meta, day } = st;
   let html = liveCard(day, 'hide-mobile') + `<div class="card in hide-mobile" id="fav-card"></div>` + leadersCard(meta, day, 'hide-mobile');
   const ml = $('#m-live'); if (ml) ml.innerHTML = liveStrip(day);
@@ -1358,7 +1369,7 @@ async function shareImage(kind, obj, fname) {
     const X = { t, lang: LANG, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
-    const cv = kind === 'match' ? await Sh.matchImage(obj, X) : await Sh.profileImage(obj, X);
+    const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : await Sh.profileImage(obj, X);
     const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
     if (!$('#sh-pv')) return;
     const url = URL.createObjectURL(blob), file = new File([blob], fname, { type: 'image/png' });
@@ -1412,7 +1423,7 @@ function streakPill(cs) {
 async function viewPlayer(pid, tok) {
   MAIN.innerHTML = `<div class="card"><div class="ph"><div class="sk" style="width:76px;height:76px;border-radius:50%"></div><div><div class="sk" style="height:26px;width:220px"></div><div class="sk" style="height:12px;width:260px;margin-top:10px"></div></div></div></div><div style="height:16px"></div>${skeletonList(5)}`;
   let P, AT;
-  try { [P, AT] = await Promise.all([loadP(pid), loadAttr().catch(() => null)]); }
+  try { [P, AT] = await Promise.all([loadP(pid), loadAttr().catch(() => null), loadAwards().catch(() => null)]); }
   catch (e) {
     if (!live(tok)) return;
     if (e.status === 404) {
@@ -1446,7 +1457,7 @@ async function viewPlayer(pid, tok) {
   MAIN.innerHTML = `
     <nav class="crumbs in"><a href="#jugadores">${esc(t('Jugadores'))}</a>${ICON.right}<span>${esc(P.n)}</span></nav>
     <section class="card in">
-      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${favBtn(P.id, P.n)}</h1>
+      <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${((aw) => aw ? `${aw.months.length ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Jugador del mes'))} · ${esc(awMonth(aw.months[0]))}</a>` : ''}${aw.weeks ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Equipo de la semana'))}${aw.weeks > 1 ? ' ×' + aw.weeks : ''}</a>` : ''}` : '')(awardsOf(String(P.id)))}${favBtn(P.id, P.n)}</h1>
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
@@ -1766,7 +1777,7 @@ function drawPlayers(all) {
 // =====================================================================
 // RANKINGS
 // =====================================================================
-const rkTabs = (on) => `<div class="seg seg-links in" role="navigation" aria-label="${esc(t('Secciones'))}"><a href="#rankings" aria-current="${on === 'rankings' ? 'page' : 'false'}">${esc(t('Rankings'))}</a><a href="#records" aria-current="${on === 'records' ? 'page' : 'false'}">${esc(t('Récords'))}</a></div>`;
+const rkTabs = (on) => `<div class="seg seg-links in" role="navigation" aria-label="${esc(t('Secciones'))}"><a href="#rankings" aria-current="${on === 'rankings' ? 'page' : 'false'}">${esc(t('Rankings'))}</a><a href="#records" aria-current="${on === 'records' ? 'page' : 'false'}">${esc(t('Récords'))}</a><a href="#premios" aria-current="${on === 'premios' ? 'page' : 'false'}">${esc(t('Premios'))}</a></div>`;
 const RK = { win: 'a' };
 async function viewRankings(tok) {
   MAIN.innerHTML = `${rkTabs('rankings')}<h1 class="h1 in">${esc(t('Rankings'))}</h1><p class="lead">${esc(t('Los mejores de la comunidad en partidas públicas. Las medias piden un mínimo de partidos para contar.'))}</p>
@@ -1850,6 +1861,50 @@ function drawRecords(R0) {
     + card('Más partidos en un día', '', R.gpd, (x, i) => mrow(x, i, v(x.gp), dayLong(x.d)))
     + card('Partidos con más goles', 'goles en total', R.tot, (x, i) => `<a class="lrow" href="${matchHref(x.k, x.i)}"><span class="i">${i + 1}</span><span class="region">${esc(regionShort(x.r))}</span><span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${x.s[0]}-${x.s[1]} · ${esc(typeLabel(x.y))}</span><span class="sub">${esc(when(x))} · ${esc(x.a || '')}</span></span>${v(x.s[0] + x.s[1])}</a>`);
   el.innerHTML = html || `<div class="card empty">${esc(t('Todavía no hay récords.'))}</div>`;
+}
+
+// =====================================================================
+// PREMIOS
+// =====================================================================
+async function viewAwards(tok) {
+  MAIN.innerHTML = `${rkTabs('premios')}<h1 class="h1 in">${esc(t('Premios'))}</h1><div id="aw">${skeletonList(6)}</div>`;
+  let A; try { A = await loadAwards(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#aw').innerHTML = `<div class="card empty">${esc(t('Los premios aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
+  if (!live(tok)) return;
+  const W = A.week || {}, M = A.month || {};
+  const line = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')} · ${x.g} G · ${x.as} A`;
+  const short = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')}`;
+  const lrow = (x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(short(x))}</span></span>${badge(x.rt)}</a>`;
+  const list = (l, empty) => (l && l.length ? `<div style="padding-bottom:8px">${l.map(lrow).join('')}</div>` : `<div class="card-b muted">${esc(empty)}</div>`);
+  const wl = (W.last && W.last.list) || [], ml = (M.last && M.last.list) || [];
+  const champ = ml[0];
+  const weekHero = `<section class="card in aw-card"><div class="card-h"><h2>${esc(t('Equipo de la semana'))}</h2><small>${W.last ? esc(awRange(W.last.f, W.last.t)) : ''}</small></div>
+    ${wl.length >= 3 ? podium(wl, 'rt') + `<div class="aw-sub">${wl.slice(0, 3).map((x, i) => `<span><b>${i + 1}.</b> ${esc(x.n)} · ${esc(line(x))}</span>`).join('')}</div><div class="card-b aw-acts"><button class="btn sm" type="button" data-aw-share="week">${ICON.share}${esc(t('Compartir imagen'))}</button></div>`
+      : `<div class="card-b muted">${esc(t('Nadie llegó a {n} partidos públicos esa semana.', { n: A.minW }))}</div>`}</section>`;
+  const monthHero = `<section class="card in aw-card"><div class="card-h"><h2>${esc(t('Jugador del mes'))}</h2><small>${M.last ? esc(awMonth(M.last.m)) : ''}</small></div>
+    ${champ ? `<a class="aw-champ" href="#j-${esc(champ.id)}">${avatar(champ.n, champ.id, 'lg')}<span class="aw-cn"><span class="nr"><b>${esc(champ.n)}</b>${supMark(champ.id)}${rank(champ.rk, 24)}</span><small>${esc(line(champ))}</small></span>${badge(champ.rt, 'md')}</a>
+      ${ml.slice(1, 3).map((x, i) => lrow(x, i + 1)).join('')}<div class="card-b aw-acts"><button class="btn sm" type="button" data-aw-share="month">${ICON.share}${esc(t('Compartir imagen'))}</button></div>`
+      : `<div class="card-b muted">${esc(t('Nadie llegó a {n} partidos públicos ese mes.', { n: A.minM }))}</div>`}</section>`;
+  const hw = (A.hist && A.hist.w) || [], hm = (A.hist && A.hist.m) || [];
+  const histW = hw.length > 1 ? `<div class="card in"><div class="card-h"><h3>${esc(t('Equipos de la semana anteriores'))}</h3></div><div style="padding-bottom:8px">${hw.slice(1).map((x) => `<div class="aw-hist"><span class="aw-d">${esc(awRange(x.f, x.t))}</span><span class="aw-ns">${x.top.map(([id, n], i) => `<a href="#j-${esc(id)}"><b>${i + 1}.</b> ${esc(n)}</a>`).join('')}</span></div>`).join('')}</div></div>` : '';
+  const histM = hm.length > 1 ? `<div class="card in"><div class="card-h"><h3>${esc(t('Jugadores del mes anteriores'))}</h3></div><div style="padding-bottom:8px">${hm.slice(1).map((x) => `<div class="aw-hist"><span class="aw-d">${esc(awMonth(x.m))}</span><span class="aw-ns">${x.top[0] ? `<a href="#j-${esc(x.top[0][0])}">${esc(x.top[0][1])}</a> ${badge(x.top[0][3])}` : '—'}</span></div>`).join('')}</div></div>` : '';
+  $('#aw').innerHTML = `<p class="lead">${esc(t('La mejor nota media en partidas públicas (las custom no cuentan), con un mínimo de {w} partidos en la semana y {m} en el mes. Semanas de lunes a domingo, en hora de Madrid.', { w: A.minW, m: A.minM }))}</p>
+    <div class="aw-grid">${weekHero}${monthHero}</div>
+    <div class="aw-grid">
+      <div class="card in"><div class="card-h"><h3>${esc(t('Esta semana, de momento'))}</h3><small>${W.cur ? esc(awRange(W.cur.f, W.cur.t)) : ''}</small></div>${list(W.cur && W.cur.list, t('Aún nadie llega a {n} partidos esta semana.', { n: A.minW }))}</div>
+      <div class="card in"><div class="card-h"><h3>${esc(t('Este mes, de momento'))}</h3><small>${M.cur ? esc(awMonth(M.cur.m)) : ''}</small></div>${list(M.cur && M.cur.list, t('Aún nadie llega a {n} partidos este mes.', { n: A.minM }))}</div>
+    </div>${histW || histM ? `<div class="aw-grid">${histW}${histM}</div>` : ''}`;
+  $$('[data-aw-share]', MAIN).forEach((b) => b.addEventListener('click', () => {
+    const k = b.getAttribute('data-aw-share');
+    if (k === 'week') shareImage('week', { list: wl.slice(0, 3), label: awRange(W.last.f, W.last.t) }, `slapscore-equipo-semana-${W.last.f}.png`);
+    else shareImage('month', { list: ml.slice(0, 3), label: awMonth(M.last.m) }, `slapscore-jugador-mes-${M.last.m}.png`);
+  }));
+}
+// Premios de un jugador (para su perfil): veces en el equipo de la semana y meses como jugador del mes
+function awardsOf(pid) {
+  const A = S.awards; if (!A || !A.hist) return null;
+  const weeks = (A.hist.w || []).filter((x) => x.top.some((y) => y[0] === pid)).length;
+  const months = (A.hist.m || []).filter((x) => x.top[0] && x.top[0][0] === pid).map((x) => x.m);
+  return weeks || months.length ? { weeks, months } : null;
 }
 
 // =====================================================================

@@ -22,6 +22,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as C from '../assets/core.js';
 import { readJSON, readText, list, exists, Writer, hash } from './io.js';
+import { computeAwards } from './awards.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data');
@@ -892,6 +893,15 @@ for (const x of records.gpd.concat(records.week.gpd)) x.n = displayName(x.id);
 // nombres y rangos al día (los guardados en cada día pueden ser antiguos)
 for (const list of [records.rt, records.g, records.as, records.sv, records.pts, ...Object.values(records.week)]) for (const x of list) if (x.id && players[x.id]) { x.n = displayName(x.id); if (!x.rk && players[x.id].rk) { x.rk = players[x.id].rk; x.ap = 1; } }
 verOf.records = (await out.json(path.join(DATA, 'records.json'), records)).v;
+// premios: equipo de la semana y jugador del mes (awards.js)
+const aggDayFiles = new Set((await list(path.join(INT, 'agg', 'd'))).map((f) => f.slice(0, 10)));
+const awards = await computeAwards({
+  dayAdd, today: TODAY, hidden: hidP,
+  dayTotals: async (d) => (aggDayFiles.has(d) ? aggSplit(await readJSON(P.aggD(d), {})).p : null),
+  monthTotals: async (m) => { const x = await readJSON(P.aggM(m), null); return x ? aggSplit(x).p : null; },
+  info: (pid) => ({ n: displayName(pid), rk: (players[pid] || {}).rk || '' }),
+}, S);
+verOf.awards = (await out.json(path.join(DATA, 'awards.json'), awards)).v;
 S.lastHeavy = NOW;
 }
 S.metaV = META_V; S.profV = PROF_V; S.aggV = AGG_V; S._hidN = Object.keys(S.hid).length;

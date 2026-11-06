@@ -192,6 +192,14 @@ export default {
   'La nota del partido es la media de las notas de cada periodo que jugó. Elige un periodo arriba para ver cómo sale cada una.': 'The match rating is the average of the ratings for each period they played. Pick a period above to see how each one is worked out.',
   'Este tramo junta {n} periodos: la nota sale de la media por periodo.': 'This block combines {n} periods: the rating uses the per-period average.',
   'En las partidas custom con periodos, slapshot.gg da cada periodo por separado. SlapScore los junta en un solo partido: el resultado y las estadísticas son las del partido entero, cuenta como un partido y dentro puedes ver cada periodo. La nota del partido es la media de las notas de los periodos que jugó.': 'In custom games with periods, slapshot.gg reports each period separately. SlapScore joins them into a single match: the result and stats cover the whole match, it counts as one match and you can look at each period inside it. The match rating is the average of the ratings for the periods each player played.',
+  // premios
+  'Premios': 'Awards', 'Mejores de la semana': 'Best of the week', 'Jugador del mes': 'Player of the month', '{n} partidos': '{n} matches',
+  'Los premios aparecerán en unos minutos.': 'Awards will appear in a few minutes.',
+  'Nadie llegó a {n} partidos públicos esa semana.': 'Nobody reached {n} public matches that week.', 'Nadie llegó a {n} partidos públicos ese mes.': 'Nobody reached {n} public matches that month.',
+  'Equipos de la semana anteriores': 'Previous teams of the week', 'Jugadores del mes anteriores': 'Previous players of the month',
+  'La mejor nota media en partidas públicas (las custom no cuentan), con un mínimo de {w} partidos en la semana y {m} en el mes. Semanas de lunes a domingo, en hora de Madrid.': 'Best average rating in public matches (custom games don\'t count), with at least {w} matches in the week and {m} in the month. Weeks run Monday to Sunday, Madrid time.',
+  'Esta semana, de momento': 'This week so far', 'Este mes, de momento': 'This month so far',
+  'Aún nadie llega a {n} partidos esta semana.': 'Nobody has reached {n} matches this week yet.', 'Aún nadie llega a {n} partidos este mes.': 'Nobody has reached {n} matches this month yet.',
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

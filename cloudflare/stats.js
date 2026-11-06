@@ -93,7 +93,7 @@ export function system(ua) {
 export const BOT = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|gtmetrix|preview|facebookexternalhit|embedly|whatsapp\/|telegrambot|discordbot|python|curl\/|wget|httpclient|okhttp|axios|node-fetch|phantom|puppeteer|playwright|selenium|scrapy|monitor|uptime/i;
 
 // ---------- validación de lo que manda la web ----------
-const PAGES = new Set(['home', 'dia', 'partido', 'tabla', 'rankings', 'records', 'eusl', 'notas', 'cmp', 'legal']);
+const PAGES = new Set(['home', 'dia', 'partido', 'tabla', 'rankings', 'records', 'premios', 'eusl', 'notas', 'cmp', 'legal']);
 const EVENTS = new Set(['share', 'fav', 'install', 'feedback']);
 export function cleanHit(b, { ip, ua, cc }) {
   if (!b || typeof b !== 'object') return null;

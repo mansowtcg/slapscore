@@ -136,3 +136,61 @@ export async function profileImage(P, X) {
   });
   return cv;
 }
+
+// Premios: equipo de la semana (los 3 mejores) o jugador del mes (con el 2.º y el 3.º)
+const MEDAL = ['#E0A800', '#B0B7C3', '#C27C4A'];
+export async function awardImage(kind, A, X) {
+  await Promise.all([document.fonts.load(F(800, 40)), document.fonts.load(F(800, 40, true)), document.fonts.load(F(600, 30))]).catch(() => {});
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const L = A.list || [];
+  frame(c, X, A.label);
+  const pct = (x) => Math.round((x.w / (x.gp || 1)) * 100) + '%';
+  const medal = (i, x, y, d) => { c.fillStyle = MEDAL[i]; c.beginPath(); c.arc(x, y, d / 2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.font = F(800, Math.round(d * 0.55)); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(i + 1), x, y + 2); c.textBaseline = 'alphabetic'; };
+  const ranks = await Promise.all(L.map((x) => loadImg(X.rankSrc(x.rk))));
+  fit(c, (kind === 'week' ? X.t('Equipo de la semana') : X.t('Jugador del mes')).toUpperCase(), W / 2, 236, W - 120, 800, 76, 'center');
+  if (kind === 'week') {
+    L.slice(0, 3).forEach((x, i) => {
+      const y = 300 + i * 290;
+      c.fillStyle = i === 0 ? 'rgba(224,168,0,.14)' : 'rgba(255,255,255,.06)'; rr(c, 60, y, W - 120, 260, 30); c.fill();
+      avatar(c, x.n, x.id, 96, y + 55, 150);
+      medal(i, 228, y + 70, 54);
+      fit(c, x.n, 280, y + 112, 470, 800, 60);
+      if (ranks[i]) c.drawImage(ranks[i], 280, y + 136, 64, 64);
+      c.font = F(600, 28); c.fillStyle = COL.muted; c.textAlign = 'left';
+      c.fillText(X.t('{n} partidos', { n: X.int(x.gp) }) + ` · ${pct(x)} ` + X.t('victorias'), ranks[i] ? 356 : 280, y + 178);
+      c.fillText(`${X.int(x.g)} ${X.t('goles')} · ${X.int(x.as)} ${X.t('asistencias')} · ${X.int(x.mvp)} MVP`, 280, y + 226);
+      badge(c, x.rt, W - 60 - 36 - 190, y + 75, 190, 110, X.fmtR);
+    });
+  } else {
+    const x = L[0];
+    if (x) {
+      c.fillStyle = 'rgba(224,168,0,.14)'; rr(c, 60, 296, W - 120, 560, 34); c.fill();
+      avatar(c, x.n, x.id, W / 2 - 110, 330, 220);
+      medal(0, W / 2 + 84, 350, 60);
+      fit(c, x.n, W / 2, 630, W - 220, 800, 84, 'center');
+      const sub = (ranks[0] ? '     ' : '') + (X.rankName(x.rk) || '');
+      c.font = F(600, 32); c.fillStyle = COL.muted; c.textAlign = 'center';
+      const tw = c.measureText(sub).width;
+      if (ranks[0]) c.drawImage(ranks[0], W / 2 - tw / 2 - 10, 650, 56, 56);
+      c.fillText(sub, W / 2 + (ranks[0] ? 24 : 0), 690);
+      const cells = [[X.fmtR(x.rt), X.t('Nota media'), true], [X.int(x.gp), X.t('Partidos')], [pct(x), X.t('Victorias')], [X.int(x.g), X.t('Goles')], [X.int(x.as), X.t('Asistencias')]];
+      const cw = (W - 120 - 72 - 4 * 14) / 5;
+      cells.forEach(([v, l, big], i) => {
+        const cx = 96 + i * (cw + 14);
+        if (big) badge(c, x.rt, cx, 724, cw, 76, X.fmtR);
+        else { c.fillStyle = '#fff'; c.textAlign = 'center'; c.font = F(800, 52, true); c.fillText(v, cx + cw / 2, 780); }
+        c.fillStyle = COL.muted; c.font = F(600, 22); c.textAlign = 'center'; c.fillText(l, cx + cw / 2, 834);
+      });
+    }
+    L.slice(1, 3).forEach((p, j) => {
+      const i = j + 1, y = 890 + j * 150;
+      c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, y, W - 120, 130, 24); c.fill();
+      medal(i, 112, y + 65, 46);
+      avatar(c, p.n, p.id, 150, y + 25, 80);
+      fit(c, p.n, 252, y + 62, 520, 800, 40);
+      c.font = F(600, 24); c.fillStyle = COL.muted; c.textAlign = 'left'; c.fillText(X.t('{n} partidos', { n: X.int(p.gp) }) + ` · ${pct(p)} ` + X.t('victorias'), 252, y + 100);
+      badge(c, p.rt, W - 60 - 30 - 140, y + 28, 140, 74, X.fmtR);
+    });
+  }
+  return cv;
+}

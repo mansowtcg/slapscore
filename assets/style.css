@@ -1105,4 +1105,29 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .kofi-h .ibtn-s:hover{color:var(--loss)}
 .kofi-msg{margin:0;font-size:13px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
 .kofi-pid{margin:0;font-size:13px;font-weight:700}
+/* ---------- premios ---------- */
+.aw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}
+@media (max-width:900px){.aw-grid{grid-template-columns:minmax(0,1fr)}}
+.aw-card .card-h h2{margin:0;font-size:18px;font-weight:800}
+.aw-card .podium{padding:6px 16px 12px}
+.aw-sub{display:flex;flex-direction:column;gap:2px;padding:0 16px 4px;font-size:12.5px;color:var(--muted)}
+.aw-sub b{color:var(--fg)}
+.aw-acts{padding-top:10px}
+.aw-acts .btn svg{width:15px;height:15px}
+.aw-champ{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;margin:4px 16px 8px;padding:14px;border-radius:16px;background:color-mix(in srgb,#F5B400 12%,var(--surface-2));color:var(--fg);text-decoration:none!important}
+.aw-cn{display:flex;flex-direction:column;gap:4px;min-width:0}
+.aw-cn .nr{display:flex;align-items:center;gap:6px;font-size:18px;min-width:0}
+.aw-cn .nr b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aw-cn small{color:var(--muted);font-size:12.5px;font-weight:600}
+.aw-hist{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;padding:8px 16px;font-size:13px}
+.aw-hist+.aw-hist{border-top:1px solid var(--line)}
+.aw-d{color:var(--muted);font-weight:700}
+.aw-ns{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-width:0}
+.aw-ns b{color:var(--muted);font-weight:700}
+.aw-grid .lrow .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.aw-ns a{color:var(--fg);font-weight:700}
+.pill.aw-pill{display:inline-flex;align-items:center;gap:4px;text-decoration:none!important;color:#8A6200;background:color-mix(in srgb,#F5B400 18%,transparent);font-size:12px;vertical-align:middle;margin-left:6px}
+.pill.aw-pill svg{width:13px;height:13px}
+[data-theme="dark"] .pill.aw-pill{color:#F5C842}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pill.aw-pill{color:#F5C842}}
 
