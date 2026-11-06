@@ -65,10 +65,10 @@
 }
 
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-padding-top:120px}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:calc(120px + env(safe-area-inset-top,0px))}
 html,body{background:var(--bg)}
 body{margin:0;color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
-  padding-bottom:env(safe-area-inset-bottom,0px)}
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}   /* con la app instalada, la cabecera empieza debajo de la barra de estado y no tapa nada */
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--hdr)}
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -132,6 +132,7 @@ main{padding-block:20px 40px;min-height:60vh}
 .card-h h2,.card-h h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.005em}
 .card-h small{color:var(--muted);font-size:12.5px}
 .card-b{padding:0 16px 16px}
+.card>.card-b:first-child{padding-top:16px}   /* tarjetas sin título: mismo aire arriba que abajo */
 .card-f{padding:10px 16px;border-top:1px solid var(--line);text-align:center}
 .h1{font-size:26px;font-weight:800;letter-spacing:-.015em;margin:0 0 4px;text-wrap:balance}
 .lead{color:var(--muted);margin:0 0 18px;max-width:70ch}
@@ -614,6 +615,7 @@ main[data-static="1"] .in{animation:none}
 
 /* ===================== v3 ===================== */
 .support .card-b{display:flex;flex-direction:column;gap:4px}
+.support b{font-size:15px}
 .support p{margin:0;color:var(--muted);font-size:13px}
 .btn.kofi{align-self:flex-start;margin-top:8px;background:#FF5E5B;border-color:#FF5E5B;color:#fff}
 .btn.kofi:hover{background:#F04B48;border-color:#F04B48}
