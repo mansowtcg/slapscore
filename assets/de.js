@@ -637,4 +637,5 @@ export default {
   "Todo lo que puedes hacer": "Alles, was du machen kannst",
   "¿Echas algo en falta?": "Fehlt dir etwas?",
   "Cuéntanoslo": "Sag es uns",
+  "Mejor nota de la semana": "Beste Note der Woche",
 };

@@ -34,7 +34,7 @@
   "shortcuts": [
     {
       "name": "Players",
-      "url": "./#jugadores",
+      "url": "/players",
       "icons": [
         {
           "src": "assets/icons/icon-192.png",
@@ -44,7 +44,7 @@
     },
     {
       "name": "Rankings",
-      "url": "./#rankings",
+      "url": "/rankings",
       "icons": [
         {
           "src": "assets/icons/icon-192.png",
@@ -54,7 +54,7 @@
     },
     {
       "name": "Records",
-      "url": "./#records",
+      "url": "/records",
       "icons": [
         {
           "src": "assets/icons/icon-192.png",
@@ -64,7 +64,7 @@
     },
     {
       "name": "EUSL",
-      "url": "./#eusl",
+      "url": "/eusl",
       "icons": [
         {
           "src": "assets/icons/icon-192.png",

@@ -1,12 +1,15 @@
 // Idioma de la web: inglés (por defecto), español, francés, alemán o portugués. Los textos se escriben en español
 // y se traducen con t(). El diccionario del idioma elegido solo se descarga si hace falta; en francés, alemán y
 // portugués, lo que aún no esté traducido sale en inglés.
+import { langOfPath } from './routes.js';
 const KEY = 'slapscore-lang';
 export const LANGS = [['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['pt', 'Português']];
 const OK = new Set(LANGS.map(([k]) => k));
 function detect() {
-  // inglés por defecto; los demás, si el visitante los elige (se recuerda en su navegador)
+  // el que el visitante eligió (se recuerda en su navegador); si no eligió ninguno, el de la dirección que abre
+  // (slapscore.app/jugador/123 sale en español, /joueurs en francés...); si no, inglés
   try { const s = localStorage.getItem(KEY); if (OK.has(s)) return s; } catch {}
+  try { const l = langOfPath(location.pathname); if (OK.has(l)) return l; } catch {}
   return 'en';
 }
 export const LANG = detect();

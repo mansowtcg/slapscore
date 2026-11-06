@@ -19,7 +19,7 @@ const tidy = (s, max) => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u00
 // ID de jugador en el mensaje: enlace de slapshot.gg o de SlapScore, «ID 12345», o un único número largo
 export function findPid(text) {
   const s = String(text || '');
-  const m = /slapshot\.gg\/(?:\w+\/)?players\/(\d{1,12})/i.exec(s) || /slapscore\.app\/(?:#j-|j\/)(\d{1,12})/i.exec(s)
+  const m = /slapshot\.gg\/(?:\w+\/)?players\/(\d{1,12})/i.exec(s) || /slapscore\.app\/(?:#j-|(?:j|player|jugador|joueur|spieler|jogador)\/)(\d{1,12})/i.exec(s)
     || /#j-(\d{1,12})\b/.exec(s) || /\bID\s*[:#=]?\s*(\d{3,12})\b/i.exec(s);
   if (m) return m[1];
   const nums = s.match(/\b\d{4,12}\b/g) || [];

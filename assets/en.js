@@ -261,6 +261,7 @@ export default {
   "Todo lo que puedes hacer": "Everything you can do",
   "¿Echas algo en falta?": "Missing something?",
   "Cuéntanoslo": "Tell us",
+  "Mejor nota de la semana": "Best rating of the week",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

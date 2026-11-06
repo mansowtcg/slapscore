@@ -125,8 +125,8 @@ jobs:
           rm -rf _site/data/.git _site/data/_int
           B="${GITHUB_SHA::8}"
           sed -i "s/__BUILD__/$B/g" _site/sw.js
-          sed -i -E "s#assets/(app\.js|core\.js|emblems\.js|i18n\.js|news\.js|style\.css)\"#assets/\1?b=$B\"#g" _site/index.html
-          sed -i -E "s#from '\./(core|emblems|i18n|news)\.js'#from './\1.js?b=$B'#g; s#import\('\./(admin|vendor/gunzip|en|fr|de|pt|share|traffic|legal)\.js'\)#import('./\1.js?b=$B')#g" _site/assets/*.js
+          sed -i -E "s#assets/(app\.js|core\.js|emblems\.js|i18n\.js|news\.js|routes\.js|style\.css)\"#assets/\1?b=$B\"#g" _site/index.html
+          sed -i -E "s#from '\./(core|emblems|i18n|news|routes)\.js'#from './\1.js?b=$B'#g; s#import\('\./(admin|vendor/gunzip|en|fr|de|pt|share|traffic|legal)\.js'\)#import('./\1.js?b=$B')#g" _site/assets/*.js
           echo "Archivos: $(find _site -type f | wc -l) · tamaño: $(du -sh _site | cut -f1)"
       # La web está en https://slapscore.app (Cloudflare Workers). GitHub Pages ya no se usa.
       - name: Publicar la web (Cloudflare)

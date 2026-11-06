@@ -127,7 +127,7 @@ export async function mount(root, ctx) {
     b.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); showTab(b.getAttribute('data-tab') === 'traffic' ? 'robot' : 'traffic', true); } });
   });
   showTab(tab);
-  $('#logout').addEventListener('click', () => { setToken(null); X.renderChrome(); X.toast('Sesión de administrador cerrada'); location.replace('#partidos'); });
+  $('#logout').addEventListener('click', () => { setToken(null); X.renderChrome(); X.toast('Sesión de administrador cerrada'); X.navTo('#partidos', true); });
   let minutes = 8;
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
@@ -154,7 +154,7 @@ function login(root) {
       await gh('/contents/config/settings.json?ref=main', {}, t);
       setToken(t); try { localStorage.setItem(X.NOTRACK_KEY, '1'); } catch {}   // tus visitas no cuentan en las estadísticas
       X.renderChrome(); X.toast('Sesión de administrador iniciada');
-      if (location.hash === '#admin') mount(root, X); else location.replace('#admin');   // la dirección de entrada no se queda en la barra
+      if (X.curHash() === '#admin') mount(root, X); else X.navTo('#admin', true);   // la dirección de entrada no se queda en la barra
     } catch (ex) { err.textContent = ex.message; err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar'; }
   });
 }

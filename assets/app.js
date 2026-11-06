@@ -3,6 +3,7 @@ import * as C from './core.js';
 import { emblem, emblemDefs, setOfficial, hasOfficial, officialSrc, RANK_KEYS } from './emblems.js';
 import { t, LANG, LOC, setLang, LANGS, TEAM_LETTER } from './i18n.js';
 import { FEATURES, GROUPS, NEWS_DATE, NEWS_HEADLINE } from './news.js';
+import { pathFor, keyFor } from './routes.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -379,6 +380,9 @@ function parseIdQuery(raw) {
   const s = String(raw || '').trim();
   let m = /slapshot\.gg\/players\/(\d{1,10})/i.exec(s) || /^#?j-(\d{1,10})$/i.exec(s) || /^(\d{3,10})$/.exec(s);
   if (m) return { pid: m[1] };
+  // enlace de SlapScore (slapscore.app/jugador/123, /player/123, /j/123...)
+  const sm = /slapscore\.app(\/[^\s?#]*)/i.exec(s); const k = sm && keyFor(sm[1]);
+  if (k && /^j-\d+$/.test(k)) return { pid: k.slice(2) };
   m = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(s);
   if (m && (/slapshot\.gg\/matches\//i.test(s) || m[1].length === s.length)) return { mid: m[1].toLowerCase() };
   return null;
@@ -437,7 +441,7 @@ function srow(r, on, pick) {
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown') { sel = Math.min(list.length - 1, sel + 1); draw(); e.preventDefault(); }
     else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); draw(); e.preventDefault(); }
-    else if (e.key === 'Enter') { clearTimeout(ti); const s0 = sel; draw().then(() => { const it = list[s0 < 0 ? 0 : s0]; if (it) { location.hash = hrefOf(it).slice(1); close(); } }); }
+    else if (e.key === 'Enter') { clearTimeout(ti); const s0 = sel; draw().then(() => { const it = list[s0 < 0 ? 0 : s0]; if (it) { navTo(hrefOf(it)); close(); } }); }
     else if (e.key === 'Escape') close();
   });
   inp.addEventListener('paste', () => setTimeout(() => { clearTimeout(ti); draw(); }, 0));
@@ -469,24 +473,27 @@ async function pickPlayer(title, exclude, onPick) {
 }
 
 // ---------- router ----------
-// Las páginas van por #hash (#j-123, #m-..., #rankings). Jugadores y partidos se enseñan además con dirección propia
-// (/j/123, /m/...) para que al compartirlas salga su vista previa (la pone el Worker); la app entiende las dos formas.
+// Las direcciones van sin # y en el idioma de cada uno (/jugadores, /players, /jugador/123...; routes.js).
+// Por dentro cada página tiene su clave de siempre (#jugadores, #j-123, #m-..., #d-..., #cmp-...): curHash() la saca de
+// la dirección, y las antiguas con # o en otro idioma se cambian solas por la buena (syncUrl, sin recargar).
 let TOK = 0;
 function curHash() {
-  if (location.hash.length > 1) return location.hash;
-  const p = location.pathname;
-  let m = /^\/j\/(\d{1,12})\/?$/.exec(p); if (m) return '#j-' + m[1];
-  m = /^\/m\/(\d{10}-[0-9a-zA-Z-]{8,64})\/?$/.exec(p); if (m) return '#m-' + m[1];
-  return '';
+  if (location.hash.length > 1 && !location.hash.startsWith('#lg-')) return location.hash;   // enlaces antiguos con #
+  const k = keyFor(location.pathname);
+  return k ? '#' + k : '';
 }
-const prettyPath = (h) => { const m = /^#(j|m)-(.+)$/.exec(h || ''); return m ? `/${m[1]}/${m[2]}` : null; };
-// Deja en la barra la dirección bonita (sin recargar ni añadir historial)
+// Deja en la barra la dirección buena (sin recargar ni añadir historial)
 function syncUrl() {
-  const h = curHash(), pp = prettyPath(h);
-  const want = (pp || '/') + location.search + (pp || !h ? '' : h);
+  const want = (pathFor(curHash(), LANG) || '/') + location.search;
   if (location.pathname + location.search + location.hash !== want) { try { history.replaceState(history.state, '', want); } catch {} }
 }
-const pageUrl = (h) => location.origin + (prettyPath(h) || '/' + (h || ''));
+const pageUrl = (h) => location.origin + (pathFor(h, LANG) || '/');
+// Ir a una página de la web sin recargar (con las claves #... de siempre)
+function navTo(hash, replace = false) {
+  const u = (pathFor(hash, LANG) || '/');
+  try { if (replace) history.replaceState(null, '', u); else history.pushState(null, '', u); } catch { location.href = u; return; }
+  onNav();
+}
 const ADMIN_ENTRY = 'entrada-ibai';
 function route() {
   const h = decodeURIComponent(curHash().slice(1));
@@ -601,7 +608,7 @@ function render(r, tok) {
   if (r.view === 'notas') return viewMethod();
   if (r.view === 'novedades') return viewNews();
   if (r.view === 'legal') return viewLegal(tok);
-  if (r.view === 'admin') { if (r.entry && isAdmin()) { location.replace('#admin'); return; } return viewAdmin(tok); }
+  if (r.view === 'admin') { if (r.entry && isAdmin()) { navTo('#admin', true); return; } return viewAdmin(tok); }
   return viewMatches(r.day, tok);
 }
 const live = (tok) => tok === TOK;
@@ -646,7 +653,7 @@ function dayBar(day) {
   </div>`;
 }
 let dayKey = false;   // el último cambio de día se hizo con el teclado: mantener el foco en la tira
-function goDay(d) { if (!d) return; MF.limit = 120; closeCal(); location.hash = 'd-' + d; }
+function goDay(d) { if (!d) return; MF.limit = 120; closeCal(); navTo('#d-' + d); }
 function wireDayBar(day) {
   const bar = $('#daybar'); if (!bar) return;
   bar.addEventListener('click', (e) => { const b = e.target.closest('[data-day]'); if (b && !b.disabled && b.getAttribute('data-day') !== day) goDay(b.getAttribute('data-day')); });
@@ -1106,9 +1113,28 @@ function liveStrip(day) {
 const awRange = (f, to) => `${DF_DM.format(dayDate(f)).replace('.', '')} – ${DF_DM.format(dayDate(to)).replace('.', '')}`;
 const awMonth = (m) => { const s = DF_MON.format(new Date(m + '-15T12:00:00Z')); return s[0].toUpperCase() + s.slice(1); };
 const podium = (W, avgKey) => `<div class="podium">${[1, 0, 2].filter((i) => W[i]).map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 18)}</span>${badge(x[avgKey], 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>`;
+// Equipo de la semana en la pista, como una alineación: dos delante y atrás el que más defiende (paradas y bloqueos
+// por partido). Cada uno con su nota; el mejor de la semana, con estrella.
+function teamRink(L, big) {
+  const W = L.slice(0, 3); if (!W.length) return '';
+  const def = (x) => ((x.sv || 0) + (x.bl || 0) * 0.5) / (x.gp || 1);
+  const back = W.length === 3 ? W.reduce((b, x) => (def(x) > def(b) ? x : b), W[0]) : null;
+  const order = back ? [...W.filter((x) => x !== back), back] : W;
+  const slots = order.length === 3 ? [[27, 29], [73, 29], [50, 64]] : order.length === 2 ? [[30, 45], [70, 45]] : [[50, 50]];
+  const marks = order.map((x, k) => `<a class="tw-p${x === W[0] ? ' best' : ''}" href="#j-${esc(x.id)}" style="left:${slots[k][0]}%;top:${slots[k][1]}%">${x === W[0] ? `<span class="tw-star" title="${esc(t('Mejor nota de la semana'))}">${ICON.star}</span>` : ''}${avatar(x.n, x.id, big ? 'lg' : 'md')}${badge(x.rt)}<span class="nm">${rank(x.rk, 14)}<span class="t">${esc(x.n)}</span>${supMark(x.id)}</span><small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`).join('');
+  return `<div class="tw-rink${big ? ' big' : ''}"><svg viewBox="0 0 100 112" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M2 2H98V86A24 24 0 0 1 74 110H26A24 24 0 0 1 2 86Z" fill="var(--ice)" stroke="var(--ice-line)" stroke-width=".8"/>
+    <line x1="2" y1="3" x2="98" y2="3" stroke="var(--ice-red)" stroke-width="1.2" opacity=".7"/>
+    <line x1="2" y1="26" x2="98" y2="26" stroke="var(--ice-blue)" stroke-width="1.4" opacity=".6"/>
+    <circle cx="27" cy="64" r="10" fill="none" stroke="var(--ice-red)" stroke-width=".6" opacity=".45"/><circle cx="73" cy="64" r="10" fill="none" stroke="var(--ice-red)" stroke-width=".6" opacity=".45"/>
+    <line x1="7" y1="100" x2="93" y2="100" stroke="var(--ice-red)" stroke-width=".6" opacity=".6"/>
+    <path d="M42 100a8 5 0 0 1 16 0" fill="var(--ice-blue)" fill-opacity=".18" stroke="var(--ice-red)" stroke-width=".6"/>
+    <rect x="45.5" y="100" width="9" height="3.4" fill="none" stroke="var(--ice-red)" stroke-width=".6"/>
+  </svg>${marks}</div>`;
+}
 function teamWeekCard(top) {
   const A = S.awards, L = A && A.week && A.week.last && A.week.last.list;
-  if (L && L.length >= 3) return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><a href="#premios">${esc(awRange(A.week.last.f, A.week.last.t))}</a></div>${podium(L, 'rt')}</div>`;
+  if (L && L.length >= 3) return `<div class="card in"><div class="card-h"><h3>${esc(t('Equipo de la semana'))}</h3><a href="#premios">${esc(awRange(A.week.last.f, A.week.last.t))}</a></div><div class="tw-box">${teamRink(L)}</div></div>`;
   const W = (top && top.week) || []; if (W.length < 3) return '';
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Mejores de la semana'))}</h3><small>${esc(t('7 días · mín. {n} PJ', { n: W[0].min || 1 }))}</small></div>
     ${podium(W, 'avg')}
@@ -1743,7 +1769,7 @@ async function viewCompare(r, tok) {
   const mode = PV.mode === 'cus' && (A._ac.gp || (B && B._ac.gp)) ? 'cus' : 'pub', cus = mode === 'cus';
   const ga = modeGames(allA, mode);
   const choose = (side) => pickPlayer(side === 'b' ? t('Comparar a {n} con…', { n: A.n }) : t('Cambiar jugador'), { id: side === 'b' ? String(A.id) : String(B && B.id), sug: side === 'b' ? sug : [] },
-    (id) => { location.hash = side === 'b' ? `cmp-${A.id}-${id}` : `cmp-${id}-${B.id}`; });
+    (id) => { navTo(side === 'b' ? `#cmp-${A.id}-${id}` : `#cmp-${id}-${B.id}`); });
   const head = (P, side) => {
     const m = P.meta || {}, a = modeAgg(P, mode);
     return `<div class="cmp-p ${side}"><a href="#j-${esc(P.id)}" aria-label="${esc(P.n)}">${avatar(P.n, P.id, 'lg')}</a><a class="nm" href="#j-${esc(P.id)}"><span>${esc(P.n)}</span>${rank(m.rk, 24)}</a>
@@ -1803,7 +1829,7 @@ async function viewCompare(r, tok) {
     </div>`;
   MAIN.onclick = (e) => { const c = e.target.closest('[data-chg]'); if (c) choose(c.getAttribute('data-chg')); };
   wireModeSwitch();
-  $('#cmp-swap').addEventListener('click', () => { location.hash = `cmp-${B.id}-${A.id}`; });
+  $('#cmp-swap').addEventListener('click', () => { navTo(`#cmp-${B.id}-${A.id}`); });
 }
 
 // =====================================================================
@@ -1911,7 +1937,7 @@ function drawRankings(R) {
     + card('% de victorias', mn, W.wp, (x) => `<span class="v">${pct(x)}</span>`)
     + card('Más partidos', t('jugados'), W.gp, v);
   el.innerHTML = (html || `<div class="card empty">${esc(t('Todavía no hay datos para este periodo.'))}</div>`) + (S.distHTML || '<div id="rk-dist"></div>');
-  const all = $('[data-allmmr]', el); if (all) all.addEventListener('click', (e) => { e.preventDefault(); PF.sort = 'mmr'; PF.dir = -1; PF.min = 1; PF.win = 'a'; PF.tier = ''; PF.q = ''; location.hash = 'jugadores'; });
+  const all = $('[data-allmmr]', el); if (all) all.addEventListener('click', (e) => { e.preventDefault(); PF.sort = 'mmr'; PF.dir = -1; PF.min = 1; PF.win = 'a'; PF.tier = ''; PF.q = ''; navTo('#jugadores'); });
 }
 
 // =====================================================================
@@ -1962,7 +1988,7 @@ async function viewAwards(tok) {
   const wl = (W.last && W.last.list) || [], ml = (M.last && M.last.list) || [];
   const champ = ml[0];
   const weekHero = `<section class="card in aw-card"><div class="card-h"><h2>${esc(t('Equipo de la semana'))}</h2><small>${W.last ? esc(awRange(W.last.f, W.last.t)) : ''}</small></div>
-    ${wl.length >= 3 ? podium(wl, 'rt') + `<div class="aw-sub">${wl.slice(0, 3).map((x, i) => `<span><b>${i + 1}.</b> ${esc(x.n)} · ${esc(line(x))}</span>`).join('')}</div><div class="card-b aw-acts"><button class="btn sm" type="button" data-aw-share="week">${ICON.share}${esc(t('Compartir imagen'))}</button></div>`
+    ${wl.length >= 3 ? `<div class="tw-box">${teamRink(wl, true)}</div>` + `<div class="aw-sub">${wl.slice(0, 3).map((x, i) => `<span><b>${i + 1}.</b> ${esc(x.n)} · ${esc(line(x))}</span>`).join('')}</div><div class="card-b aw-acts"><button class="btn sm" type="button" data-aw-share="week">${ICON.share}${esc(t('Compartir imagen'))}</button></div>`
       : `<div class="card-b muted">${esc(t('Nadie llegó a {n} partidos públicos esa semana.', { n: A.minW }))}</div>`}</section>`;
   const monthHero = `<section class="card in aw-card"><div class="card-h"><h2>${esc(t('Jugador del mes'))}</h2><small>${M.last ? esc(awMonth(M.last.m)) : ''}</small></div>
     ${champ ? `<a class="aw-champ" href="#j-${esc(champ.id)}">${avatar(champ.n, champ.id, 'lg')}<span class="aw-cn"><span class="nr"><b>${esc(champ.n)}</b>${supMark(champ.id)}${rank(champ.rk, 24)}</span><small>${esc(line(champ))}</small></span>${badge(champ.rt, 'md')}</a>
@@ -2121,7 +2147,7 @@ function viewMethod() {
 // ADMIN
 // =====================================================================
 function ctx() {
-  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl, apiBase, NOTRACK_KEY, loadP };
+  return { S, C, esc, toast, emblem, avatar, badge, fmtR, dec, int, ago, getJSON, loadPlayers, loadSearch, applySettings, refreshData, renderChrome, go, isAdmin, ADMIN_KEY, rank, RANK_KEYS, setOfficial, supportUrl, apiBase, NOTRACK_KEY, loadP, navTo, curHash };
 }
 async function viewAdmin(tok) {
   MAIN.innerHTML = skeletonList(4);
@@ -2172,12 +2198,37 @@ setInterval(async () => {
 }, 90_000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.booted && S.index && Date.now() - Date.parse(S.index.updated) > 5 * 60_000) getJSON('data/index.json', true).then((idx) => { if (idx.updated !== S.ver) { if (canAutoApply()) refreshData(false, true); else $('#newbar').hidden = false; } }).catch(() => {}); });
 
+// ---------- enlaces sin # ----------
+// Las plantillas siguen escribiendo href="#jugadores", "#j-123"...: aquí se cambian por la dirección limpia en el
+// idioma de la web (para pasar el ratón, copiar el enlace o abrirlo en otra pestaña) y los clics navegan sin recargar.
+function fixLinks(root) {
+  const fix = (a) => { const h = a.getAttribute('href'); if (!h || h.length < 2 || h.startsWith('#lg-')) return; const u = pathFor(h, LANG); if (u) a.setAttribute('href', u); };
+  if (root.matches && root.matches('a[href^="#"]')) fix(root);
+  if (root.querySelectorAll) root.querySelectorAll('a[href^="#"]').forEach(fix);
+}
+fixLinks(document.body);
+new MutationObserver((muts) => { for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1) fixLinks(n); })
+  .observe(document.body, { childList: true, subtree: true });
+document.addEventListener('click', (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest && e.target.closest('a[href]'); if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+  const href = a.getAttribute('href') || '';
+  let k = null;
+  if (href.startsWith('#') && href.length > 1 && !href.startsWith('#lg-')) k = href.slice(1);
+  else if (href.startsWith('/') && !href.startsWith('//') && !/^\/(data|assets|api)\//.test(href)) k = keyFor(href);
+  if (k == null) return;
+  e.preventDefault();
+  if (('#' + k) === (curHash() || '#')) { window.scrollTo({ top: 0, behavior: REDUCED.matches ? 'auto' : 'smooth' }); return; }
+  navTo('#' + k);
+});
+
 // ---------- precarga al señalar un enlace (ratón encima o dedo apoyado) ----------
 (() => {
   let hov = 0;
   const warm = (a) => {
     if (!S.index || S.index.v !== 3) return;
-    const h = decodeURIComponent((a.getAttribute('href') || '').slice(1));
+    const href = a.getAttribute('href') || '';
+    const h = href.startsWith('#') ? decodeURIComponent(href.slice(1)) : (keyFor(href) || '');
     try {
       if (h.startsWith('m-')) { const m = parseMatch(h); if (m) loadMatch(m.key, m.id).catch(() => {}); }
       else if (h.startsWith('j-')) Promise.all([loadP(h.slice(2)), loadAttr()]).catch(() => {});
@@ -2189,7 +2240,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
       else if (h === 'eusl') loadEusl().catch(() => {});
     } catch {}
   };
-  const target = (e) => e.target.closest && e.target.closest('a[href^="#"]');
+  const target = (e) => e.target.closest && e.target.closest('a[href^="#"], a[href^="/"]:not([href^="//"])');
   document.addEventListener('pointerover', (e) => { const a = target(e); if (!a || e.pointerType === 'touch') return; clearTimeout(hov); hov = setTimeout(() => warm(a), 70); }, { passive: true });
   document.addEventListener('pointerout', () => clearTimeout(hov), { passive: true });
   document.addEventListener('touchstart', (e) => { const a = target(e); if (a) warm(a); }, { passive: true });
@@ -2209,7 +2260,7 @@ function moved() {
       const q = new URLSearchParams(location.search);
       try { const h = document.referrer ? new URL(document.referrer).hostname : ''; if (h && h !== location.hostname && !q.has('rf')) q.set('rf', h); } catch {}
       const qs = q.toString();
-      location.replace(u.origin + u.pathname + (qs ? '?' + qs : '') + location.hash); return true;
+      location.replace(u.origin + location.pathname + (qs ? '?' + qs : '') + location.hash); return true;
     }
   } catch {}
   return false;

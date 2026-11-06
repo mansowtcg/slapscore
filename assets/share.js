@@ -149,17 +149,36 @@ export async function awardImage(kind, A, X) {
   const ranks = await Promise.all(L.map((x) => loadImg(X.rankSrc(x.rk))));
   fit(c, (kind === 'week' ? X.t('Equipo de la semana') : X.t('Jugador del mes')).toUpperCase(), W / 2, 236, W - 120, 800, 76, 'center');
   if (kind === 'week') {
-    L.slice(0, 3).forEach((x, i) => {
-      const y = 300 + i * 290;
-      c.fillStyle = i === 0 ? 'rgba(224,168,0,.14)' : 'rgba(255,255,255,.06)'; rr(c, 60, y, W - 120, 260, 30); c.fill();
-      avatar(c, x.n, x.id, 96, y + 55, 150);
-      medal(i, 228, y + 70, 54);
-      fit(c, x.n, 280, y + 112, 470, 800, 60);
-      if (ranks[i]) c.drawImage(ranks[i], 280, y + 136, 64, 64);
-      c.font = F(600, 28); c.fillStyle = COL.muted; c.textAlign = 'left';
-      c.fillText(X.t('{n} partidos', { n: X.int(x.gp) }) + ` · ${pct(x)} ` + X.t('victorias'), ranks[i] ? 356 : 280, y + 178);
-      c.fillText(`${X.int(x.g)} ${X.t('goles')} · ${X.int(x.as)} ${X.t('asistencias')} · ${X.int(x.mvp)} MVP`, 280, y + 226);
-      badge(c, x.rt, W - 60 - 36 - 190, y + 75, 190, 110, X.fmtR);
+    // en la pista, como una alineación: dos delante y atrás el que más defiende
+    const W3 = L.slice(0, 3);
+    const def = (x) => ((x.sv || 0) + (x.bl || 0) * 0.5) / (x.gp || 1);
+    const back = W3.length === 3 ? W3.reduce((b, x) => (def(x) > def(b) ? x : b), W3[0]) : null;
+    const order = back ? [...W3.filter((x) => x !== back), back] : W3;
+    const RX = 90, RY = 290, RW = W - 180, RH = 960;
+    c.save();
+    c.beginPath(); c.moveTo(RX, RY); c.lineTo(RX + RW, RY); c.lineTo(RX + RW, RY + RH - 200); c.arcTo(RX + RW, RY + RH, RX + RW - 200, RY + RH, 200); c.lineTo(RX + 200, RY + RH); c.arcTo(RX, RY + RH, RX, RY + RH - 200, 200); c.closePath();
+    c.fillStyle = '#EEF3FB'; c.fill(); c.lineWidth = 6; c.strokeStyle = '#C9D6EA'; c.stroke(); c.clip();
+    const ln = (y, col, w) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(RX, y); c.lineTo(RX + RW, y); c.stroke(); };
+    ln(RY + 10, 'rgba(229,57,53,.75)', 10); ln(RY + 220, 'rgba(55,77,245,.6)', 12); ln(RY + RH - 90, 'rgba(229,57,53,.55)', 5);
+    c.strokeStyle = 'rgba(229,57,53,.4)'; c.lineWidth = 4;
+    for (const fx of [0.27, 0.73]) { c.beginPath(); c.arc(RX + RW * fx, RY + 650, 85, 0, Math.PI * 2); c.stroke(); }
+    c.fillStyle = 'rgba(55,77,245,.16)'; c.beginPath(); c.ellipse(W / 2, RY + RH - 90, 80, 40, 0, Math.PI, 0); c.fill(); c.strokeStyle = 'rgba(229,57,53,.55)'; c.stroke();
+    c.restore();
+    const slots = order.length === 3 ? [[0.27, 0.28], [0.73, 0.28], [0.5, 0.62]] : [[0.3, 0.4], [0.7, 0.4]];
+    order.forEach((x, k) => {
+      const cx = RX + RW * slots[k][0], cy = RY + RH * slots[k][1], i = W3.indexOf(x);
+      const d = 190;
+      c.save(); c.shadowColor = 'rgba(0,0,0,.25)'; c.shadowBlur = 24; c.shadowOffsetY = 8;
+      c.fillStyle = i === 0 ? '#F5B400' : '#fff'; c.beginPath(); c.arc(cx, cy, d / 2 + 9, 0, Math.PI * 2); c.fill(); c.restore();
+      avatar(c, x.n, x.id, cx - d / 2, cy - d / 2, d);
+      badge(c, x.rt, cx + 34, cy - d / 2 - 14, 130, 74, X.fmtR);
+      if (i === 0) medal(0, cx - d / 2 + 10, cy - d / 2 + 10, 52);
+      const name = x.n; c.font = F(800, 40); const tw = Math.min(330, c.measureText(name).width) + (ranks[i] ? 58 : 0) + 44;
+      c.fillStyle = '#fff'; rr(c, cx - tw / 2, cy + d / 2 + 18, tw, 62, 31); c.fill();
+      if (ranks[i]) c.drawImage(ranks[i], cx - tw / 2 + 16, cy + d / 2 + 26, 46, 46);
+      fit(c, name, cx + (ranks[i] ? 29 : 0), cy + d / 2 + 63, 330, 800, 40, 'center', '#121A33');
+      c.font = F(700, 26); c.fillStyle = '#5B6785'; c.textAlign = 'center';
+      c.fillText(X.t('{n} partidos', { n: X.int(x.gp) }) + ` · ${pct(x)} ` + X.t('victorias'), cx, cy + d / 2 + 118);
     });
   } else {
     const x = L[0];

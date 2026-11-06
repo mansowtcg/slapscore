@@ -6,7 +6,7 @@
 //  4) cada 30 minutos comprueba que el robot sigue en marcha: las pasadas van encadenadas
 //     (cada una deja en cola la siguiente) y, si la cadena se ha cortado, la vuelve a lanzar, y
 //  5) si la web deja de actualizarse, avisa al administrador por email (alerts.js), y
-//  6) sirve las direcciones /j/<id> y /m/<id> con la vista previa de ese jugador o partido (preview.js), y
+//  6) sirve la web en todas sus direcciones (/players, /jugador/123...), con la vista previa de cada página (preview.js), y
 //  7) recibe los avisos de Ko-fi para poner la insignia ♥ Supporter (kofi.js), y
 //  8) manda los avisos en el móvil de los jugadores favoritos (push.js, cada 3 minutos).
 //
@@ -259,8 +259,9 @@ export default {
     if (path === '/api/alerts' || path === '/api/alerts/test') return alerts(request, env, path);
     if (path === '/api/kofi' || path.startsWith('/api/kofi/')) return kofi(request, env, path);
     if (path.startsWith('/api/push/')) return push(request, env, path);
-    // /j/<id> y /m/<id>: la web con el título, la descripción y la imagen de ese jugador o partido (vista previa de los enlaces)
-    if (path.startsWith('/j/') || path.startsWith('/m/')) { const r = await preview(request, env, ctx, path); if (r) return r; }
+    // Páginas de la web (/players, /jugador/123, /match/..., en cualquier idioma): index.html con el título, la descripción
+    // y la imagen de esa página (vista previa de los enlaces). Lo que parece un archivo y no existe: 404 normal.
+    if ((request.method === 'GET' || request.method === 'HEAD') && !path.startsWith('/api/') && !/\.[a-z0-9]{1,8}$/i.test(path)) return preview(request, env, ctx, path);
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {

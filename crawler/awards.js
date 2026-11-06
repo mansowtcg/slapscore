@@ -24,7 +24,7 @@ export async function computeAwards(io, state = {}) {
     for (let d = ym + '-01'; d <= end; d = dayAdd(d, 1)) add(t, await day(d));
     return t;
   }
-  const row = (pid, a) => { const i = io.info(pid) || {}; return { id: pid, n: i.n || pid, rk: i.rk || '', gp: a[0], w: a[1], mvp: a[4], rt: Math.round((a[5] / a[0]) * 100) / 100, g: a[6], as: a[7] }; };
+  const row = (pid, a) => { const i = io.info(pid) || {}; return { id: pid, n: i.n || pid, rk: i.rk || '', gp: a[0], w: a[1], mvp: a[4], rt: Math.round((a[5] / a[0]) * 100) / 100, g: a[6], as: a[7], sv: a[9], bl: a[12] }; };   // paradas y bloqueos: para colocarlos en la pista
   const ranked = (t, min, n = 10) => [...t.entries()]
     .filter(([pid, a]) => a[0] >= min && /^\d{1,12}$/.test(pid) && !io.hidden.has(pid))
     .map(([pid, a]) => row(pid, a)).sort((x, y) => y.rt - x.rt || y.gp - x.gp || (x.id < y.id ? -1 : 1)).slice(0, n);

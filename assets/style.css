@@ -1196,4 +1196,24 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .nw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .nw-grid .card{margin:0}
 .nw-foot{margin:24px 0 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+/* ---------- equipo de la semana en la pista ---------- */
+.tw-box{padding:4px 16px 14px}
+.tw-rink{position:relative;width:100%;max-width:340px;margin:0 auto;aspect-ratio:100/112}
+.tw-rink.big{max-width:430px}
+.tw-rink svg{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.08))}
+.tw-p{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;width:104px;text-align:center;color:var(--fg);text-decoration:none!important}
+.tw-p .av{box-shadow:0 0 0 3px var(--surface),0 4px 12px rgba(0,0,0,.2);transition:transform .2s var(--ease)}
+.tw-p:hover .av{transform:scale(1.07)}
+.tw-p.best .av{box-shadow:0 0 0 3px #F5B400,0 4px 14px rgba(245,180,0,.35)}
+.tw-p .rt{position:absolute;top:-4px;left:calc(50% + 14px);height:20px;min-width:30px;font-size:12.5px}
+.tw-rink.big .tw-p .rt{left:calc(50% + 20px);height:22px;font-size:13.5px}
+.tw-p .tw-star{position:absolute;top:-6px;left:calc(50% - 34px);width:20px;height:20px;border-radius:50%;background:#F5B400;color:#fff;display:grid;place-items:center;box-shadow:0 0 0 2px var(--surface)}
+.tw-rink.big .tw-p .tw-star{left:calc(50% - 42px)}
+.tw-p .tw-star svg{width:12px;height:12px;fill:#fff;stroke:#fff}
+.tw-p .nm{display:flex;align-items:center;gap:4px;max-width:104px;font-size:12px;font-weight:800;background:var(--surface);padding:2px 8px;border-radius:999px;box-shadow:var(--shadow-1)}
+.tw-p .nm .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tw-p small{font-size:10.5px;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--surface) 75%,transparent);padding:0 6px;border-radius:999px}
+.tw-rink.big .tw-p{width:130px}
+.tw-rink.big .tw-p .nm{max-width:130px;font-size:13px}
+@media (max-width:400px){.tw-p{width:92px}.tw-p .nm{max-width:92px;font-size:11px}}
 

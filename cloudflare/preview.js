@@ -3,6 +3,7 @@
 // web (index.html) pero con su título, descripción e imagen en las etiquetas <meta>. Los robots de las redes leen
 // esas etiquetas; las personas ven la web normal (la app entiende esas direcciones). Va en inglés, como la web por defecto.
 import { bucketOf, aggObj } from '../assets/core.js';
+import { keyFor, pathFor, langOfPath } from '../assets/routes.js';
 
 const SITE = 'https://slapscore.app';
 const TIER = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold', PLAT: 'Platinum', DIAMOND: 'Diamond', LEGEND: 'Legend' };
@@ -16,11 +17,31 @@ const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&qu
 // sin caracteres de control ni de dirección del texto (los nombres de jugador los escribe cualquiera)
 const tidy = (s, max = 300) => String(s ?? '').replace(/[\u0000-\u001F\u007F‎‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 
+// Dirección -> qué página es (cualquier idioma, las cortas /j/ y /m/ y las antiguas; routes.js). null: no es de la web
 export function parsePath(path) {
-  let m = /^\/j\/(\d{1,12})$/.exec(path);
-  if (m) return { kind: 'player', pid: m[1] };
-  m = /^\/m\/(\d{4})(\d{2})(\d{2})(\d{2})-([0-9a-f-]{8,64})$/i.exec(path);
-  if (m) return { kind: 'match', d: `${m[1]}-${m[2]}-${m[3]}`, hh: m[4], id: m[5].toLowerCase() };
+  const k = keyFor(path); if (k == null) return null;
+  let m = /^j-(\d{1,12})$/.exec(k);
+  if (m) return { kind: 'player', key: k, pid: m[1] };
+  m = /^m-(\d{4})(\d{2})(\d{2})(\d{2})-([0-9a-f-]{8,64})$/i.exec(k);
+  if (m) return { kind: 'match', key: k, d: `${m[1]}-${m[2]}-${m[3]}`, hh: m[4], id: m[5].toLowerCase() };
+  return { kind: 'page', key: k };
+}
+// Título y descripción de cada sección (en inglés, como la web por defecto)
+const PAGE_META = {
+  jugadores: ['Players', 'Every Slapshot: Rebound player with recorded matches: ratings, stats and form, sortable by any column.'],
+  rankings: ['Rankings', 'The best Slapshot: Rebound players in every stat.'],
+  records: ['Records', 'The best single-match performances and longest streaks in Slapshot: Rebound.'],
+  premios: ['Awards', 'Slapshot: Rebound team of the week and player of the month, by average rating.'],
+  eusl: ['EUSL', 'European Slapshot League standings, results and top scorers.'],
+  notas: ['How we rate', 'How SlapScore rates every Slapshot: Rebound player from 3 to 10 in every match.'],
+  novedades: ["What's new", 'Everything you can do on SlapScore, and the latest additions.'],
+  legal: ['Legal & privacy', 'Legal notice and privacy policy of SlapScore.'],
+};
+function pageMeta(key) {
+  if (PAGE_META[key]) return { title: PAGE_META[key][0], desc: PAGE_META[key][1], url: SITE + pathFor(key, 'en') };
+  let m = /^d-(\d{4}-\d{2}-\d{2})$/.exec(key);
+  if (m) return { title: `Matches on ${date(Date.parse(m[1] + 'T12:00:00Z'))}`, desc: 'Every public and custom Slapshot: Rebound match of the day, with ratings for every player.', url: SITE + pathFor(key, 'en') };
+  if (/^cmp-/.test(key)) return { title: 'Compare players', desc: 'Two Slapshot: Rebound players head to head: per-match stats, attributes and results against each other.', url: SITE + pathFor(key, 'en') };
   return null;
 }
 
@@ -66,7 +87,7 @@ export async function playerMeta(env, pid) {
   return {
     title: rank ? `${name} · ${rank}` : name,
     desc: (bits.length ? bits.join(' · ') + '. ' : '') + 'Ratings, form and match history on SlapScore.',
-    image: img, small: !!img, url: `${SITE}/j/${pid}`,
+    image: img, small: !!img, url: SITE + pathFor('j-' + pid, 'en'),
   };
 }
 
@@ -84,7 +105,7 @@ export async function matchMeta(env, d, hh, id) {
   return {
     title: `Home ${s[0]}–${s[1]} Away · ${where}`,
     desc: tidy([`Home: ${team(0) || '—'}.`, `Away: ${team(1) || '—'}.`, mvp ? `MVP: ${mvp.name} (${r1(mvp.rating || 0)}).` : '', e.t ? date(e.t) + '.' : ''].filter(Boolean).join(' '), 600),
-    image: null, small: false, url: `${SITE}/m/${d.replace(/-/g, '')}${hh}-${id}`,
+    image: null, small: false, url: SITE + pathFor(`m-${d.replace(/-/g, '')}${hh}-${id}`, 'en'),
   };
 }
 
@@ -104,9 +125,10 @@ export function withMeta(html, m) {
   return html;
 }
 
-// Respuesta para /j/... y /m/... (null si la dirección no es de esas)
+// La web en cualquiera de sus direcciones (/players, /jugador/123, /match/...): index.html con el título, la descripción
+// y la imagen de esa página. Si la dirección no es de la web, la misma página con error 404 (la web enseña la portada).
 export async function preview(request, env, ctx, path) {
-  const p = parsePath(path); if (!p) return null;
+  const p = parsePath(path);
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } });
   const cache = typeof caches !== 'undefined' ? caches.default : null;
   const key = new Request(SITE + path);
@@ -114,14 +136,23 @@ export async function preview(request, env, ctx, path) {
   const base = await env.ASSETS.fetch(new Request(SITE + '/'));
   let html = await base.text();
   let m = null;
-  try { m = p.kind === 'player' ? await playerMeta(env, p.pid) : await matchMeta(env, p.d, p.hh, p.id); } catch (e) { console.log('vista previa: ' + (e && e.message)); }
+  try { m = !p ? null : p.kind === 'player' ? await playerMeta(env, p.pid) : p.kind === 'match' ? await matchMeta(env, p.d, p.hh, p.id) : pageMeta(p.key); } catch (e) { console.log('vista previa: ' + (e && e.message)); }
   if (m) html = withMeta(html, m);
+  // cada página existe en 5 idiomas: la dirección abierta es la buena (canonical) y se enlazan las demás (hreflang)
+  if (p && p.key !== 'admin' && p.key !== 'entrada-ibai' && pathFor(p.key, 'en')) {
+    const lang = langOfPath(path) || 'en', alt = (l) => SITE + pathFor(p.key, l);
+    html = html.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${escAttr(alt(lang))}$2`).replace(/<html lang="[a-z]+"/, `<html lang="${lang}"`);
+    const links = ['en', 'es', 'fr', 'de', 'pt'].map((l) => `<link rel="alternate" hreflang="${l}" href="${escAttr(alt(l))}">`).join('') + `<link rel="alternate" hreflang="x-default" href="${escAttr(alt('en'))}">`;
+    html = html.replace('</head>', links + '</head>');
+  }
+  // el panel de administrador, las direcciones que no existen y los jugadores o partidos que no están no salen en los buscadores
+  if (!p || p.key === 'admin' || p.key === 'entrada-ibai' || (!m && (p.kind === 'player' || p.kind === 'match'))) html = html.replace('</head>', '<meta name="robots" content="noindex"></head>');
   // mismas cabeceras de seguridad que la portada (vienen de _headers); se guarda 10 minutos
   const h = new Headers(base.headers);
   for (const k of ['content-length', 'etag', 'last-modified', 'content-encoding']) h.delete(k);
   h.set('content-type', 'text/html; charset=utf-8');
   h.set('cache-control', 'public, max-age=600');
-  const res = new Response(request.method === 'HEAD' ? null : html, { status: base.ok ? 200 : base.status, headers: h });
-  if (cache && base.ok && request.method === 'GET') { const put = cache.put(key, res.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(put); }
+  const res = new Response(request.method === 'HEAD' ? null : html, { status: !base.ok ? base.status : p ? 200 : 404, headers: h });
+  if (cache && base.ok && p && request.method === 'GET') { const put = cache.put(key, res.clone()).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(put); }
   return res;
 }
