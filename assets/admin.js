@@ -101,6 +101,7 @@ export async function mount(root, ctx) {
     </div>
     <div class="col">
       <div class="card in" id="inbox-card"><div class="card-h"><h3>Buzón de sugerencias</h3><button class="btn sm" type="button" id="inbox-reload">Actualizar</button></div><div id="inbox"><div class="card-b"><div class="sk" style="height:90px"></div></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Ko-fi</h3><small>insignia ♥ automática al apoyar</small></div><div id="kofi"><div class="card-b"><div class="sk" style="height:80px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Supporters</h3><small>apoyan el proyecto: insignia ♥ y sus partidos al momento</small></div><div id="sups"><div class="card-b"><div class="sk" style="height:60px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan en cada pasada</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
@@ -131,7 +132,7 @@ export async function mount(root, ctx) {
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
-  loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts();
+  loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts(); loadKofi();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
   try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawExtra(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'sups', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
@@ -194,6 +195,43 @@ async function loadAlerts() {
     catch (ex) { X.toast(ex.message); }
     b.disabled = false; b.textContent = 'Enviar prueba';
   });
+}
+
+// ---------- Ko-fi ----------
+const KOFI_HOOK = 'https://slapscore.app/api/kofi';
+async function loadKofi() {
+  const el = $('#kofi'); if (!el) return;
+  const { esc, ago, int } = X;
+  let k;
+  try { k = await workerApi('/api/kofi'); } catch (e) { el.innerHTML = `<div class="card-b err">${esc(e.message)}</div>`; return; }
+  let P = {}; try { P = await X.loadPlayers(); } catch {}
+  const pname = (id) => (P[id] ? P[id].n : 'Jugador ' + id);
+  const pidIn = (v) => { const m = /#j-(\d{1,12})\b/.exec(v) || /\/j\/(\d{1,12})\b/.exec(v) || /players\/(\d{1,12})/.exec(v) || /^(\d{1,12})$/.exec(v.trim()); return m ? m[1] : ''; };
+  const setup = `<div class="card-b kofi-setup"><p class="muted" style="margin-top:0">${k.configured ? '<b class="ok-t">Conectado.</b> Cada apoyo aparece aquí. Si el mensaje lleva el ID o el enlace del perfil de slapshot.gg, la insignia ♥ se pone sola; si no, asígnala tú.' : 'Para que la insignia ♥ se ponga sola cuando alguien apoya:'}</p>
+    ${k.configured ? '' : `<ol class="steps"><li>En Ko-fi, abre <a href="https://ko-fi.com/manage/webhooks" target="_blank" rel="noopener">Ajustes → API (webhooks)</a>.</li><li>En «Webhook URL» pega esta dirección y pulsa «Update»: <code class="kofi-url">${esc(KOFI_HOOK)}</code> <button class="btn sm" type="button" data-copy="${esc(KOFI_HOOK)}">Copiar</button></li><li>Abre «Advanced», copia el «Verification Token» y pégalo aquí abajo.</li><li>Prueba con «Send Single Donation Test»: el apoyo de prueba aparece en esta lista.</li></ol>`}
+    <form id="kofi-tk" class="al-form"${k.configured ? ' hidden' : ''}><input class="input" id="kofi-tk-in" type="password" autocomplete="off" aria-label="Verification Token de Ko-fi" placeholder="Verification Token de Ko-fi"><button class="btn primary" type="submit">Guardar</button></form>
+    ${k.configured ? '<button class="btn sm" type="button" id="kofi-tk-show">Cambiar la clave de Ko-fi</button>' : ''}</div>`;
+  const items = k.items || [];
+  const list = items.length ? `<div class="kofi-list">${items.map((x) => `<div class="kofi-it" data-key="${esc(x.key)}">
+      <div class="kofi-h"><b>${esc(x.name)}</b><span class="kofi-amt">${esc(x.amount)} ${esc(x.cur)}</span><span class="muted">${esc(x.tier || (x.sub ? 'Suscripción' : x.type || 'Apoyo'))} · ${esc(ago(x.t))}</span><button class="ibtn-s" type="button" data-kofi-del="${esc(x.key)}" aria-label="Borrar este apoyo" title="Borrar">✕</button></div>
+      ${x.msg ? `<p class="kofi-msg">${esc(x.msg)}</p>` : ''}
+      ${x.pid ? `<p class="kofi-pid"><span class="sup">♥</span> ${esc(pname(x.pid))} <small>ID ${esc(x.pid)}</small></p>`
+        : `<form class="al-form" data-kofi-as="${esc(x.key)}"><input class="input" aria-label="Jugador" placeholder="ID o enlace del perfil${x.cand ? ' (en el mensaje: ' + esc(x.cand) + ', no está en SlapScore)' : ''}"><button class="btn sm primary" type="submit">Dar insignia</button></form>`}
+    </div>`).join('')}</div>` : `<div class="card-b muted">${k.configured ? 'Aún no ha llegado ningún apoyo.' : ''}</div>`;
+  const sups = (k.supporters || []);
+  const supl = sups.length ? `<div class="card-b" style="border-top:1px solid var(--line);padding-top:12px"><b style="font-size:13px">Supporters por Ko-fi (${int(sups.length)})</b>${sups.map((id) => `<div class="seedrow">${X.avatar(pname(id), id, 'sm')}<span class="nm">${esc(pname(id))} <span class="sup">♥</span><small>ID ${esc(id)}</small></span><button class="btn sm" type="button" data-kofi-rm="${esc(id)}">Quitar</button></div>`).join('')}</div>` : '';
+  el.innerHTML = setup + list + supl;
+  const post = async (path, body, okMsg) => { try { await workerApi(path, { method: 'POST', body: JSON.stringify(body) }); X.toast(okMsg); loadKofi(); } catch (e) { X.toast(e.message); } };
+  const tk = $('#kofi-tk', el);
+  tk.addEventListener('submit', (e) => { e.preventDefault(); const v = $('#kofi-tk-in', el).value.trim(); if (v) post('/api/kofi/token', { token: v }, 'Clave de Ko-fi guardada'); });
+  const show = $('#kofi-tk-show', el); if (show) show.addEventListener('click', () => { tk.hidden = false; show.hidden = true; $('#kofi-tk-in', el).focus(); });
+  $$('[data-kofi-as]', el).forEach((f) => f.addEventListener('submit', (e) => {
+    e.preventDefault(); const pid = pidIn($('input', f).value);
+    if (!pid) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
+    post('/api/kofi/assign', { key: f.getAttribute('data-kofi-as'), pid }, 'Insignia ♥ dada: sale en la web en unos minutos');
+  }));
+  $$('[data-kofi-rm]', el).forEach((b) => b.addEventListener('click', () => post('/api/kofi/remove', { pid: b.getAttribute('data-kofi-rm') }, 'Quitado de supporters')));
+  $$('[data-kofi-del]', el).forEach((b) => b.addEventListener('click', () => post('/api/kofi/delete', { key: b.getAttribute('data-kofi-del') }, 'Apoyo borrado de la lista')));
 }
 
 // ---------- buzón de sugerencias ----------

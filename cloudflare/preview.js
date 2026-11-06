@@ -44,6 +44,13 @@ async function rankImage(env, rk) {
   return f && /^[\w.-]+\.png$/.test(f) ? `${SITE}/assets/ranks/${f}` : null;
 }
 
+// ¿Está este jugador en SlapScore? (tiene perfil guardado)
+export async function playerExists(env, pid) {
+  if (!/^\d{1,12}$/.test(String(pid))) return false;
+  const b = await gzJSON(env, `/data/p/${bucketOf(String(pid))}.json.gz`);
+  return !!(b && b[pid]);
+}
+
 export async function playerMeta(env, pid) {
   const b = await gzJSON(env, `/data/p/${bucketOf(pid)}.json.gz`);
   const P = b && b[pid]; if (!P || !P.n) return null;

@@ -50,7 +50,10 @@ const wHash = hash(JSON.stringify(W));
 const RETAIN = Math.max(35, Math.min(400, Number(settings.retainDays) || 60));
 // seguidos: los de la lista y los supporters (apoyan el proyecto): sus partidos se buscan en cada pasada mientras juegan.
 // Solo cambia lo pronto que aparecen sus partidos; las notas, tablas y rankings son iguales para todos.
-const seeds = [...new Set([...(settings.seeds || []), ...(Array.isArray(settings.supporters) ? settings.supporters : [])].map(String))];
+// supporters: los de los ajustes y los de Ko-fi (los recibe el Worker; el flujo los baja a _int/kofi.json antes de la pasada)
+const kofiSup = await readJSON(path.join(INT, 'kofi.json'), []);
+const supporters = [...new Set([...(Array.isArray(settings.supporters) ? settings.supporters : []), ...(Array.isArray(kofiSup) ? kofiSup : [])].map(String).filter((x) => /^\d{1,12}$/.test(x)))];
+const seeds = [...new Set([...(settings.seeds || []), ...supporters].map(String))];
 // Jugadores ocultos: han pedido no aparecer (privacidad). Sus partidos siguen, pero sin su nombre ni su ID:
 // en su lugar sale «—», sin perfil, sin estadísticas y sin entrar en tablas, rankings ni récords.
 const HIDDEN_NAME = '—';
@@ -920,6 +923,8 @@ await fs.writeFile(path.join(DATA, 'index.json'), JSON.stringify({
     tracked: Object.values(players).filter((p) => p.chk && !p.gone).length, ranked: Object.values(players).filter((p) => p.mmr != null).length,
     rankChecked: Object.values(players).filter((p) => p.rchk).length, rankBacklog: backlog,
   },
+  // supporters (ajustes + Ko-fi), para la insignia ♥ de la web
+  sup: supporters.filter((id) => !hidP.has(id)),
   lastRun, runs, days: dayList,
 }));
 

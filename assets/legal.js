@@ -17,7 +17,7 @@ const ES = {
       <ul><li><b>Para qué:</b> resultados, estadísticas, perfiles, rankings, récords y comparativas.</li>
       <li><b>Base legal:</b> interés legítimo (art. 6.1.f del RGPD) en ofrecer información estadística sobre un juego cuyos datos ya son públicos.</li>
       <li><b>Cuánto tiempo:</b> el detalle completo de cada partido se muestra 60 días; después quedan sus resúmenes y una copia del partido completo en el archivo público del repositorio de GitHub de SlapScore. Cada perfil muestra los últimos 400 partidos.</li></ul>
-      <p>Si apoyas el proyecto y pides la insignia de Supporter, se muestra en tu perfil y junto a tu nombre; puedes pedir que se quite cuando quieras.</p>
+      <p>Si apoyas el proyecto en Ko-fi, Ko-fi nos avisa del apoyo con el nombre que muestras allí, el importe, el tipo de apoyo, la fecha y tu mensaje (no tu email ni tus datos de pago, que solo tiene Ko-fi). Lo usamos solo para darte la insignia de Supporter: si el mensaje lleva el ID o el enlace de tu perfil de slapshot.gg, se pone sola. Esos datos se borran a los dos años, o antes si lo pides. La insignia se muestra en tu perfil y junto a tu nombre; puedes pedir que se quite cuando quieras.</p>
       <p>Si eres jugador y no quieres aparecer, mira <a href="#legal" data-legal-go="jugadores">más abajo</a>.</p>`],
     ['visitas', 'Visitas a la web', `
       <p>Para saber cuánta gente usa SlapScore se cuentan las visitas <b>sin cookies y sin guardar la IP</b>. Por cada página vista se anota la página, la hora, el país aproximado (lo indica Cloudflare), el tipo de dispositivo, el nombre del navegador y del sistema, el idioma, la web desde la que llegas y algunas acciones (compartir, favoritos, sugerencias, instalar la app).</p>
@@ -36,7 +36,8 @@ const ES = {
     ['proveedores', 'Proveedores', `
       <ul><li><b>Cloudflare, Inc.</b> (EE. UU.): alojamiento, red, DNS, contador de visitas, buzón y reenvío del correo.</li>
       <li><b>GitHub, Inc.</b> (EE. UU.): código de la web, datos públicos de los partidos y su archivo.</li>
-      <li><b>Google</b> (Gmail): recibe los correos enviados a ${MAIL}.</li></ul>
+      <li><b>Google</b> (Gmail): recibe los correos enviados a ${MAIL}.</li>
+      <li><b>Ko-fi Labs Ltd</b> (Reino Unido): recibe los apoyos al proyecto y nos avisa de ellos (ver arriba).</li></ul>
       <p>Las transferencias fuera del Espacio Económico Europeo se amparan en el Marco de Privacidad de Datos UE-EE. UU. o en las cláusulas contractuales tipo de la Comisión Europea, según el proveedor. slapshot.gg y eusl.gg son las fuentes de los datos públicos y no reciben nada de tus visitas. No se venden ni se ceden datos a nadie.</p>`],
     ['derechos', 'Tus derechos', `
       <p>Puedes pedir acceso, rectificación, supresión, oposición, limitación o portabilidad de tus datos escribiendo a ${mail}. Se responde en un mes como máximo. Si no estás conforme con la respuesta, puedes reclamar ante la Agencia Española de Protección de Datos (<a href="https://www.aepd.es" target="_blank" rel="noopener">aepd.es</a>).</p>`],
@@ -60,7 +61,7 @@ const EN = {
       <ul><li><b>Why:</b> results, stats, profiles, rankings, records and comparisons.</li>
       <li><b>Legal basis:</b> legitimate interest (Art. 6(1)(f) GDPR) in providing statistics about a game whose data is already public.</li>
       <li><b>How long:</b> full match details are shown for 60 days; after that their summaries remain, and a copy of the full match is kept in the public archive of SlapScore's GitHub repository. Each profile shows the last 400 matches.</li></ul>
-      <p>If you support the project and ask for the Supporter badge, it is shown on your profile and next to your name; you can ask for it to be removed at any time.</p>
+      <p>If you support the project on Ko-fi, Ko-fi tells us about it with the name you show there, the amount, the type of support, the date and your message (not your email or payment details, which only Ko-fi has). We use this only to give you the Supporter badge: if your message includes the ID or link of your slapshot.gg profile, it is added automatically. This data is deleted after two years, or sooner if you ask. The badge is shown on your profile and next to your name; you can ask for it to be removed at any time.</p>
       <p>If you are a player and don't want to appear, see <a href="#legal" data-legal-go="jugadores">below</a>.</p>`],
     ['visitas', 'Visits to the site', `
       <p>To know how many people use SlapScore, visits are counted <b>without cookies and without storing your IP</b>. For each page view we record the page, the time, the approximate country (provided by Cloudflare), the device type, the browser and system name, the language, the site you came from and a few actions (share, favourites, feedback, installing the app).</p>
@@ -79,7 +80,8 @@ const EN = {
     ['proveedores', 'Providers', `
       <ul><li><b>Cloudflare, Inc.</b> (USA): hosting, network, DNS, visit counter, feedback box and email forwarding.</li>
       <li><b>GitHub, Inc.</b> (USA): the site's code, public match data and its archive.</li>
-      <li><b>Google</b> (Gmail): receives emails sent to ${MAIL}.</li></ul>
+      <li><b>Google</b> (Gmail): receives emails sent to ${MAIL}.</li>
+      <li><b>Ko-fi Labs Ltd</b> (UK): handles support for the project and notifies us of it (see above).</li></ul>
       <p>Transfers outside the European Economic Area rely on the EU-US Data Privacy Framework or on the European Commission's standard contractual clauses, depending on the provider. slapshot.gg and eusl.gg are the sources of the public data and receive nothing from your visits. No data is sold or shared with anyone.</p>`],
     ['derechos', 'Your rights', `
       <p>You can ask for access, rectification, erasure, objection, restriction or portability of your data by writing to ${mail}. We reply within one month at the latest. If you are not satisfied, you can complain to the Spanish Data Protection Agency (<a href="https://www.aepd.es" target="_blank" rel="noopener">aepd.es</a>) or your local authority.</p>`],

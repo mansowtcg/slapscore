@@ -59,6 +59,22 @@ jobs:
         with:
           # Wrangler (Publicar en Cloudflare) necesita Node 22 o superior
           node-version: 22
+      - name: Supporters de Ko-fi
+        if: steps.gate.outputs.go == 'true' && steps.gate.outputs.cf == 'true'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # La lista la guarda el Worker en el KV del buzón (cloudflare/kofi.js). Si no se puede leer, se usa la de la pasada anterior.
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          ns=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api?per_page=100" | jq -r '.result[] | select(.title=="slapscore-feedback") | .id' | head -1)
+          [ -n "$ns" ] || { echo "Sin almacén KV todavía"; exit 0; }
+          code=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -o "$RUNNER_TEMP/kofi.json" -w '%{http_code}' "$api/$ns/values/sys%3Asupporters")
+          mkdir -p data/_int
+          if [ "$code" = 200 ] && jq -e 'type == "array"' "$RUNNER_TEMP/kofi.json" >/dev/null; then cp "$RUNNER_TEMP/kofi.json" data/_int/kofi.json; echo "Supporters de Ko-fi: $(jq length data/_int/kofi.json)"
+          elif [ "$code" = 404 ]; then echo '[]' > data/_int/kofi.json; echo "Aún no hay supporters de Ko-fi"
+          else echo "::warning::No se pudo leer la lista de supporters de Ko-fi (respuesta $code)"; fi
       - name: Rastrear slapshot.gg
         if: steps.gate.outputs.go == 'true'
         env:

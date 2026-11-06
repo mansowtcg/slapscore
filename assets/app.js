@@ -20,12 +20,13 @@ function applySettings(s) {
   S.W = C.weightsFrom(S.settings.weights);
   // los ocultos se guardan como "día/hora|id" (o solo el id en ajustes antiguos)
   S.hidden = new Set((S.settings.hidden || []).map((h) => String(h).split('|').pop()));
-  S.sup = new Set((Array.isArray(S.settings.supporters) ? S.settings.supporters : []).map(String));
+  S.sup = new Set([...(Array.isArray(S.settings.supporters) ? S.settings.supporters : []), ...((S.index && Array.isArray(S.index.sup)) ? S.index.sup : [])].map(String));
 }
 function setIndex(idx) {
   S.index = idx; S.ver = idx.updated;
   S.dayMap = new Map((idx.days || []).map((d) => [d.d, d]));
   S.featured = new Set((idx.featured || []).map(String));
+  if (Array.isArray(idx.sup)) idx.sup.forEach((id) => S.sup && S.sup.add(String(id)));   // supporters de Ko-fi (los junta el robot)
 }
 
 // ---------- favoritos (solo en este navegador) ----------
