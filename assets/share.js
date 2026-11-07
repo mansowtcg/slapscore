@@ -5,6 +5,9 @@ const COL = { bg: '#0F1320', bg2: '#171C2E', line: 'rgba(255,255,255,.08)', fg: 
 const RT = [[9, '#374DF5', '#fff'], [8, '#008EA3', '#fff'], [7, '#189335', '#fff'], [6.5, '#D3A600', '#251D00'], [6, '#D86A00', '#fff'], [-1, '#D7261B', '#fff']];
 const rtCol = (r) => RT.find(([m]) => r >= m) || RT[RT.length - 1];
 const F = (w, s, cond) => `${w} ${s}px ${cond ? '"Sofia Sans Condensed", ' : ''}"Sofia Sans", system-ui, sans-serif`;
+// también las letras de otros alfabetos latinos (ğ ş İ ı ő ł…), que van en otro archivo de la fuente
+const SAMPLE = 'AaĞğŞşİıŁłŐő';
+const loadFonts = () => Promise.all([document.fonts.load(F(800, 40), SAMPLE), document.fonts.load(F(800, 40, true), SAMPLE), document.fonts.load(F(600, 30), SAMPLE)]).catch(() => {});
 
 function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 // texto que se encoge hasta caber en el ancho
@@ -50,7 +53,7 @@ function frame(c, X, sub) {
 }
 
 export async function matchImage(m, X) {
-  await Promise.all([document.fonts.load(F(800, 40)), document.fonts.load(F(800, 40, true)), document.fonts.load(F(600, 30))]).catch(() => {});
+  await loadFonts();
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   frame(c, X, X.date(m.t));
   fit(c, `${X.typeLabel(m.type)} · ${X.region(m.region)} · ${m.arena}`, W / 2, 196, 900, 700, 34, 'center', 'rgba(255,255,255,.8)');
@@ -75,7 +78,7 @@ export async function matchImage(m, X) {
     c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, y, W - 120, 56, 14); c.fill();
     crest(c, 78, y + 12, 32, tm === 'home' ? COL.home : COL.away, tm === 'home' ? X.teamL[0] : X.teamL[1]);
     c.font = F(800, 30); c.textAlign = 'left'; c.fillStyle = '#fff'; c.fillText(`${tm === 'home' ? X.t('Local') : X.t('Visitante')} · ${m.score[tm]}`, 124, y + 39);
-    if (win === tm) { c.font = F(800, 24); c.fillStyle = COL.win; c.textAlign = 'right'; c.fillText(X.t('Ganador').toUpperCase(), W - 84, y + 37); }
+    if (win === tm) { c.font = F(800, 24); c.fillStyle = COL.win; c.textAlign = 'right'; c.fillText(X.t('Ganador').toLocaleUpperCase(X.loc), W - 84, y + 37); }
     y += 64;
     for (const [p, i] of teams[k]) {
       const d = Math.round(rowH * 0.62), cy = y + rowH / 2;
@@ -96,7 +99,7 @@ export async function matchImage(m, X) {
 }
 
 export async function profileImage(P, X) {
-  await Promise.all([document.fonts.load(F(800, 40)), document.fonts.load(F(800, 40, true)), document.fonts.load(F(600, 30))]).catch(() => {});
+  await loadFonts();
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   const meta = P.meta || {}, a = P._a, games = P._g || [];
   frame(c, X, X.t('Perfil de jugador') + (P._mode === 'cus' ? ' · Custom' : ''));
@@ -113,9 +116,9 @@ export async function profileImage(P, X) {
   badge(c, avgR, 96, 478, 230, 134, X.fmtR);
   c.font = F(800, 44); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Nota media'), 364, 532);
   c.font = F(600, 30); c.fillStyle = COL.muted; c.fillText(X.t('{n} partidos analizados', { n: X.int(a.gp) }), 364, 580);
-  if (peak && meta.prk) { c.drawImage(peak, W - 60 - 150, 470, 150, 150); c.font = F(700, 22); c.textAlign = 'center'; c.fillStyle = COL.muted; c.fillText(X.t('Mejor rango').toUpperCase(), W - 60 - 75, 636); }
+  if (peak && meta.prk) { c.drawImage(peak, W - 60 - 150, 470, 150, 150); c.font = F(700, 22); c.textAlign = 'center'; c.fillStyle = COL.muted; c.fillText(X.t('Mejor rango').toLocaleUpperCase(X.loc), W - 60 - 75, 636); }
   // estadísticas
-  const pct = (x) => Math.round(x * 100) + '%';
+  const pct = (x) => X.pct(x);
   const cells = [[X.int(a.gp), X.t('Partidos')], [pct(a.gp ? a.w / a.gp : 0), X.t('Victorias')], [X.int(a.mvp), 'MVP'], [X.int(a.g), X.t('Goles')], [X.int(a.as), X.t('Asistencias')], [X.int(a.sv), X.t('Paradas')]];
   const cw = (W - 120 - 2 * 24) / 3;
   cells.forEach(([v, l], i) => {
@@ -140,14 +143,14 @@ export async function profileImage(P, X) {
 // Premios: equipo de la semana (los 3 mejores) o jugador del mes (con el 2.º y el 3.º)
 const MEDAL = ['#E0A800', '#B0B7C3', '#C27C4A'];
 export async function awardImage(kind, A, X) {
-  await Promise.all([document.fonts.load(F(800, 40)), document.fonts.load(F(800, 40, true)), document.fonts.load(F(600, 30))]).catch(() => {});
+  await loadFonts();
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   const L = A.list || [];
   frame(c, X, A.label);
-  const pct = (x) => Math.round((x.w / (x.gp || 1)) * 100) + '%';
+  const pct = (x) => X.pct(x.w / (x.gp || 1));
   const medal = (i, x, y, d) => { c.fillStyle = MEDAL[i]; c.beginPath(); c.arc(x, y, d / 2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.font = F(800, Math.round(d * 0.55)); c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(i + 1), x, y + 2); c.textBaseline = 'alphabetic'; };
   const ranks = await Promise.all(L.map((x) => loadImg(X.rankSrc(x.rk))));
-  fit(c, (kind === 'week' ? X.t('Equipo de la semana') : X.t('Jugador del mes')).toUpperCase(), W / 2, 236, W - 120, 800, 76, 'center');
+  fit(c, (kind === 'week' ? X.t('Equipo de la semana') : X.t('Jugador del mes')).toLocaleUpperCase(X.loc), W / 2, 236, W - 120, 800, 76, 'center');
   if (kind === 'week') {
     // en la pista, como una alineación: dos delante y atrás el que más defiende
     const W3 = L.slice(0, 3);

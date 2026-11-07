@@ -108,7 +108,7 @@ export function cleanHit(b, { ip, ua, cc }) {
     out.dev = ['m', 't', 'd'].includes(b.d) ? b.d : null;
     out.br = browser(ua); out.os = system(ua);
     out.lang = /^[a-z]{2,3}$/.test(b.l || '') ? b.l : null;
-    out.sl = b.s === 'es' || b.s === 'en' ? b.s : null;
+    out.sl = ['es', 'en', 'fr', 'de', 'pt', 'tr'].includes(b.s) ? b.s : null;   // idioma en que ve la web
     out.app = b.a ? 1 : 0;
   } else if (k === 1) {
     const n = Math.round(Number(b.n));

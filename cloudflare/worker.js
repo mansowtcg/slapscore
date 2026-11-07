@@ -113,7 +113,7 @@ async function feedback(request, env, path) {
       t, type, text,
       contact: clean(b.contact, MAX_CONTACT),
       page: clean(b.page, MAX_PAGE),
-      lang: ['en', 'es', 'fr', 'de', 'pt'].includes(b.lang) ? b.lang : 'es',
+      lang: ['en', 'es', 'fr', 'de', 'pt', 'tr'].includes(b.lang) ? b.lang : 'es',
     };
     // los mensajes se borran solos al año
     try { await KV.put(id, JSON.stringify(item), { expirationTtl: 365 * 86400 }); } catch { return json({ error: 'unavailable' }, 503, request, env); }

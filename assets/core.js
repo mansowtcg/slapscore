@@ -227,6 +227,7 @@ export function periodOrd(n, lang) {
   if (lang === 'fr') return n + (n === 1 ? 're' : 'e');
   if (lang === 'de') return n + '.';
   if (lang === 'pt') return n + 'º';
+  if (lang === 'tr') return n + '.';
   return n + (n === 1 || n === 3 ? '.er' : '.º');
 }
 // Partida completa a partir de sus periodos (registros de slapshot.gg, en orden). Devuelve lo mismo que normalize()

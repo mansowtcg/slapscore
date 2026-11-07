@@ -190,7 +190,7 @@ const NF0 = new Intl.NumberFormat(LOC), NF1 = nf(1), NF2 = nf(2);
 const fmtR = (r) => NF1.format(Math.round(r * 10) / 10);
 const dec = (x, d = 1) => (d === 2 ? NF2 : NF1).format(x || 0);
 const int = (x) => NF0.format(x || 0);
-const pct = (x) => Math.round((x || 0) * 100) + (LANG === 'en' || LANG === 'pt' ? '%' : ' %');
+const pct = (x) => { const n = Math.round((x || 0) * 100); return LANG === 'tr' ? '%' + n : n + (LANG === 'en' || LANG === 'pt' ? '%' : ' %'); };   // en turco, %95
 const pl = (n, one, many) => `${int(n)} ${t(n === 1 ? one : many)}`;
 const rcls = (r) => r >= 9 ? 'elite' : r >= 8 ? 'great' : r >= 7 ? 'good' : r >= 6.5 ? 'ok' : r >= 6 ? 'meh' : 'bad';
 const badge = (r, size) => `<span class="rt ${rcls(r)}${size ? ' ' + size : ''}">${fmtR(r)}</span>`;
@@ -215,7 +215,7 @@ const DF_LONGDAY = new Intl.DateTimeFormat(LOC, { weekday: 'long', day: 'numeric
 const today = () => C.madrid(Date.now()).day;
 const yesterday = () => C.madrid(Date.now() - 864e5).day;
 const dayDate = (d) => new Date(d + 'T12:00:00Z');
-const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
+const cap = (s) => s ? s[0].toLocaleUpperCase(LOC) + s.slice(1) : s;
 function dayShort(d) { if (d === today()) return t('Hoy'); if (d === yesterday()) return t('Ayer'); return cap(DF_WD.format(dayDate(d)).replace('.', '')); }
 const dayLong = (d) => d === today() ? t('Hoy') : d === yesterday() ? t('Ayer') : DF_LONGDAY.format(dayDate(d));
 const shortDate = (ms) => DF_SHORT.format(new Date(ms)).replace('.', '');
@@ -252,6 +252,8 @@ const ICON = {
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12.5a7.5 7.5 0 0 1-10.9 6.7L4 20.5l1.4-4.3A7.5 7.5 0 1 1 20 12.5Z"/><path d="M9 11h6M9 14.5h3.5"/></svg>',
@@ -283,7 +285,7 @@ APP.innerHTML = `
       <button class="ibtn" id="btn-install" type="button" aria-label="${esc(t('Instalar SlapScore'))}" title="${esc(t('Instalar la app'))}" hidden>${ICON.install}</button>
       <button class="ibtn" id="btn-fb" type="button" data-fb aria-label="${esc(t('Enviar una sugerencia'))}" title="${esc(t('Sugerencias y errores'))}">${ICON.chat}</button>
       <button class="ibtn" id="btn-refresh" type="button" aria-label="${esc(t('Actualizar datos'))}" title="${esc(t('Actualizar datos'))}">${ICON.refresh}</button>
-      <button class="ibtn lang" id="btn-lang" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Language · Idioma" title="Language · Idioma">${LANG.toUpperCase()}</button>
+      <div class="lang-dd" id="lang-dd"><button class="lang-btn" id="btn-lang" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="${esc(t('Idioma'))}: ${esc((LANGS.find(([k]) => k === LANG) || [])[1] || LANG)}" title="${esc(t('Idioma'))}">${ICON.globe}<span>${LANG.toUpperCase()}</span>${ICON.down}</button></div>
       <button class="ibtn" id="btn-theme" type="button" aria-label="${esc(t('Cambiar tema claro u oscuro'))}" title="${esc(t('Tema claro / oscuro'))}">${ICON.theme}</button>
       <a class="ibtn" id="btn-admin" href="#admin" aria-label="${esc(t('Panel de administrador'))}" title="${esc(t('Administrador'))}" hidden>${ICON.admin}</a>
     </div>
@@ -301,23 +303,36 @@ APP.innerHTML = `
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div id="sheet-root"></div>`;
 const MAIN = $('#main');
-// idioma: menú bajo el botón de la cabecera y lista en el pie
+// idioma: menú desplegable pegado al botón de la cabecera (y lista en el pie). Cada idioma con su nombre propio y,
+// debajo, cómo se llama en el idioma de la web. Se maneja con el teclado: flechas, Inicio/Fin, Esc y Tab.
+const LANG_NAMES = (() => { try { return new Intl.DisplayNames([LOC], { type: 'language' }); } catch { return null; } })();
 function langMenu(open) {
   const btn = $('#btn-lang'); let m = $('#lang-menu');
   if (!open) { if (m) m.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
-  m = document.createElement('div'); m.id = 'lang-menu'; m.className = 'lang-menu'; m.setAttribute('role', 'menu');
-  m.innerHTML = LANGS.map(([k, n]) => `<button type="button" role="menuitemradio" aria-checked="${k === LANG}" data-setlang="${k}"><b>${k.toUpperCase()}</b>${esc(n)}</button>`).join('');
-  document.body.appendChild(m);
-  const r = btn.getBoundingClientRect(); m.style.top = `${r.bottom + 6}px`; m.style.right = `${Math.max(8, innerWidth - r.right)}px`;
-  btn.setAttribute('aria-expanded', 'true'); $('[aria-checked="true"]', m).focus();
+  if (m) return;
+  m = document.createElement('div'); m.id = 'lang-menu'; m.className = 'lang-menu'; m.setAttribute('role', 'menu'); m.setAttribute('aria-label', t('Idioma'));
+  m.innerHTML = `<div class="lm-h" aria-hidden="true">${esc(t('Idioma'))}</div>` + LANGS.map(([k, n]) => {
+    let sub = ''; try { sub = LANG_NAMES ? cap(LANG_NAMES.of(k)) : ''; } catch {}
+    return `<button type="button" role="menuitemradio" tabindex="-1" aria-checked="${k === LANG}" data-setlang="${k}"><span class="lm-c">${k.toUpperCase()}</span><span class="lm-n"><b lang="${k}">${esc(n)}</b>${sub && sub.toLocaleLowerCase(LOC) !== n.toLocaleLowerCase(LOC) ? `<small>${esc(sub)}</small>` : ''}</span>${k === LANG ? ICON.check : ''}</button>`;
+  }).join('');
+  $('#lang-dd').appendChild(m);
+  m.style.setProperty('--caret', `${Math.round(btn.offsetWidth / 2 - 6)}px`);   // la flechita, en el centro del botón
+  btn.setAttribute('aria-expanded', 'true'); ($('[aria-checked="true"]', m) || $('button', m)).focus();
 }
 $('#btn-lang').addEventListener('click', (e) => { e.stopPropagation(); langMenu(!$('#lang-menu')); });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-setlang]'); if (b) { e.preventDefault(); const l = b.getAttribute('data-setlang'); if (l !== LANG) setLang(l); else langMenu(false); return; }
-  if ($('#lang-menu') && !e.target.closest('#lang-menu')) langMenu(false);
+  if ($('#lang-menu') && !e.target.closest('#lang-dd')) langMenu(false);
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#lang-menu')) { langMenu(false); $('#btn-lang').focus(); } });
-addEventListener('resize', () => langMenu(false));
+document.addEventListener('keydown', (e) => {
+  const m = $('#lang-menu');
+  if (!m) { if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && document.activeElement === $('#btn-lang')) { e.preventDefault(); langMenu(true); } return; }
+  const items = $$('button', m), i = items.indexOf(document.activeElement);
+  if (e.key === 'Escape') { e.preventDefault(); langMenu(false); $('#btn-lang').focus(); }
+  else if (e.key === 'Tab') langMenu(false);
+  else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const d = e.key === 'ArrowDown' ? 1 : -1; items[(i + d + items.length) % items.length].focus(); }
+  else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1].focus(); }
+});
 
 function toast(msg, ms = 3800) {
   const el = document.createElement('div'); el.className = 'toast'; el.textContent = msg;
@@ -635,8 +650,8 @@ const skeletonList = (n) => `<div class="card">${'<div class="card-h"><div class
 const dayAdd = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 const DF_WD1 = new Intl.DateTimeFormat(LOC, { weekday: 'short', timeZone: 'UTC' });
 const DF_MON = new Intl.DateTimeFormat(LOC, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-const wdShort = (d) => DF_WD1.format(dayDate(d)).replace('.', '').toUpperCase();
-const K_SUF = { en: 'k', es: ' mil', fr: ' k', de: ' Tsd.', pt: ' mil' }[LANG];
+const wdShort = (d) => DF_WD1.format(dayDate(d)).replace('.', '').toLocaleUpperCase(LOC);
+const K_SUF = { en: 'k', es: ' mil', fr: ' k', de: ' Tsd.', pt: ' mil', tr: ' B' }[LANG];
 const countShort = (n) => n >= 10000 ? Math.round(n / 1000) + K_SUF : n >= 1000 ? NF1.format(Math.round(n / 100) / 10) + K_SUF : String(n);
 const dayN = (d) => { const x = S.dayMap.get(d); return x ? x.n : 0; };
 const dmShort = (d) => DF_DM.format(dayDate(d)).replace('.', '');
@@ -1119,7 +1134,7 @@ function liveStrip(day) {
 // Equipo de la semana: las mejores medias de los últimos 7 días
 // Premios (awards.json): equipo de la semana (lunes a domingo) y jugador del mes. Si aún no hay, los mejores de los últimos 7 días.
 const awRange = (f, to) => `${DF_DM.format(dayDate(f)).replace('.', '')} – ${DF_DM.format(dayDate(to)).replace('.', '')}`;
-const awMonth = (m) => { const s = DF_MON.format(new Date(m + '-15T12:00:00Z')); return s[0].toUpperCase() + s.slice(1); };
+const awMonth = (m) => { const s = DF_MON.format(new Date(m + '-15T12:00:00Z')); return s[0].toLocaleUpperCase(LOC) + s.slice(1); };
 const podium = (W, avgKey) => `<div class="podium">${[1, 0, 2].filter((i) => W[i]).map((i) => { const x = W[i]; return `<a class="pod p${i + 1}" href="#j-${esc(x.id)}">${avatar(x.n, x.id, i === 0 ? 'lg' : 'md')}<span class="medal">${i + 1}</span><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 18)}</span>${badge(x[avgKey], 'md')}<small>${esc(pl(x.gp, 'partido', 'partidos'))}</small></a>`; }).join('')}</div>`;
 // Equipo de la semana en la pista, como una alineación: dos delante y atrás el que más defiende (paradas y bloqueos
 // por partido). Cada uno con su nota; el mejor de la semana, con estrella.
@@ -1473,7 +1488,7 @@ async function shareImage(kind, obj, fname) {
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
   try {
     const Sh = await import('./share.js');
-    const X = { t, lang: LANG, teamL: TEAM_LETTER, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
+    const X = { t, lang: LANG, loc: LOC, pct, teamL: TEAM_LETTER, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
     const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : await Sh.profileImage(obj, X);
@@ -1989,8 +2004,8 @@ async function viewAwards(tok) {
   let A; try { A = await loadAwards(); } catch (e) { if (!live(tok)) return; if (e.status === 404) { $('#aw').innerHTML = `<div class="card empty">${esc(t('Los premios aparecerán en unos minutos.'))}</div>`; return; } errorBox(e); return; }
   if (!live(tok)) return;
   const W = A.week || {}, M = A.month || {};
-  const line = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')} · ${x.g} ${t('G')} · ${x.as} ${t('A')}`;
-  const short = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${Math.round((x.w / (x.gp || 1)) * 100)}% ${t('victorias')}`;
+  const line = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${pct(x.w / (x.gp || 1))} ${t('victorias')} · ${x.g} ${t('G')} · ${x.as} ${t('A')}`;
+  const short = (x) => `${pl(x.gp, 'partido', 'partidos')} · ${pct(x.w / (x.gp || 1))} ${t('victorias')}`;
   const lrow = (x, i) => `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${i + 1}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(short(x))}</span></span>${badge(x.rt)}</a>`;
   const list = (l, empty) => (l && l.length ? `<div style="padding-bottom:8px">${l.map(lrow).join('')}</div>` : `<div class="card-b muted">${esc(empty)}</div>`);
   const wl = (W.last && W.last.list) || [], ml = (M.last && M.last.list) || [];

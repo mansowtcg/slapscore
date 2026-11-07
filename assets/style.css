@@ -687,7 +687,6 @@ html.vt-same .days{view-transition-name:daybar}
 }
 
 /* ===================== v4: idioma, favoritos, comparador, récords, EUSL ===================== */
-.ibtn.lang{font-weight:800;font-size:12.5px;letter-spacing:.02em}
 .fv{color:#F5B400;margin-right:3px;font-size:.92em}
 .ft{font-weight:inherit;color:inherit}
 .names .ft::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--primary);margin:0 4px 0 1px;vertical-align:2px}
@@ -1141,12 +1140,30 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .bell-btn[aria-pressed="true"]{color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,var(--surface));border-color:color-mix(in srgb,var(--primary) 55%,transparent)}
 .bell-btn[aria-pressed="true"] svg{fill:var(--primary)}
 /* ---------- idioma ---------- */
-.lang-menu{position:fixed;z-index:80;min-width:180px;padding:6px;border-radius:14px;background:var(--surface);box-shadow:var(--shadow-2);border:1px solid var(--line);display:flex;flex-direction:column;animation:fade .15s var(--ease)}
-.lang-menu button{display:flex;align-items:center;gap:10px;padding:9px 12px;border:0;border-radius:9px;background:none;color:var(--fg);font-weight:600;font-size:14px;text-align:left}
-.lang-menu button b{width:24px;font-size:11.5px;color:var(--muted);font-weight:800}
-.lang-menu button:hover,.lang-menu button:focus-visible{background:var(--surface-2)}
-.lang-menu button[aria-checked="true"]{color:var(--primary)}
-.lang-menu button[aria-checked="true"] b{color:var(--primary)}
+.lang-dd{position:relative;display:flex}
+.lang-btn{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 9px 0 8px;border-radius:999px;border:1px solid color-mix(in srgb,var(--hdr-ink) 26%,transparent);background:transparent;color:inherit;font:inherit;font-weight:800;font-size:12.5px;letter-spacing:.04em;cursor:pointer;transition:background .2s var(--ease),border-color .2s var(--ease)}
+.lang-btn:hover,.lang-btn[aria-expanded="true"]{background:var(--hdr-soft);border-color:transparent}
+.lang-btn:focus-visible{outline:2px solid var(--hdr-ink);outline-offset:2px}
+.lang-btn svg{width:16px;height:16px;flex:none}
+.lang-btn svg:last-child{width:13px;height:13px;opacity:.75;transition:transform .2s var(--ease)}
+.lang-btn[aria-expanded="true"] svg:last-child{transform:rotate(180deg)}
+.lang-menu{position:absolute;top:calc(100% + 10px);right:0;z-index:80;width:244px;padding:6px;border-radius:16px;background:var(--surface);color:var(--fg);border:1px solid var(--line);box-shadow:var(--shadow-2);transform-origin:calc(100% - var(--caret,14px) - 6px) 0;animation:lm-in .16s var(--ease)}
+.lang-menu::before{content:"";position:absolute;top:-7px;right:var(--caret,14px);width:12px;height:12px;background:var(--surface);border-left:1px solid var(--line);border-top:1px solid var(--line);border-top-left-radius:3px;transform:rotate(45deg)}
+@keyframes lm-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+.lm-h{padding:8px 10px 6px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lang-menu button{position:relative;display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:6px 10px;border:0;border-radius:11px;background:none;color:var(--fg);font:inherit;text-align:left;cursor:pointer;transition:background .15s var(--ease)}
+.lang-menu button+button{margin-top:2px}
+.lang-menu button:hover,.lang-menu button:focus-visible{background:var(--surface-2);outline:none}
+.lm-c{flex:none;display:grid;place-items:center;width:32px;height:24px;border-radius:7px;background:var(--surface-3);color:var(--muted);font-size:10.5px;font-weight:800;letter-spacing:.05em}
+.lm-n{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;line-height:1.2}
+.lm-n b{font-size:14.5px;font-weight:700}
+.lm-n small{font-size:12px;color:var(--muted)}
+.lang-menu button>svg{flex:none;width:17px;height:17px;color:var(--primary)}
+.lang-menu button[aria-checked="true"]{background:var(--primary-soft)}
+.lang-menu button[aria-checked="true"] .lm-c{background:var(--primary);color:var(--on-primary)}
+.lang-menu button[aria-checked="true"] .lm-n b{color:var(--primary)}
+@media (max-width:560px){.lang-btn{padding:0 7px;gap:3px}.lang-btn svg:first-child{display:none}}
+@media (prefers-reduced-motion:reduce){.lang-menu{animation:none}.lang-btn svg:last-child{transition:none}}
 .foot-langs{display:inline-flex;flex-wrap:wrap;gap:4px 12px}
 .foot-langs b{font-weight:700;color:var(--fg)}
 @media (max-width:600px){.favs-h .push-btn span{display:none}.favs-h .push-btn{padding:0 10px}}

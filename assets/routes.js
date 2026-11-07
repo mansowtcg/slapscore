@@ -5,21 +5,21 @@
 // Lo usan la web (app.js) y el Worker de Cloudflare (que sirve la web en todas estas direcciones).
 
 export const PAGES = {
-  jugadores: { en: 'players', es: 'jugadores', fr: 'joueurs', de: 'spieler', pt: 'jogadores' },
-  rankings: { en: 'rankings', es: 'rankings', fr: 'classements', de: 'ranglisten', pt: 'rankings' },
-  records: { en: 'records', es: 'records', fr: 'records', de: 'rekorde', pt: 'recordes' },
-  premios: { en: 'awards', es: 'premios', fr: 'recompenses', de: 'auszeichnungen', pt: 'premios' },
-  eusl: { en: 'eusl', es: 'eusl', fr: 'eusl', de: 'eusl', pt: 'eusl' },
-  notas: { en: 'how-we-rate', es: 'como-puntuamos', fr: 'notation', de: 'bewertung', pt: 'como-avaliamos' },
-  novedades: { en: 'whats-new', es: 'novedades', fr: 'nouveautes', de: 'neuigkeiten', pt: 'novidades' },
-  legal: { en: 'legal', es: 'aviso-legal', fr: 'mentions-legales', de: 'impressum', pt: 'aviso-legal' },
+  jugadores: { en: 'players', es: 'jugadores', fr: 'joueurs', de: 'spieler', pt: 'jogadores', tr: 'oyuncular' },
+  rankings: { en: 'rankings', es: 'rankings', fr: 'classements', de: 'ranglisten', pt: 'rankings', tr: 'siralamalar' },
+  records: { en: 'records', es: 'records', fr: 'records', de: 'rekorde', pt: 'recordes', tr: 'rekorlar' },
+  premios: { en: 'awards', es: 'premios', fr: 'recompenses', de: 'auszeichnungen', pt: 'premios', tr: 'oduller' },
+  eusl: { en: 'eusl', es: 'eusl', fr: 'eusl', de: 'eusl', pt: 'eusl', tr: 'eusl' },
+  notas: { en: 'how-we-rate', es: 'como-puntuamos', fr: 'notation', de: 'bewertung', pt: 'como-avaliamos', tr: 'notlandirma' },
+  novedades: { en: 'whats-new', es: 'novedades', fr: 'nouveautes', de: 'neuigkeiten', pt: 'novidades', tr: 'yenilikler' },
+  legal: { en: 'legal', es: 'aviso-legal', fr: 'mentions-legales', de: 'impressum', pt: 'aviso-legal', tr: 'yasal' },
 };
 // páginas con un dato detrás: jugador, partido, día y comparación
 export const PARAM = {
-  j: { en: 'player', es: 'jugador', fr: 'joueur', de: 'spieler', pt: 'jogador' },
-  m: { en: 'match', es: 'partido', fr: 'match', de: 'spiel', pt: 'partida' },
-  d: { en: 'matches', es: 'partidos', fr: 'matchs', de: 'spiele', pt: 'partidas' },
-  cmp: { en: 'compare', es: 'comparar', fr: 'comparer', de: 'vergleich', pt: 'comparar' },
+  j: { en: 'player', es: 'jugador', fr: 'joueur', de: 'spieler', pt: 'jogador', tr: 'oyuncu' },
+  m: { en: 'match', es: 'partido', fr: 'match', de: 'spiel', pt: 'partida', tr: 'mac' },
+  d: { en: 'matches', es: 'partidos', fr: 'matchs', de: 'spiele', pt: 'partidas', tr: 'maclar' },
+  cmp: { en: 'compare', es: 'comparar', fr: 'comparer', de: 'vergleich', pt: 'comparar', tr: 'karsilastir' },
 };
 const VALID = { j: /^\d{1,12}$/, m: /^\d{10}-[0-9a-zA-Z-]{8,64}$/, d: /^\d{4}-\d{2}-\d{2}$/, cmp: /^\d{1,12}(-\d{1,12})?$/ };
 // sin traducir: el panel de administrador y su entrada (que no se enlaza en ningún sitio)

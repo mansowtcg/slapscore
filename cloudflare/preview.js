@@ -142,7 +142,7 @@ export async function preview(request, env, ctx, path) {
   if (p && p.key !== 'admin' && p.key !== 'entrada-ibai' && pathFor(p.key, 'en')) {
     const lang = langOfPath(path) || 'en', alt = (l) => SITE + pathFor(p.key, l);
     html = html.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${escAttr(alt(lang))}$2`).replace(/<html lang="[a-z]+"/, `<html lang="${lang}"`);
-    const links = ['en', 'es', 'fr', 'de', 'pt'].map((l) => `<link rel="alternate" hreflang="${l}" href="${escAttr(alt(l))}">`).join('') + `<link rel="alternate" hreflang="x-default" href="${escAttr(alt('en'))}">`;
+    const links = ['en', 'es', 'fr', 'de', 'pt', 'tr'].map((l) => `<link rel="alternate" hreflang="${l}" href="${escAttr(alt(l))}">`).join('') + `<link rel="alternate" hreflang="x-default" href="${escAttr(alt('en'))}">`;
     html = html.replace('</head>', links + '</head>');
   }
   // el panel de administrador, las direcciones que no existen y los jugadores o partidos que no están no salen en los buscadores

@@ -53,6 +53,7 @@ const TXT = {
   fr: { W: 'Victoire', L: 'Défaite', D: 'Nul', rt: 'note', up: '{n} passe {r}', upb: 'Nouveau rang dans Slapshot: Rebound', also: 'aussi {n}', pub: 'Publique', cus: 'Custom', dec: ',' },
   de: { W: 'Sieg', L: 'Niederlage', D: 'Unentschieden', rt: 'Note', up: '{n} steigt auf {r} auf', upb: 'Neuer Rang in Slapshot: Rebound', also: 'auch {n}', pub: 'Öffentlich', cus: 'Custom', dec: ',' },
   pt: { W: 'Vitória', L: 'Derrota', D: 'Empate', rt: 'nota', up: '{n} subiu para {r}', upb: 'Novo rank no Slapshot: Rebound', also: 'também {n}', pub: 'Pública', cus: 'Custom', dec: ',' },
+  tr: { W: 'Galibiyet', L: 'Mağlubiyet', D: 'Beraberlik', rt: 'not', up: '{n} {r} rütbesine yükseldi', upb: "Slapshot: Rebound'da yeni rütbe", also: 'ayrıca {n}', pub: 'Açık', cus: 'Özel', dec: ',' },
 };
 const TIER = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold', PLAT: 'Platinum', DIAMOND: 'Diamond', LEGEND: 'Legend' };
 const rankName = (rk) => { const [t, n] = String(rk || '').split('_'); return (TIER[t] || t || '') + (n ? ' ' + n : ''); };
@@ -128,7 +129,7 @@ export class Push {
       // aviso de prueba a un navegador (lo pide el propio navegador al activar los avisos)
       const ep = String(b.endpoint || ''), row = this.sql.exec('SELECT * FROM subs WHERE ep = ?', ep).toArray()[0];
       if (!row) return out({ error: 'no sub' }, 404);
-      const T = { es: ['Avisos activados', 'Te avisaremos cuando tus favoritos terminen un partido o suban de rango.'], en: ['Notifications on', "We'll let you know when your favourites finish a match or rank up."], fr: ['Notifications activées', 'On te prévient quand tes favoris terminent un match ou montent de rang.'], de: ['Benachrichtigungen an', 'Wir melden uns, wenn deine Favoriten ein Spiel beenden oder aufsteigen.'], pt: ['Avisos ativados', 'Vamos avisar quando seus favoritos terminarem uma partida ou subirem de rank.'] }[row.lang] || ['Notifications on', ''];
+      const T = { es: ['Avisos activados', 'Te avisaremos cuando tus favoritos terminen un partido o suban de rango.'], en: ['Notifications on', "We'll let you know when your favourites finish a match or rank up."], fr: ['Notifications activées', 'On te prévient quand tes favoris terminent un match ou montent de rang.'], de: ['Benachrichtigungen an', 'Wir melden uns, wenn deine Favoriten ein Spiel beenden oder aufsteigen.'], pt: ['Avisos ativados', 'Vamos avisar quando seus favoritos terminarem uma partida ou subirem de rank.'], tr: ['Bildirimler açık', 'Favorilerin bir maçı bitirdiğinde veya rütbe atladığında sana haber vereceğiz.'] }[row.lang] || ['Notifications on', ''];
       const r = await this.send(row, { title: T[0], body: T[1], url: '/', tag: 'test' }, await this.keys());
       return out({ ok: r === 'ok', status: r });
     }

@@ -211,7 +211,7 @@ export default {
   'Ya te avisamos de sus partidos. Para dejarlo, quítalo de favoritos o desactiva los avisos en «Tus favoritos».': 'You already get alerts for their matches. To stop, remove them from favourites or turn alerts off in "Your favourites".',
   'Te avisaremos cuando {n} termine un partido o suba de rango': "We'll let you know when {n} finishes a match or ranks up",
   // novedades
-  "Nuevo: premios de la semana y del mes, avisos en el móvil, enlaces con vista previa y 3 idiomas más.": "New: weekly and monthly awards, phone alerts, link previews and 3 more languages.",
+  "Nuevo: SlapScore ya está también en turco (Türkçe).": "New: SlapScore is now available in Turkish too (Türkçe).",
   "Clasificaciones": "Leaderboards",
   "Para ti": "For you",
   "La app": "The app",
@@ -239,8 +239,8 @@ export default {
   "Con la campana te avisamos cuando un favorito termina un partido o sube de rango. En iPhone funciona con la app instalada.": "With the bell, we'll let you know when a favourite finishes a match or ranks up. On iPhone it works with the installed app.",
   "Enlaces con vista previa": "Link previews",
   "Los jugadores y los partidos tienen su propio enlace: en Discord o WhatsApp sale con su nombre, su rango y sus estadísticas. También puedes compartir una imagen.": "Players and matches have their own link: on Discord or WhatsApp it shows their name, rank and stats. You can also share an image.",
-  "5 idiomas": "5 languages",
-  "English, Español, Français, Deutsch y Português. Se cambia en el menú de idioma de arriba.": "English, Español, Français, Deutsch and Português. Change it in the language menu at the top.",
+  "6 idiomas": "6 languages",
+  "English, Español, Français, Deutsch, Português y Türkçe. Se cambia en el menú de idioma de arriba.": "English, Español, Français, Deutsch, Português and Türkçe. Change it in the language menu at the top.",
   "Instálala como app": "Install it as an app",
   "Añádela a la pantalla de inicio del móvil o al ordenador y ábrela como una app más.": "Add it to your phone's home screen or your computer and open it like any other app.",
   "Tema claro y oscuro": "Light and dark theme",
@@ -262,6 +262,7 @@ export default {
   "¿Echas algo en falta?": "Missing something?",
   "Cuéntanoslo": "Tell us",
   "Mejor nota de la semana": "Best rating of the week",
+  "Idioma": "Language",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

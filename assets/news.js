@@ -4,9 +4,9 @@
 // a quien aún no lo haya visto le sale un punto en «Novedades» y un aviso en la portada.
 // Los textos van en español y se traducen con t() (en.js, fr.js, de.js, pt.js).
 
-export const NEWS_DATE = '2026-11-06';
+export const NEWS_DATE = '2026-11-07';
 // resumen de la última tanda, para el aviso de la portada
-export const NEWS_HEADLINE = 'Nuevo: premios de la semana y del mes, avisos en el móvil, enlaces con vista previa y 3 idiomas más.';
+export const NEWS_HEADLINE = 'Nuevo: SlapScore ya está también en turco (Türkçe).';
 
 export const GROUPS = [
   ['partidos', 'Partidos'],
@@ -31,7 +31,7 @@ export const FEATURES = [
   { g: 'ti', icon: 'star', title: 'Favoritos', text: 'Marca jugadores con la estrella de su perfil para tener sus partidos a mano en la portada.' },
   { g: 'ti', icon: 'bell', nuevo: '2026-11-06', title: 'Avisos en el móvil', text: 'Con la campana te avisamos cuando un favorito termina un partido o sube de rango. En iPhone funciona con la app instalada.' },
   { g: 'ti', icon: 'share', nuevo: '2026-11-06', title: 'Enlaces con vista previa', text: 'Los jugadores y los partidos tienen su propio enlace: en Discord o WhatsApp sale con su nombre, su rango y sus estadísticas. También puedes compartir una imagen.' },
-  { g: 'ti', icon: 'chat', nuevo: '2026-11-06', title: '5 idiomas', text: 'English, Español, Français, Deutsch y Português. Se cambia en el menú de idioma de arriba.' },
+  { g: 'ti', icon: 'chat', nuevo: '2026-11-07', title: '6 idiomas', text: 'English, Español, Français, Deutsch, Português y Türkçe. Se cambia en el menú de idioma de arriba.' },
   { g: 'app', icon: 'install', title: 'Instálala como app', text: 'Añádela a la pantalla de inicio del móvil o al ordenador y ábrela como una app más.' },
   { g: 'app', icon: 'theme', title: 'Tema claro y oscuro', text: 'Sigue al de tu dispositivo, o elige el que prefieras con el botón de la luna.' },
   { g: 'app', icon: 'chat', action: 'feedback', title: 'Buzón de sugerencias', text: 'Cuéntanos ideas o fallos: lo lee la persona que hace SlapScore.' },
