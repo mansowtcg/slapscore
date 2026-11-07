@@ -599,6 +599,7 @@ async function go(opts = {}) {
     try { const tr = quiet(document.startViewTransition(() => Promise.race([Promise.resolve(run()).catch(() => {}), sleep(90)]))); tr.finished.finally(() => root.classList.remove('vt-same')).catch(() => {}); }
     catch { root.classList.remove('vt-same'); run(); }
   } else run();
+  if (r.view === 'matches') maybeTour();
 }
 function restoreScroll(y, tok) {
   let n = 0;
@@ -979,8 +980,24 @@ function leadersCard(meta, day, cls = '') {
 }
 function supportCard(cls = '') {
   const url = supportUrl(); if (!url) return '';
-  return `<div class="card in support ${cls}"><div class="card-b"><b>${esc(t('SlapScore es gratis y sin anuncios'))}</b><p>${esc(t('Lo hace un jugador de la comunidad. Si te resulta útil, puedes ayudar a mantenerlo.'))}</p><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a></div></div>`;
+  return `<div class="card in support ${cls}"><div class="card-b"><b>${esc(t('SlapScore es gratis y sin anuncios'))}</b><p>${esc(t('Lo hace un jugador de la comunidad. Si te resulta útil, puedes ayudar a mantenerlo.'))}</p>
+    <div class="sup-perk"><span class="sp-ic">${ICON.bolt}</span><p><b>${esc(t('Prioridad para quien apoye'))}</b> ${esc(t('Con cualquier donación, aunque sea simbólica, y tu ID de jugador en el mensaje, tus partidos se cargan antes y llevas la insignia ♥ Supporter.'))}</p></div>
+    <div class="sup-acts"><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a><button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></div></div></div>`;
 }
+// Cómo conseguir la prioridad con Ko-fi: cualquier cantidad y el ID de jugador en el mensaje (cloudflare/kofi.js lo lee)
+function kofiHow() {
+  const url = supportUrl(); if (!url) return;
+  openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Prioridad para quien apoye'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="sheet-b kofi-how"><p>${esc(t('SlapScore es gratis y sin anuncios. Si lo apoyas en Ko-fi con cualquier cantidad, aunque sea simbólica, tus partidos se cargarán antes.'))}</p>
+      <ol class="tour-kofi">
+        <li>${esc(t('Dona en Ko-fi lo que quieras: no hay mínimo, vale cualquier cantidad.'))}</li>
+        <li>${esc(t('En el mensaje de la donación, escribe tu ID de jugador o pega el enlace de tu perfil (de SlapScore o de slapshot.gg). Tu ID sale en tu perfil, debajo de tu nombre.'))}</li>
+        <li>${esc(t('En unos minutos llevarás la insignia ♥ Supporter y el robot revisará tus partidos antes que los de los demás, así que saldrán antes en la web.'))}</li>
+      </ol>
+      <p class="muted">${esc(t('Es un pequeño agradecimiento: la web sigue siendo gratis y completa para todos.'))}</p>
+      <a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener" autofocus>${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a></div>`, 'kofi-sheet');
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-kofi-how]')) { e.preventDefault(); kofiHow(); } });
 // ---------- buzón de sugerencias ----------
 // La web y su API (Worker de Cloudflare) están en la misma dirección: el token del administrador nunca sale de ella
 function apiBase() { return ''; }
@@ -1595,6 +1612,7 @@ async function viewPlayer(pid, tok) {
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
       <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
+      ${supportUrl() && !(S.sup && S.sup.has(String(P.id))) ? `<button type="button" class="ph-prio" data-kofi-how><span class="sp-ic">${ICON.bolt}</span><span class="t"><b>${esc(t('¿Es tu perfil?'))}</b> ${esc(t('Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.'))}</span>${ICON.right}</button>` : ''}
       <div class="ranks">${curRank}${peakRank}</div>
       ${modeSwitch(P, mode)}
       <div class="strip"><div><b>${int(a.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${a.w}-${a.l}${a.d ? '-' + a.d : ''}</b><span>${esc(a.d ? t('V-D-E') : t('V-D'))}</span></div><div><b>${pct(a.gp ? a.w / a.gp : 0)}</b><span>${esc(t('Victorias'))}</span></div><div><b>${int(a.mvp)}</b><span>MVP</span></div><div><b>${int(a.g)}</b><span>${esc(t('Goles'))}</span></div><div><b>${int(a.as)}</b><span>${esc(t('Asistencias'))}</span></div></div>
@@ -2114,12 +2132,49 @@ function newsBanner() {
   return `<div class="news-banner in" id="news-banner" role="status"><span class="nb-ic">${ICON.bolt}</span><p><b>${esc(t('Novedades'))}</b> ${esc(t(NEWS_HEADLINE))}</p><a class="btn sm primary" href="#novedades">${esc(t('Ver novedades'))}</a><button type="button" class="nb-x" data-news-x aria-label="${esc(t('Cerrar'))}" title="${esc(t('Cerrar'))}">✕</button></div>`;
 }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-news-x]')) { e.preventDefault(); newsSeen(); } });
+// ---------- tutorial de bienvenida (tour.js) ----------
+// La primera vez que alguien entra desde un navegador (en la portada, con los partidos ya cargados). Se puede saltar
+// y se recuerda en el navegador; se vuelve a ver desde Novedades o con ?tutorial en la dirección. No sale a robots.
+const TOUR_KEY = 'slapscore-tour';
+let tourPending = false;
+const tourDone = () => { try { return !!localStorage.getItem(TOUR_KEY); } catch { return true; } };
+const isBot = () => navigator.webdriver || /bot|crawl|spider|slurp|preview|lighthouse|headless/i.test(navigator.userAgent);
+function maybeTour() {
+  const force = /[?&]tutorial\b/.test(location.search);
+  if (tourPending || document.querySelector('.tour') || (!force && (tourDone() || isBot()))) return;
+  tourPending = true;
+  let n = 0;
+  const tick = () => {
+    if (route().view !== 'matches') { tourPending = false; return; }
+    if (!$('#m-list .grp') && n++ < 40) { setTimeout(tick, 250); return; }
+    setTimeout(() => { tourPending = false; if (route().view === 'matches' && !$('#ovl')) startTour(); }, 700);
+  };
+  tick();
+}
+async function startTour() {
+  if (document.querySelector('.tour')) return;
+  if (/[?&]tutorial\b/.test(location.search)) { try { history.replaceState(history.state, '', location.pathname); } catch {} }
+  hideTip(false);
+  try {
+    const T = await import('./tour.js');
+    T.start({ t, esc, ICON, supportUrl }, (done) => {
+      // a quien llega por primera vez no le sale además el aviso de novedades: el tutorial ya lo cuenta todo
+      try { if (!localStorage.getItem(NEWS_KEY)) newsSeen(); localStorage.setItem(TOUR_KEY, done ? 'done' : 'skip'); } catch {}
+      trackEvent(done ? 'tour' : 'tourskip');
+      if (installEvt || (isIOS() && !standalone())) setTimeout(showTip, 1500);
+    });
+  } catch {}
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-tour]')) { e.preventDefault(); if (route().view === 'matches') startTour(); else { try { localStorage.removeItem(TOUR_KEY); } catch {} navTo('#partidos'); } }
+});
 const DF_NEWS = new Intl.DateTimeFormat(LOC, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 function viewNews() {
   const now = Date.parse(today() + 'T12:00:00Z');
   const isNew = (f) => f.nuevo && now - Date.parse(f.nuevo + 'T12:00:00Z') <= 45 * 86400000;
   const go = (f) => (f.action === 'feedback' ? `<button type="button" class="tbtn nw-go" data-fb>${esc(t('Abrir el buzón'))}${ICON.right}</button>`
-    : f.action === 'support' ? (supportUrl() ? `<a class="tbtn nw-go" href="${esc(supportUrl())}" target="_blank" rel="noopener">${esc(t('Ir a Ko-fi'))}${ICON.ext}</a>` : '')
+    : f.action === 'tour' ? `<button type="button" class="tbtn nw-go" data-tour>${esc(t('Ver el tutorial'))}${ICON.right}</button>`
+    : f.action === 'support' ? (supportUrl() ? `<button type="button" class="tbtn nw-go" data-kofi-how>${esc(t('¿Cómo funciona?'))}${ICON.right}</button>` : '')
     : f.href ? `<a class="tbtn nw-go" href="${esc(f.href)}">${esc(t('Abrir'))}${ICON.right}</a>` : '');
   const tile = (f, big) => `<div class="nw-item${big ? ' big' : ''}"><span class="nw-ic">${ICON[f.icon] || ICON.info}</span><div class="nw-b"><h3>${esc(t(f.title))}${!big && isNew(f) ? ` <span class="pill nw-new">${esc(t('Nuevo'))}</span>` : ''}</h3><p>${esc(t(f.text))}</p>${go(f)}</div></div>`;
   const recent = FEATURES.filter(isNew).sort((a, b) => (b.nuevo > a.nuevo) - (b.nuevo < a.nuevo));
@@ -2318,7 +2373,7 @@ const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.
 let installEvt = null;
 function hideTip(remember) { $('#itip').innerHTML = ''; if (remember) { try { localStorage.setItem('slapscore-tip', String(Date.now())); } catch {} } }
 function showTip() {
-  if (standalone() || !matchMedia('(max-width: 900px)').matches) return;
+  if (standalone() || !matchMedia('(max-width: 900px)').matches || document.querySelector('.tour') || tourPending) return;
   let last = 0; try { last = Number(localStorage.getItem('slapscore-tip')) || 0; } catch {}
   if (Date.now() - last < 7 * 864e5) return;
   const ios = isIOS() && !installEvt;

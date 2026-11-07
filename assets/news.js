@@ -6,7 +6,7 @@
 
 export const NEWS_DATE = '2026-11-07';
 // resumen de la última tanda, para el aviso de la portada
-export const NEWS_HEADLINE = 'Nuevo: SlapScore ya está también en turco (Türkçe).';
+export const NEWS_HEADLINE = 'Nuevo: SlapScore en turco, un tutorial de bienvenida y prioridad para quien apoye en Ko-fi.';
 
 export const GROUPS = [
   ['partidos', 'Partidos'],
@@ -35,6 +35,7 @@ export const FEATURES = [
   { g: 'app', icon: 'install', title: 'Instálala como app', text: 'Añádela a la pantalla de inicio del móvil o al ordenador y ábrela como una app más.' },
   { g: 'app', icon: 'theme', title: 'Tema claro y oscuro', text: 'Sigue al de tu dispositivo, o elige el que prefieras con el botón de la luna.' },
   { g: 'app', icon: 'chat', action: 'feedback', title: 'Buzón de sugerencias', text: 'Cuéntanos ideas o fallos: lo lee la persona que hace SlapScore.' },
-  { g: 'app', icon: 'coffee', action: 'support', nuevo: '2026-11-06', title: 'Insignia ♥ Supporter', text: 'SlapScore es gratis y sin anuncios. Si lo apoyas en Ko-fi, llevas la insignia ♥ Supporter y tus partidos salen antes.' },
+  { g: 'app', icon: 'coffee', action: 'support', nuevo: '2026-11-07', title: 'Prioridad para quien apoye', text: 'SlapScore es gratis y sin anuncios. Con cualquier donación en Ko-fi, aunque sea simbólica, y tu ID de jugador en el mensaje, tus partidos se cargan antes y llevas la insignia ♥ Supporter.' },
+  { g: 'app', icon: 'info', action: 'tour', nuevo: '2026-11-07', title: 'Tutorial de bienvenida', text: 'Un repaso rápido de todo lo que hay en SlapScore, en menos de un minuto.' },
   { g: 'app', icon: 'info', href: '#legal', title: 'Sin cookies ni anuncios', text: 'Las visitas se cuentan de forma anónima, sin guardar tu IP ni ponerte identificadores.' },
 ];

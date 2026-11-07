@@ -1234,3 +1234,59 @@ a[href="#j-"]{pointer-events:none;cursor:default;color:inherit;text-decoration:n
 .tw-rink.big .tw-p .nm{max-width:130px;font-size:13px}
 @media (max-width:400px){.tw-p{width:92px}.tw-p .nm{max-width:92px;font-size:11px}}
 
+
+/* ===================== ventaja de Ko-fi y tutorial de bienvenida ===================== */
+.support .sup-perk{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,#FF5E5B 10%,var(--surface));border:1px solid color-mix(in srgb,#FF5E5B 28%,transparent)}
+.support .sup-perk .sp-ic{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#FF5E5B;color:#fff}
+.support .sup-perk .sp-ic svg{width:15px;height:15px}
+.support .sup-perk p{color:var(--fg);font-size:13px;line-height:1.4}
+.support .sup-perk p b{font-size:13px;display:block;margin-bottom:1px}
+.support .sup-acts{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px}
+.support .sup-acts .btn.kofi{margin-top:0}
+.kofi-how{padding:0 18px 20px;display:flex;flex-direction:column;gap:12px}
+.kofi-how>p{margin:0}
+.kofi-how .btn.kofi{align-self:stretch;justify-content:center;margin-top:2px}
+.tour-kofi{margin:0;padding:0;list-style:none;counter-reset:k;display:flex;flex-direction:column;gap:10px}
+.tour-kofi li{counter-increment:k;display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start;font-size:14px;line-height:1.45}
+.tour-kofi li::before{content:counter(k);display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:color-mix(in srgb,#FF5E5B 14%,var(--surface));color:#E0413E;font-weight:800;font-size:13px}
+
+html.touring{scroll-behavior:auto}
+.tour{position:fixed;inset:0;z-index:200;animation:fade .2s var(--ease)}
+.tour.out{opacity:0;transition:opacity .18s ease-in}
+.tour{--veil:rgba(8,10,22,.62)}
+.tour-hole{position:fixed;border-radius:14px;box-shadow:0 0 0 9999px var(--veil),0 0 0 2px rgba(255,255,255,.9) inset;pointer-events:none;transition:top .32s var(--ease),left .32s var(--ease),width .32s var(--ease),height .32s var(--ease),border-radius .32s var(--ease)}
+.tour-hole.none{box-shadow:0 0 0 9999px var(--veil)}
+.tour-card{position:fixed;display:flex;flex-direction:column;gap:8px;padding:16px 18px 14px;border-radius:18px;background:var(--surface);color:var(--fg);border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.35);outline:none;transition:top .32s var(--ease),left .32s var(--ease);max-height:calc(100vh - 24px);overflow:auto}
+.tour-card.center{text-align:left}
+.tour-hero{display:flex;margin-bottom:2px}
+.tour-hero .brand-mark{width:48px;height:48px;border-radius:14px;background:#374DF5}
+.tour-hero .brand-mark i{background:#fff}
+.tour-hero .brand-mark i{width:26px;height:14px}
+.tour-ic{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--primary-soft);color:var(--primary)}
+.tour-ic svg{width:26px;height:26px}
+.tour-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tour-n{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--primary)}
+.tour-skip{border:0;background:none;padding:4px 2px;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.tour-skip:hover{color:var(--fg);text-decoration:underline}
+.tour-card h3{margin:0;font-size:19px;line-height:1.25;font-weight:800}
+.tour-card>p{margin:0;font-size:14.5px;line-height:1.5;color:var(--fg-2,var(--fg));opacity:.92}
+.tour-card .tour-kofi{margin-top:4px}
+.tour-card .btn.kofi{align-self:flex-start;margin-top:4px}
+.tour-f{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.tour-dots{display:flex;gap:5px;flex-wrap:wrap}
+.tour-dots i{width:7px;height:7px;border-radius:50%;background:var(--line-2);transition:background .2s,width .2s}
+.tour-dots i.done{background:color-mix(in srgb,var(--primary) 45%,var(--line-2))}
+.tour-dots i.on{width:18px;border-radius:4px;background:var(--primary)}
+.tour-btns{display:flex;gap:8px;margin-left:auto}
+@media (prefers-reduced-motion:reduce){.tour,.tour-hole,.tour-card{animation:none;transition:none}}
+
+/* en el perfil: cómo tener prioridad (Ko-fi) */
+.ph-prio{display:flex;align-items:center;gap:10px;width:calc(100% - 40px);margin:-4px 20px 16px;padding:9px 12px;border-radius:12px;border:1px dashed color-mix(in srgb,#FF5E5B 45%,transparent);background:color-mix(in srgb,#FF5E5B 6%,var(--surface));color:var(--fg);font:inherit;font-size:13px;line-height:1.4;text-align:left;cursor:pointer;transition:background .2s var(--ease)}
+.ph-prio:hover{background:color-mix(in srgb,#FF5E5B 11%,var(--surface))}
+.ph-prio .sp-ic{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#FF5E5B;color:#fff}
+.ph-prio .sp-ic svg{width:14px;height:14px}
+.ph-prio .t{flex:1;min-width:0}
+.ph-prio>svg{flex:none;width:16px;height:16px;color:var(--muted)}
+@media (max-width:720px){.ph-prio{width:calc(100% - 28px);margin:-2px 14px 14px}}
+:root[data-theme="dark"] .tour{--veil:rgba(0,0,0,.72)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tour{--veil:rgba(0,0,0,.72)}}
