@@ -4,9 +4,9 @@
 // a quien aún no lo haya visto le sale un punto en «Novedades» y un aviso en la portada.
 // Los textos van en español y se traducen con t() (en.js, fr.js, de.js, pt.js).
 
-export const NEWS_DATE = '2026-11-07';
+export const NEWS_DATE = '2026-11-07T23';   // se compara como texto: vale cualquier valor mayor que el anterior
 // resumen de la última tanda, para el aviso de la portada
-export const NEWS_HEADLINE = 'Nuevo: SlapScore en turco, un tutorial de bienvenida y prioridad para quien apoye en Ko-fi.';
+export const NEWS_HEADLINE = 'Nuevo: overlay para OBS con las últimas notas de cualquier jugador, para tus directos.';
 
 export const GROUPS = [
   ['partidos', 'Partidos'],
@@ -24,6 +24,7 @@ export const FEATURES = [
   { g: 'jugadores', icon: 'flame', href: '#notas', title: 'Notas de 3 a 10', text: 'Cada jugador recibe una nota en cada partido, calculada solo con sus estadísticas. El que más saca es el MVP.' },
   { g: 'jugadores', icon: 'users', href: '#jugadores', title: 'Perfil de cada jugador', text: 'Rango y MMR con su evolución, forma, notas por partido, atributos, mejores partidos, compañeros y rivales habituales y sus números en cada arena.' },
   { g: 'jugadores', icon: 'vs', href: '#jugadores', title: 'Comparar jugadores', text: 'Dos jugadores frente a frente: estadísticas por partido, atributos y cómo les va el uno contra el otro y jugando juntos.' },
+  { g: 'jugadores', icon: 'obs', nuevo: '2026-11-07', title: 'Overlay para OBS', text: 'Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo.' },
   { g: 'jugadores', icon: 'search', href: '#jugadores', title: 'Tabla y buscador', text: 'Encuentra a cualquiera por su nombre, su ID o el enlace de su perfil, y ordena la tabla de jugadores por la columna que quieras.' },
   { g: 'clasif', icon: 'trophy', href: '#premios', nuevo: '2026-11-06', title: 'Premios', text: 'Equipo de la semana y jugador del mes por nota media, con su historial, una insignia en el perfil y una imagen para compartir.' },
   { g: 'clasif', icon: 'trophy', href: '#rankings', title: 'Rankings y récords', text: 'Los mejores de la comunidad en cada estadística, las mejores marcas en un partido y las rachas más largas.' },

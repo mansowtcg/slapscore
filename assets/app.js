@@ -252,6 +252,7 @@ const ICON = {
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  obs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10.5" r="1.6" fill="currentColor"/><path d="M8.6 7.6a4.6 4.6 0 0 0 0 5.8M15.4 7.6a4.6 4.6 0 0 1 0 5.8"/></svg>',
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
@@ -1518,6 +1519,64 @@ function statPlain(st) {
   if (st.passes) b.push(pl(st.passes, 'pase', 'pases'));
   return (b.length ? b : [t('Sin acciones destacadas')]).slice(0, 3).join(' · ');
 }
+// ---------- overlay para OBS (overlay.js): configurador con vista previa en el perfil ----------
+const BUILD_Q = (() => { try { const b = new URL(import.meta.url).searchParams.get('b'); return b ? '?b=' + b : ''; } catch { return ''; } })();
+async function obsSheet(P, mode) {
+  let O;
+  try { O = await import('./overlay.js'); } catch (e) { toast(t('No se pudieron cargar los datos.')); return; }
+  // estilos del overlay: la vista previa se mide cuando ya han cargado
+  let css = $('#ov-css');
+  if (!css) { css = document.createElement('link'); css.id = 'ov-css'; css.rel = 'stylesheet'; css.href = '/assets/overlay.css' + BUILD_Q; document.head.appendChild(css); }
+  const cssReady = css.sheet ? Promise.resolve() : new Promise((ok) => { css.addEventListener('load', ok, { once: true }); css.addEventListener('error', ok, { once: true }); setTimeout(ok, 3000); });
+  const o = { ...O.OV_DEFAULTS, l: LANG, m: mode === 'cus' ? 'cus' : 'pub' };
+  const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-ov="${k}" data-v="${v}" aria-pressed="${String(o[k]) === String(v)}">${esc(l)}</button>`).join('')}</div>`;
+  const row = (label, html) => `<div class="obs-r"><span class="lbl">${esc(label)}</span>${html}</div>`;
+  const chk = (k, label) => `<label class="obs-chk"><input type="checkbox" data-ovc="${k}"${o[k] ? ' checked' : ''}> ${esc(label)}</label>`;
+  const ovl = openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Overlay para OBS'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="obs-b"><p class="muted">${esc(t('Pon en tu directo las notas de los últimos partidos de {n} y su nota media. Se actualiza solo cada minuto.', { n: P.n }))}</p>
+      <div class="obs-pv" id="obs-pv"><div class="obs-sc" id="obs-sc"></div></div>
+      <div class="obs-opts">
+        ${row(t('Partidos'), seg('n', [[5, '5'], [10, '10'], [20, '20']]))}
+        ${row(t('Tipo de partida'), seg('m', [['pub', t('Pública')], ['cus', t('Custom')], ['all', t('Todas')]]))}
+        ${row(t('Diseño'), seg('v', [['full', t('Completo')], ['compact', t('Compacto')]]))}
+        ${row(t('Fondo'), seg('th', [['dark', t('Oscuro')], ['light', t('Claro')], ['clear', t('Transparente')]]))}
+        ${row(t('Mostrar'), `<div class="obs-chks">${chk('rk', t('Rango y MMR'))}${chk('st', t('Estadísticas'))}</div>`)}
+        ${row(t('Idioma'), `<select class="select" id="obs-l" aria-label="${esc(t('Idioma'))}">${LANGS.map(([k, n]) => `<option value="${k}"${k === o.l ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
+      </div>
+      <div class="obs-url"><input class="input" id="obs-u" readonly aria-label="${esc(t('Enlace del overlay'))}"><button type="button" class="btn primary" id="obs-copy">${esc(t('Copiar enlace'))}</button></div>
+      <ol class="tour-kofi obs-how">
+        <li>${esc(t('En OBS, añade una fuente nueva: «+» → «Navegador».'))}</li>
+        <li id="obs-size"></li>
+        <li>${esc(t('Listo: se actualiza solo y el fondo es transparente. Muévelo y escálalo como quieras.'))}</li>
+      </ol>
+      <p class="muted obs-note">${esc(t('Consejo: los partidos de los supporters de Ko-fi se cargan antes, también en el overlay.'))} <button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></p>
+    </div>`, 'obs-sheet');
+  const url = () => `${location.origin}/overlay/${encodeURIComponent(P.id)}${O.ovQuery(o)}`;
+  function draw() {
+    const sc = $('#obs-sc', ovl); if (!sc) return;
+    sc.innerHTML = O.renderOverlay(P, o);
+    const pv = $('#obs-pv', ovl), el = sc.firstElementChild;
+    const k = Math.min(1, (pv.clientWidth - 24) / (el.offsetWidth || 1));
+    sc.style.transform = k < 1 ? `scale(${k})` : ''; pv.style.height = Math.ceil(el.offsetHeight * k + 24) + 'px';
+    $('#obs-u', ovl).value = url();
+    const z = O.ovSize(o); $('#obs-size', ovl).textContent = t('Pega el enlace y pon de tamaño {w} × {h}.', { w: z.w, h: z.h });
+    $$('[data-ovc="st"]', ovl).forEach((c) => { c.disabled = o.v === 'compact'; c.closest('label').classList.toggle('off', o.v === 'compact'); });
+  }
+  ovl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ov]');
+    if (b) { const k = b.dataset.ov, v = b.dataset.v; o[k] = k === 'n' ? Number(v) : v; $$(`[data-ov="${k}"]`, ovl).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); draw(); }
+  });
+  ovl.addEventListener('change', (e) => {
+    const c = e.target.closest('[data-ovc]'); if (c) { o[c.dataset.ovc] = c.checked ? 1 : 0; draw(); }
+    if (e.target.id === 'obs-l') { o.l = e.target.value; draw(); }
+  });
+  $('#obs-copy', ovl).addEventListener('click', () => { const i = $('#obs-u', ovl); i.select(); copyText(i.value, i); trackEvent('obs'); });
+  $('#obs-u', ovl).addEventListener('focus', (e) => e.target.select());
+  draw(); cssReady.then(() => { draw(); requestAnimationFrame(draw); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw).catch(() => {});
+  const onR = () => { if (!$('#obs-sc')) { removeEventListener('resize', onR); return; } draw(); };
+  addEventListener('resize', onR, { passive: true });
+}
 async function shareImage(kind, obj, fname) {
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
   try {
@@ -1628,7 +1687,7 @@ async function viewPlayer(pid, tok) {
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
-      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
+      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button><button class="btn sm" type="button" id="p-obs">${ICON.obs}${esc(t('Overlay para OBS'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
       ${supportUrl() && !(S.sup && S.sup.has(String(P.id))) ? `<button type="button" class="ph-prio" data-kofi-how><span class="sp-ic">${ICON.bolt}</span><span class="t"><b>${esc(t('¿Es tu perfil?'))}</b> ${esc(t('Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.'))}</span>${ICON.right}</button>` : ''}
       <div class="ranks">${curRank}${peakRank}</div>
       ${modeSwitch(P, mode)}
@@ -1660,6 +1719,7 @@ async function viewPlayer(pid, tok) {
   $$('[data-hf]', MAIN).forEach((b) => b.addEventListener('click', () => { PV.hist = b.getAttribute('data-hf'); PV.histN = 15; $$('[data-hf]', MAIN).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); drawHist(P, games, a); }));
   const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(pageUrl('#j-' + P.id), sh));
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
+  $('#p-obs').addEventListener('click', () => obsSheet(P, mode));
   $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games, _a: a, _mode: mode }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games, a);
   // su equipo de la EUSL, si su nombre en la liga coincide con este jugador

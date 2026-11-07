@@ -249,6 +249,16 @@ async function kofi(request, env, path) {
   return kofiAdmin(request, env, path, exists);
 }
 
+// La página del overlay (overlay.html) en /overlay/<id>: sin caché larga (OBS la recarga al cambiar de escena) y fuera de los buscadores
+async function overlayPage(request, env) {
+  let r = await env.ASSETS.fetch(new Request(new URL('/overlay', request.url)));
+  if (!r.ok) r = await env.ASSETS.fetch(new Request(new URL('/overlay.html', request.url)));
+  if (!r.ok) return new Response('Not found', { status: 404 });
+  const h = new Headers(r.headers);
+  h.set('content-type', 'text/html; charset=utf-8'); h.set('cache-control', 'no-cache'); h.set('x-robots-tag', 'noindex');
+  return new Response(request.method === 'HEAD' ? null : r.body, { status: 200, headers: h });
+}
+
 export default {
   async fetch(request, env, ctx) {
     let path = '';
@@ -259,6 +269,8 @@ export default {
     if (path === '/api/alerts' || path === '/api/alerts/test') return alerts(request, env, path);
     if (path === '/api/kofi' || path.startsWith('/api/kofi/')) return kofi(request, env, path);
     if (path.startsWith('/api/push/')) return push(request, env, path);
+    // Overlay para OBS (/overlay/<id>): una página aparte, ligera, sin la web alrededor (overlay.html)
+    if ((request.method === 'GET' || request.method === 'HEAD') && /^\/overlay\/\d{1,12}\/?$/.test(path)) return overlayPage(request, env);
     // Páginas de la web (/players, /jugador/123, /match/..., en cualquier idioma): index.html con el título, la descripción
     // y la imagen de esa página (vista previa de los enlaces). Lo que parece un archivo y no existe: 404 normal.
     if ((request.method === 'GET' || request.method === 'HEAD') && !path.startsWith('/api/') && !/\.[a-z0-9]{1,8}$/i.test(path)) return preview(request, env, ctx, path);

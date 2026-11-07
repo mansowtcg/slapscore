@@ -1296,3 +1296,25 @@ html.touring{scroll-behavior:auto}
 .kofi-why p{margin:0;color:var(--fg-2)}
 .tour-why{margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--muted)}
 .kofi-how .kofi-ok{align-self:stretch;justify-content:center}
+
+/* ===================== configurador del overlay para OBS ===================== */
+.obs-b{padding:0 18px 20px;display:flex;flex-direction:column;gap:14px}
+.obs-b>p{margin:0}
+.obs-pv{position:relative;border-radius:14px;overflow:hidden;padding:12px;border:1px solid var(--line);
+  background-color:#2a2d38;background-image:linear-gradient(45deg,#323644 25%,transparent 25%,transparent 75%,#323644 75%),linear-gradient(45deg,#323644 25%,transparent 25%,transparent 75%,#323644 75%);background-size:20px 20px;background-position:0 0,10px 10px}
+.obs-sc{transform-origin:0 0;width:max-content}
+.obs-opts{display:flex;flex-direction:column;gap:10px}
+.obs-r{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:center;gap:10px}
+.obs-r .lbl{font-size:13px;font-weight:700;color:var(--muted)}
+.obs-r .seg{justify-self:start;flex-wrap:wrap}
+.obs-r .seg button{padding:0 12px}
+.obs-r .select{justify-self:start;min-width:160px}
+.obs-chks{display:flex;flex-wrap:wrap;gap:6px 16px}
+.obs-chk{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:600;cursor:pointer}
+.obs-chk input{width:17px;height:17px;accent-color:var(--primary)}
+.obs-chk.off{opacity:.45;cursor:default}
+.obs-url{display:flex;gap:8px}
+.obs-url .input{flex:1;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.obs-how li::before{background:var(--primary-soft);color:var(--primary)}
+.obs-note{font-size:13px}
+@media (max-width:560px){.obs-r{grid-template-columns:1fr;gap:6px}.obs-url{flex-direction:column}}
