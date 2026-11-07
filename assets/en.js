@@ -298,6 +298,10 @@ export default {
   "Un repaso rápido de todo lo que hay en SlapScore, en menos de un minuto.": "A quick tour of everything on SlapScore, in under a minute.",
   "¿Es tu perfil?": "Is this your profile?",
   "Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.": "Support SlapScore on Ko-fi with any amount and your matches will load sooner.",
+  "¿Por qué solo para quien apoya?": "Why only for supporters?",
+  "El robot revisa a miles de jugadores por turnos. Cada consulta a slapshot.gg lleva su tiempo y hay que hacerlas con calma para no saturarla, así que no se puede mirar a todo el mundo cada pocos minutos: si todos tuvieran prioridad, en la práctica no la tendría nadie.": "The bot checks thousands of players in turns. Every request to slapshot.gg takes time and they have to be spaced out so as not to overload it, so it can't look at everyone every few minutes: if everyone had priority, in practice nobody would.",
+  "Por eso la prioridad es para una lista corta: los jugadores de más MMR y quienes apoyan el proyecto. No se busca ganar dinero: las donaciones ayudan a mantener la web y esta es la ventaja que de verdad se puede dar a cambio.": "That's why priority goes to a short list: the highest-MMR players and those who support the project. It's not about making money: donations help keep the site running, and this is the perk that can genuinely be given in return.",
+  "¿Por qué solo a quien apoya? El robot no puede dar prioridad a todos los jugadores a la vez, así que es la ventaja que se puede ofrecer. No se busca ganar dinero con ello.": "Why only supporters? The bot can't give priority to every player at once, so this is the perk that can be offered. It's not about making money.",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',

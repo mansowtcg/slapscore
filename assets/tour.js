@@ -49,7 +49,7 @@ export function start(X, onEnd) {
       <li>${esc(t('Dona en Ko-fi lo que quieras: no hay mínimo, vale cualquier cantidad.'))}</li>
       <li>${esc(t('En el mensaje de la donación, escribe tu ID de jugador o pega el enlace de tu perfil (de SlapScore o de slapshot.gg). Tu ID sale en tu perfil, debajo de tu nombre.'))}</li>
       <li>${esc(t('En unos minutos llevarás la insignia ♥ Supporter y el robot revisará tus partidos antes que los de los demás, así que saldrán antes en la web.'))}</li>
-    </ol><a class="btn kofi sm" href="${esc(X.supportUrl())}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a>`;
+    </ol><p class="tour-why">${esc(t('¿Por qué solo a quien apoya? El robot no puede dar prioridad a todos los jugadores a la vez, así que es la ventaja que se puede ofrecer. No se busca ganar dinero con ello.'))}</p><a class="btn kofi sm" href="${esc(X.supportUrl())}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a>`;
 
   function draw() {
     const s = S[i], first = i === 0, last = i === S.length - 1;

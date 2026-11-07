@@ -674,4 +674,8 @@ export default {
   "Un repaso rápido de todo lo que hay en SlapScore, en menos de un minuto.": "SlapScore'daki her şeyin bir dakikadan kısa süren hızlı bir özeti.",
   "¿Es tu perfil?": "Bu senin profilin mi?",
   "Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.": "SlapScore'u Ko-fi'de istediğin kadar destekle, maçların daha erken yüklensin.",
+  "¿Por qué solo para quien apoya?": "Neden yalnızca destekçilere?",
+  "El robot revisa a miles de jugadores por turnos. Cada consulta a slapshot.gg lleva su tiempo y hay que hacerlas con calma para no saturarla, así que no se puede mirar a todo el mundo cada pocos minutos: si todos tuvieran prioridad, en la práctica no la tendría nadie.": "Robot binlerce oyuncuyu sırayla kontrol eder. slapshot.gg'ye yapılan her sorgu zaman alır ve siteyi yormamak için aralıklı yapılmalıdır; bu yüzden herkese birkaç dakikada bir bakılamaz. Herkesin önceliği olsaydı, aslında kimsenin olmazdı.",
+  "Por eso la prioridad es para una lista corta: los jugadores de más MMR y quienes apoyan el proyecto. No se busca ganar dinero: las donaciones ayudan a mantener la web y esta es la ventaja que de verdad se puede dar a cambio.": "Bu yüzden öncelik kısa bir listeye verilir: en yüksek MMR'ye sahip oyuncular ve projeyi destekleyenler. Amaç para kazanmak değil: bağışlar sitenin ayakta kalmasına yardım eder ve karşılığında gerçekten verilebilecek avantaj bu.",
+  "¿Por qué solo a quien apoya? El robot no puede dar prioridad a todos los jugadores a la vez, así que es la ventaja que se puede ofrecer. No se busca ganar dinero con ello.": "Neden yalnızca destekçiler? Robot aynı anda tüm oyunculara öncelik veremez, bu yüzden sunulabilecek avantaj bu. Amaç para kazanmak değil.",
 };

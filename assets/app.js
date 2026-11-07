@@ -994,6 +994,9 @@ function kofiHow() {
         <li>${esc(t('En el mensaje de la donación, escribe tu ID de jugador o pega el enlace de tu perfil (de SlapScore o de slapshot.gg). Tu ID sale en tu perfil, debajo de tu nombre.'))}</li>
         <li>${esc(t('En unos minutos llevarás la insignia ♥ Supporter y el robot revisará tus partidos antes que los de los demás, así que saldrán antes en la web.'))}</li>
       </ol>
+      <div class="kofi-why"><b>${esc(t('¿Por qué solo para quien apoya?'))}</b>
+        <p>${esc(t('El robot revisa a miles de jugadores por turnos. Cada consulta a slapshot.gg lleva su tiempo y hay que hacerlas con calma para no saturarla, así que no se puede mirar a todo el mundo cada pocos minutos: si todos tuvieran prioridad, en la práctica no la tendría nadie.'))}</p>
+        <p>${esc(t('Por eso la prioridad es para una lista corta: los jugadores de más MMR y quienes apoyan el proyecto. No se busca ganar dinero: las donaciones ayudan a mantener la web y esta es la ventaja que de verdad se puede dar a cambio.'))}</p></div>
       <p class="muted">${esc(t('Es un pequeño agradecimiento: la web sigue siendo gratis y completa para todos.'))}</p>
       <a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener" autofocus>${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a></div>`, 'kofi-sheet');
 }
