@@ -1295,3 +1295,4 @@ html.touring{scroll-behavior:auto}
 .kofi-why b{font-size:14px}
 .kofi-why p{margin:0;color:var(--fg-2)}
 .tour-why{margin:2px 0 0;font-size:12.5px;line-height:1.45;color:var(--muted)}
+.kofi-how .kofi-ok{align-self:stretch;justify-content:center}

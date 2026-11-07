@@ -985,7 +985,7 @@ function supportCard(cls = '') {
     <div class="sup-acts"><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a><button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></div></div></div>`;
 }
 // Cómo conseguir la prioridad con Ko-fi: cualquier cantidad y el ID de jugador en el mensaje (cloudflare/kofi.js lo lee)
-function kofiHow() {
+function kofiHow(note = false) {
   const url = supportUrl(); if (!url) return;
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Prioridad para quien apoye'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
     <div class="sheet-b kofi-how"><p>${esc(t('SlapScore es gratis y sin anuncios. Si lo apoyas en Ko-fi con cualquier cantidad, aunque sea simbólica, tus partidos se cargarán antes.'))}</p>
@@ -998,7 +998,21 @@ function kofiHow() {
         <p>${esc(t('El robot revisa a miles de jugadores por turnos. Cada consulta a slapshot.gg lleva su tiempo y hay que hacerlas con calma para no saturarla, así que no se puede mirar a todo el mundo cada pocos minutos: si todos tuvieran prioridad, en la práctica no la tendría nadie.'))}</p>
         <p>${esc(t('Por eso la prioridad es para una lista corta: los jugadores de más MMR y quienes apoyan el proyecto. No se busca ganar dinero: las donaciones ayudan a mantener la web y esta es la ventaja que de verdad se puede dar a cambio.'))}</p></div>
       <p class="muted">${esc(t('Es un pequeño agradecimiento: la web sigue siendo gratis y completa para todos.'))}</p>
-      <a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener" autofocus>${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a></div>`, 'kofi-sheet');
+      <a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener"${note ? '' : ' autofocus'}>${ICON.coffee}${esc(t('Apoyar en Ko-fi'))}</a>${note ? `<button type="button" class="btn kofi-ok" data-close autofocus>${esc(t('Entendido'))}</button>` : ''}</div>`, 'kofi-sheet');
+}
+// Aviso de la prioridad de Ko-fi: sale una sola vez a cada navegador, también a quien ya había entrado antes.
+// Quien lo ha visto en el tutorial (paso de Ko-fi) no lo vuelve a ver; si se saltó el tutorial antes, le sale en otra visita.
+const KOFI_NOTE_KEY = 'slapscore-kofi-note';
+let tourThisVisit = false;
+const kofiNoteSeen = () => { try { return !!localStorage.getItem(KOFI_NOTE_KEY) || localStorage.getItem('slapscore-tour') === 'done'; } catch { return true; } };
+function kofiNoteMark() { try { localStorage.setItem(KOFI_NOTE_KEY, String(Date.now())); } catch {} }
+function maybeKofiNote(tries = 0) {
+  if (!supportUrl() || kofiNoteSeen() || tourThisVisit || isBot()) return;
+  const v = route().view;
+  if (v === 'admin') return;
+  // con el tutorial a punto de salir, o algo abierto, se espera un poco
+  if (document.querySelector('.tour') || tourPending || $('#ovl') || $('#lang-menu') || (v === 'matches' && !tourDone())) { if (tries < 6) setTimeout(() => maybeKofiNote(tries + 1), 2500); return; }
+  kofiNoteMark(); hideTip(false); kofiHow(true);
 }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-kofi-how]')) { e.preventDefault(); kofiHow(); } });
 // ---------- buzón de sugerencias ----------
@@ -2160,7 +2174,8 @@ async function startTour() {
   hideTip(false);
   try {
     const T = await import('./tour.js');
-    T.start({ t, esc, ICON, supportUrl }, (done) => {
+    tourThisVisit = true;
+    T.start({ t, esc, ICON, supportUrl, onStep: (id) => { if (id === 'kofi') kofiNoteMark(); } }, (done) => {
       // a quien llega por primera vez no le sale además el aviso de novedades: el tutorial ya lo cuenta todo
       try { if (!localStorage.getItem(NEWS_KEY)) newsSeen(); localStorage.setItem(TOUR_KEY, done ? 'done' : 'skip'); } catch {}
       trackEvent(done ? 'tour' : 'tourskip');
@@ -2368,6 +2383,7 @@ document.addEventListener('click', (e) => { if (e.target.closest && e.target.clo
   }
   renderChrome(); go({ instant: true }); S.booted = true;
   trackView(route());
+  setTimeout(maybeKofiNote, 3000);
 })();
 
 // ---------- app instalable ----------

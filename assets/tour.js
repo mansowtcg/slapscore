@@ -112,6 +112,7 @@ export function start(X, onEnd) {
     i = Math.max(0, Math.min(S.length - 1, n));
     el = S[i].center ? null : findTarget(S[i].target);
     draw();
+    if (X.onStep) X.onStep(S[i].id);
     await bring(el);
     if (ended) return;
     place();
