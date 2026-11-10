@@ -11,6 +11,7 @@
   "home": "https://slapscore.app",
   "support": "https://ko-fi.com/slapscoreapp",
   "discord": "https://discord.gg/RUUzZPQT2g",
+  "discordRoles": { "totw": "1569727863492710410", "news": "1569727836279804005" },
   "hiddenPlayers": [],
   "supporters": []
 }
