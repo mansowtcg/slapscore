@@ -1433,3 +1433,17 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 @media (hover:none) and (pointer:coarse){html.sheet-open{overflow:hidden}}
 
 .sheet-h small{flex-wrap:wrap;row-gap:2px}
+
+/* Administrador: redes sociales (estado de X e Instagram y kit de TikTok) */
+.soc-row{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.soc-n{flex:0 0 96px}
+.soc-s{flex:1;min-width:0}
+.soc-s p{margin:4px 0 0;font-size:12.5px;font-weight:500}
+.soc-s p.err{font-weight:600;overflow-wrap:anywhere}
+.soc-kit{border-top:1px solid var(--line);padding:12px 0 2px}
+.soc-kh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px;font-size:13.5px}
+.soc-kb{display:flex;gap:12px;align-items:flex-start}
+.soc-kb img{display:block;width:108px;height:auto;border-radius:8px;border:1px solid var(--line)}
+.soc-kt{flex:1;min-width:0}
+.soc-kt pre{margin:0 0 8px;padding:8px 10px;max-height:150px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:12.5px;line-height:1.45;background:var(--surface-3);border-radius:8px}
+@media (max-width:420px){.soc-row{flex-direction:column;gap:2px}.soc-n{flex:none}}

@@ -97,6 +97,7 @@ export async function mount(root, ctx) {
         <div id="prog"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Estado del robot</h3><span id="wf-pill"></span></div><div class="card-b" id="wf"><div class="sk" style="height:90px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Avisos por email</h3><small>si la web deja de actualizarse</small></div><div class="card-b" id="alerts"><div class="sk" style="height:60px"></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Redes sociales</h3><small>equipo de la semana y jugador del mes</small></div><div id="social"><div class="card-b"><div class="sk" style="height:90px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Últimas pasadas</h3><a href="https://github.com/${esc(REPO)}/actions" target="_blank" rel="noopener">Ver en GitHub</a></div><div class="runs" id="runs"><div class="card-b"><div class="sk" style="height:120px"></div></div></div></div>
     </div>
     <div class="col">
@@ -132,7 +133,7 @@ export async function mount(root, ctx) {
   $$('[data-min]', root).forEach((b) => b.addEventListener('click', () => { minutes = Number(b.getAttribute('data-min')); $$('[data-min]', root).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); }));
   $('#go-now').addEventListener('click', () => bringNow(minutes));
   drawProgress(null);
-  loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts(); loadKofi();
+  loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts(); loadKofi(); loadSocial();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
   try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawExtra(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'sups', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
@@ -195,6 +196,46 @@ async function loadAlerts() {
     catch (ex) { X.toast(ex.message); }
     b.disabled = false; b.textContent = 'Enviar prueba';
   });
+}
+
+// ---------- redes sociales ----------
+// Lo que publica el robot (crawler/social.js) y el kit para TikTok. El estado es público: data/social/status.json.
+const NET_NAME = { x: 'X (Twitter)', ig: 'Instagram', kit: 'TikTok' };
+const KIND_NAME = { totw: 'Equipo de la semana', month: 'Jugador del mes', news: 'Novedades' };
+async function loadSocial() {
+  const el = $('#social'); if (!el) return;
+  const { esc, ago } = X;
+  let s = null;
+  try { const r = await fetch('/data/social/status.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) s = await r.json(); } catch {}
+  s = s && typeof s === 'object' ? s : {};
+  const on = s.on || {}, last = s.last || {}, err = s.err || {}, ig = s.ig || {}, posts = s.posts || {};
+  const day = (ms) => new Date(ms).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+  const web = (u) => (/^https:\/\/(x\.com|www\.instagram\.com)\//.test(String(u)) ? String(u) : '');
+  const row = (net, off, extra = '') => {
+    const l = last[net], e = err[net];
+    const lastTxt = l ? ` · ${esc(KIND_NAME[l.kind] || l.kind)}, ${esc(ago(l.at))}${web(l.url) ? ` · <a href="${esc(web(l.url))}" target="_blank" rel="noopener">ver</a>` : ''}` : on[net] ? ' · aún no ha publicado nada' : '';
+    return `<div class="soc-row"><b class="soc-n">${NET_NAME[net]}</b><div class="soc-s">${on[net] ? `<b class="ok-t">${net === 'kit' ? 'Kit activo' : 'Publica solo'}</b>` : `<span class="muted">${off}</span>`}${lastTxt}${extra}${e ? `<p class="err">No se pudo publicar (${esc(KIND_NAME[e.kind] || e.kind)}, intento ${esc(e.n)} de 4, ${esc(ago(e.at))}): ${esc(e.msg)}</p>` : ''}</div></div>`;
+  };
+  const igx = !on.ig ? '' : ig.dead ? '<p class="err">El token de Instagram ya no vale: genera otro y cámbialo en el secreto IG_ACCESS_TOKEN.</p>'
+    : ig.rotate ? `<p class="err">Instagram cambió el token al renovarlo y no se pudo guardar: pon uno nuevo en el secreto IG_ACCESS_TOKEN${ig.exp ? ` antes del ${esc(day(ig.exp))}` : ' en las próximas semanas'}.</p>`
+    : ig.exp ? `<p class="muted">${ig.user ? `@${esc(ig.user)} · ` : ''}token válido hasta el ${esc(day(ig.exp))}; se renueva solo cada semana.</p>` : '';
+  const kit = ['totw', 'month'].filter((k) => posts[k] && posts[k].tiktok).map((k) => {
+    const p = posts[k], img = /^(totw|month)-[\w-]+\.jpg$/.test(String(p.img)) ? '/data/social/' + p.img : '';
+    return `<div class="soc-kit" data-kit="${k}"><div class="soc-kh"><b>${esc(KIND_NAME[k])}</b><span class="muted">${esc(p.label || '')}</span></div>
+      <div class="soc-kb">${img ? `<a href="${esc(img)}" target="_blank" rel="noopener"><img src="${esc(img)}" alt="Imagen de ${esc(KIND_NAME[k])}" loading="lazy" width="108" height="135"></a>` : ''}
+      <div class="soc-kt"><pre>${esc(p.tiktok)}</pre><div class="toolbar"><button class="btn sm" type="button" data-copy="${esc(p.tiktok)}">Copiar texto</button>${img ? `<button class="btn sm primary" type="button" data-kit-share="${esc(img)}">Compartir imagen</button>` : '<a class="btn sm" href="#premios">Sacar la imagen en Premios</a>'}</div></div></div></div>`;
+  }).join('');
+  el.innerHTML = `<div class="card-b soc"><p class="muted" style="margin-top:0">Los lunes a las 18:00 (hora de Madrid) sale el equipo de la semana y el día 1, el jugador del mes. X e Instagram se publican solos cuando están sus claves en los secretos del repositorio. TikTok no deja publicar desde fuera: aquí tienes la imagen y el texto para subirlo desde el móvil.</p>
+    ${row('x', 'Sin claves: no publica')}${row('ig', 'Sin token: no publica', igx)}${row('kit', 'Kit apagado')}
+    ${kit || (on.kit ? '<p class="muted" style="margin-bottom:0">El kit se prepara con el próximo equipo de la semana.</p>' : '')}</div>`;
+  $$('[data-kit-share]', el).forEach((b) => b.addEventListener('click', async () => {
+    const url = b.getAttribute('data-kit-share'), name = url.split('/').pop();
+    try {
+      const blob = await (await fetch(url)).blob(), file = new File([blob], name, { type: 'image/jpeg' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'SlapScore' }); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); X.toast('Imagen descargada');
+    } catch (e) { if (!e || e.name !== 'AbortError') X.toast('No se pudo preparar la imagen: prueba dentro de unos minutos.'); }
+  }));
 }
 
 // ---------- Ko-fi ----------

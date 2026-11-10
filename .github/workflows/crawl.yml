@@ -19,6 +19,9 @@ on:
       discord:
         description: 'Publicar ahora en Discord aunque no toque: totw, month o news (vacío: lo normal)'
         default: ''
+      social:
+        description: 'Publicar ahora en las redes (X, Instagram, kit de TikTok) aunque no toque: totw, month o news (vacío: lo normal)'
+        default: ''
 
 permissions:
   contents: write
@@ -117,6 +120,35 @@ jobs:
               && node crawler/discord.js render || echo "::warning::No se pudo preparar la imagen para Discord: el mensaje sale sin ella."
           fi
           node crawler/discord.js post
+      - name: Redes sociales
+        if: steps.gate.outputs.go == 'true'
+        continue-on-error: true
+        env:
+          # X (Twitter): las cuatro claves de la app. Instagram: el token de la cuenta. Canal privado de Discord: avisos del kit de TikTok.
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          DISCORD_WEBHOOK_STAFF: ${{ secrets.DISCORD_WEBHOOK_STAFF }}
+          # para guardar el token de Instagram si cambia al renovarlo (almacén privado de Cloudflare)
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SOCIAL_FORCE: ${{ github.event.inputs.social }}
+          DATA_DIR: data
+        run: |
+          # Equipo de la semana y jugador del mes en X e Instagram, y el kit para TikTok: crawler/social.js
+          case "$SOCIAL_FORCE" in totw|month|news|'') ;; *) SOCIAL_FORCE='' ;; esac
+          if [ "$(node crawler/social.js plan)" = "render" ]; then
+            # la imagen es la misma que hace la web, en JPEG; se guarda en data/social/ y sale publicada con la web
+            export PW_DIR="$RUNNER_TEMP/pw"
+            if [ ! -d "$PW_DIR/node_modules/playwright" ]; then
+              mkdir -p "$PW_DIR"
+              ( cd "$PW_DIR" && npm init -y >/dev/null && npm i --silent --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium >/dev/null ) || echo "::warning::No se pudo instalar el navegador para preparar la imagen."
+            fi
+            node crawler/social.js render || echo "::warning::No se pudo preparar la imagen para las redes."
+          fi
+          node crawler/social.js post
       - name: Subir el archivo
         if: steps.gate.outputs.go == 'true'
         env:

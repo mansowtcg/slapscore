@@ -30,7 +30,7 @@ export function madridStamp(ms) {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}T${p.hour}`;
 }
-const hookOk = (u) => typeof u === 'string' && /^https:\/\/(?:(?:canary\.|ptb\.)?discord\.com|discordapp\.com)\/api\/webhooks\/\d{5,25}\/[\w-]{20,200}$/.test(u.trim());
+export const hookOk = (u) => typeof u === 'string' && /^https:\/\/(?:(?:canary\.|ptb\.)?discord\.com|discordapp\.com)\/api\/webhooks\/\d{5,25}\/[\w-]{20,200}$/.test(u.trim());
 const roleOk = (id) => typeof id === 'string' && /^\d{5,25}$/.test(id);
 const md = (s) => String(s).replace(/([\\*_~`|>\[\]()#-])/g, '\\$1').replace(/@/g, '@\u200b').slice(0, 80);   // nombres de jugadores: sin formato ni menciones
 const rating = (x) => Number(x).toFixed(2);
@@ -95,7 +95,7 @@ export async function send(url, payload, file) {
   if (file) {
     const fd = new FormData();
     fd.append('payload_json', JSON.stringify({ ...payload, attachments: [{ id: 0, filename: file.name }] }));
-    fd.append('files[0]', new Blob([file.data], { type: 'image/png' }), file.name);
+    fd.append('files[0]', new Blob([file.data], { type: /\.jpe?g$/i.test(file.name) ? 'image/jpeg' : 'image/png' }), file.name);
     body = fd;
   } else { body = JSON.stringify(payload); headers = { 'content-type': 'application/json' }; }
   for (let i = 0; i < 3; i++) {
@@ -108,7 +108,7 @@ export async function send(url, payload, file) {
 }
 
 // Titular de las novedades, en inglés (assets/en.js); si falta la traducción, sale el original
-async function newsInfo() {
+export async function newsInfo() {
   try {
     const N = await import(pathToFileURL(path.join(ROOT, 'assets', 'news.js')).href);
     let en = {}; try { en = (await import(pathToFileURL(path.join(ROOT, 'assets', 'en.js')).href)).default || {}; } catch {}
@@ -126,8 +126,9 @@ async function context() {
   return { hooks, roles, force, now, awards, state, news };
 }
 
-// Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana
-async function render(kinds) {
+// Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana.
+// dir y names: dónde y con qué nombre se guardan; jpeg: en JPEG (lo que piden Instagram y TikTok) en vez de PNG.
+export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } = {}) {
   const { chromium } = createRequire(path.join(path.resolve(process.env.PW_DIR || ROOT), 'x.js'))('playwright');
   const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' };
   const srv = http.createServer(async (req, res) => {
@@ -148,16 +149,24 @@ async function render(kinds) {
     await ctx.addInitScript(() => { try { localStorage.setItem('slapscore-lang', 'en'); localStorage.setItem('slapscore-tour', 'done'); localStorage.setItem('slapscore-kofi-note', '1'); localStorage.setItem('slapscore-dc-note', '1'); } catch {} });
     const page = await ctx.newPage();
     await page.goto(base + '/awards', { waitUntil: 'domcontentloaded' });
-    await fs.mkdir(IMG, { recursive: true });
+    await fs.mkdir(dir, { recursive: true });
     for (const k of kinds) {
       const btn = `[data-aw-share="${k === 'totw' ? 'week' : 'month'}"]`;
       await page.waitForSelector(btn, { timeout: 30000 });
       await page.click(btn);
       await page.waitForSelector('#sh-pv img', { timeout: 30000 });
-      const b64 = await page.$eval('#sh-pv img', async (img) => { const r = await fetch(img.src); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(s); });
+      const b64 = await page.$eval('#sh-pv img', async (img, asJpeg) => {
+        let blob = await (await fetch(img.src)).blob();
+        if (asJpeg) {
+          const bmp = await createImageBitmap(blob), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+          const g = c.getContext('2d'); g.fillStyle = '#0b1020'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0);
+          blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.92));
+        }
+        const b = new Uint8Array(await blob.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192)); return btoa(s);
+      }, jpeg);
       const buf = Buffer.from(b64, 'base64');
       if (buf.length < 5000) throw new Error('imagen vacía');
-      await fs.writeFile(path.join(IMG, FILES[k]), buf);
+      await fs.writeFile(path.join(dir, names[k]), buf);
       console.log(`Imagen de ${k}: ${Math.round(buf.length / 1024)} KB`);
       await page.keyboard.press('Escape'); await page.waitForSelector('#ovl', { state: 'detached', timeout: 5000 }).catch(() => {});
     }

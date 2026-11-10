@@ -70,6 +70,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.
 - `discord`: invitación al servidor de Discord de la comunidad (`https://discord.gg/...`, que no caduque). Si está, sale un recuadro en la portada, un enlace en el pie, en el buzón de sugerencias y en Novedades. El panel de tráfico cuenta los clics. Además, a cada navegador le sale una vez un aviso del servidor (`slapscore-dc-note`), también a quien ya había entrado antes; solo sale un aviso por visita (tutorial, Ko-fi o Discord, en ese orden).
 - `discordRoles`: roles de Discord a los que mencionan los avisos automáticos: `{ "totw": "<id del rol TOTW Ping>", "news": "<id del rol News Ping>" }`. Sin ellos, los avisos salen sin mención.
+- `social`: redes sociales (ver «Redes sociales» más abajo): `{ "tiktok": true, "xLink": false, "tags": "#SlapshotRebound #SlapScore" }`. `tiktok`: prepara cada semana el kit (imagen y texto) para subirlo a mano. `xLink`: añade el enlace a la web en las publicaciones de X (en la API de X una publicación con enlace cuesta bastante más). `tags`: etiquetas de las publicaciones.
 - `supporters`: IDs con la insignia ♥ puestos a mano. Los de **Ko-fi** van aparte y solos: Ko-fi avisa al Worker de cada apoyo (`/api/kofi`, con la clave de verificación que se pega en el panel); si el mensaje lleva el ID o el enlace del perfil, la insignia se pone sola, y si no, se asigna desde el panel. El robot baja esa lista en cada pasada.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
 
@@ -130,3 +131,27 @@ Usa webhooks (sin bot). Cada webhook es la dirección secreta de un canal y va e
 `DISCORD_WEBHOOK_NEWS` (canal `#announcements`). Sin secretos no se publica nada. Lo ya publicado se apunta en
 `data/_int/discord.json`; si un premio lleva más de 6 días sin publicarse, se da por visto. La primera vez, las novedades
 no se publican (solo las que lleguen después). Para publicar algo a mano: «Run workflow» con `discord` = `totw`, `month` o `news`.
+
+## Redes sociales
+
+El robot publica también en las redes (`crawler/social.js`, paso «Redes sociales» de la pasada), a la misma hora que en
+Discord (equipo de la semana los lunes a las 18:00 de Madrid; jugador del mes el día 1) y con la misma imagen de Premios,
+en JPEG de 1080×1350. La imagen se guarda en `data/social/` y sale publicada con la web.
+
+- **X (Twitter)**: imagen y texto, y además las novedades de la web como texto. Secretos `X_API_KEY`, `X_API_SECRET`,
+  `X_ACCESS_TOKEN` y `X_ACCESS_SECRET` (los cuatro de la app en console.x.com, con permiso «Read and write»; no caducan).
+  La API de X es de pago por uso: unos céntimos por publicación, y bastante más si el texto lleva un enlace (por eso `xLink`
+  viene apagado: la dirección de la web ya sale en la imagen).
+- **Instagram**: cuenta profesional y un token de la «API de Instagram con inicio de sesión de Instagram» con el permiso
+  `instagram_business_content_publish`, en el secreto `IG_ACCESS_TOKEN`. Instagram descarga la imagen de la web, así que
+  publica en la pasada siguiente a la que la prepara. El token dura 60 días: el robot lo renueva cada semana y, si al
+  renovarlo cambia, lo guarda en el almacén privado de Cloudflare (clave `sys:social-ig` del KV del buzón).
+- **TikTok**: su API solo deja publicar en público a aplicaciones auditadas y no admite herramientas para cuentas propias,
+  así que no se publica solo. Con `social.tiktok` se prepara el kit (imagen y texto), que sale en el panel de administración
+  («Redes sociales») con botones para copiar el texto y compartir la imagen desde el móvil. Con el secreto
+  `DISCORD_WEBHOOK_STAFF` (webhook de un canal privado), el kit llega también a Discord.
+
+Sin secretos no se publica nada. Lo publicado, los fallos y los textos se apuntan en `data/social/status.json` (público, sin
+nada secreto). Cada publicación se intenta hasta 4 veces, con media hora entre intentos; si un premio lleva más de 6 días
+sin publicarse, se da por visto. Las claves nunca se escriben en el registro. Para publicar algo a mano: «Run workflow» con
+`social` = `totw`, `month` o `news`.
