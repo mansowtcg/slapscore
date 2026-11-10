@@ -391,7 +391,7 @@ export default {
   "Entrar al Discord": "Join the Discord",
   "¿Prefieres hablarlo con la comunidad?": "Would you rather talk it over with the community?",
   "Servidor de Discord": "Discord server",
-  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.": "The home of the SlapScore community: site news, the team of the week, suggestions, clips and people to play with. There are channels in English and Spanish.",
+  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar.": "The home of the SlapScore community: site news, the team of the week, suggestions, clips and people to play with.",
   "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "New: the SlapScore Discord server. Plus your profile with session and weekly summaries, achievements and \"On fire\".",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',

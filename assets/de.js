@@ -767,6 +767,6 @@ export default {
   "Entrar al Discord": "Zum Discord",
   "¿Prefieres hablarlo con la comunidad?": "Lieber mit der Community darüber reden?",
   "Servidor de Discord": "Discord-Server",
-  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.": "Der Treffpunkt der SlapScore-Community: Neuigkeiten zur Seite, das Team der Woche, Vorschläge, Clips und Leute zum Mitspielen. Es gibt Kanäle auf Englisch und Spanisch.",
+  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar.": "Der Treffpunkt der SlapScore-Community: Neuigkeiten zur Seite, das Team der Woche, Vorschläge, Clips und Leute zum Mitspielen.",
   "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "Neu: der Discord-Server von SlapScore. Dazu dein Profil mit Session- und Wochenzusammenfassung, Erfolge und „In Form“.",
 };
