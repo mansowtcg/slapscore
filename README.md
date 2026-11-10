@@ -69,6 +69,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `retainDays`: días con el detalle completo en la web (por defecto 60).
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.
 - `discord`: invitación al servidor de Discord de la comunidad (`https://discord.gg/...`, que no caduque). Si está, sale un recuadro en la portada, un enlace en el pie, en el buzón de sugerencias y en Novedades. El panel de tráfico cuenta los clics. Además, a cada navegador le sale una vez un aviso del servidor (`slapscore-dc-note`), también a quien ya había entrado antes; solo sale un aviso por visita (tutorial, Ko-fi o Discord, en ese orden).
+- `discordRoles`: roles de Discord a los que mencionan los avisos automáticos: `{ "totw": "<id del rol TOTW Ping>", "news": "<id del rol News Ping>" }`. Sin ellos, los avisos salen sin mención.
 - `supporters`: IDs con la insignia ♥ puestos a mano. Los de **Ko-fi** van aparte y solos: Ko-fi avisa al Worker de cada apoyo (`/api/kofi`, con la clave de verificación que se pega en el panel); si el mensaje lleva el ID o el enlace del perfil, la insignia se pone sola, y si no, se asigna desde el panel. El robot baja esa lista en cada pasada.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
 
@@ -115,3 +116,17 @@ Los textos se escriben en español en el código y se traducen con `t()` (`asset
 - `cloudflare/worker.js`, `wrangler.toml`: publicación opcional en Cloudflare.
 
 SlapScore no está afiliado a Oddshot Games.
+
+## Avisos automáticos en Discord
+
+El robot publica solo en el servidor de Discord (`crawler/discord.js`, paso «Avisos en Discord» de la pasada):
+
+- **Equipo de la semana**: los lunes a partir de las 18:00 (hora de Madrid), con la misma imagen que hace la web en Premios.
+- **Jugador del mes**: el día 1 a partir de las 18:00.
+- **Novedades de la web**: cuando sube `NEWS_DATE` en `assets/news.js`, con el titular en inglés.
+
+Usa webhooks (sin bot). Cada webhook es la dirección secreta de un canal y va en los secretos del repositorio
+(Settings → Secrets and variables → Actions): `DISCORD_WEBHOOK_TOTW` (canal `#team-of-the-week`) y
+`DISCORD_WEBHOOK_NEWS` (canal `#announcements`). Sin secretos no se publica nada. Lo ya publicado se apunta en
+`data/_int/discord.json`; si un premio lleva más de 6 días sin publicarse, se da por visto. La primera vez, las novedades
+no se publican (solo las que lleguen después). Para publicar algo a mano: «Run workflow» con `discord` = `totw`, `month` o `news`.

@@ -16,6 +16,9 @@ on:
       chain:
         description: 'Pasada automática encadenada (1) o manual (0)'
         default: '0'
+      discord:
+        description: 'Publicar ahora en Discord aunque no toque: totw, month o news (vacío: lo normal)'
+        default: ''
 
 permissions:
   contents: write
@@ -92,6 +95,28 @@ jobs:
         if: steps.gate.outputs.go == 'true'
         continue-on-error: true
         run: node crawler/eusl.js
+      - name: Avisos en Discord
+        if: steps.gate.outputs.go == 'true'
+        continue-on-error: true
+        env:
+          # direcciones secretas de los canales (webhooks): #team-of-the-week y #announcements
+          DISCORD_WEBHOOK_TOTW: ${{ secrets.DISCORD_WEBHOOK_TOTW }}
+          DISCORD_WEBHOOK_NEWS: ${{ secrets.DISCORD_WEBHOOK_NEWS }}
+          DISCORD_FORCE: ${{ github.event.inputs.discord }}
+          DATA_DIR: data
+        run: |
+          # Equipo de la semana (lunes), jugador del mes (día 1) y novedades de la web: crawler/discord.js
+          [ -n "$DISCORD_WEBHOOK_TOTW$DISCORD_WEBHOOK_NEWS" ] || { echo "Sin webhooks de Discord: no se publica nada."; exit 0; }
+          case "$DISCORD_FORCE" in totw|month|news|'') ;; *) DISCORD_FORCE='' ;; esac
+          due=$(node crawler/discord.js plan)
+          echo "Toca publicar: ${due:-nada}"
+          if echo "$due" | grep -qE '^(totw|month)$'; then
+            # la imagen es la misma que hace la web; si no se puede preparar, el mensaje sale sin ella
+            export PW_DIR="$RUNNER_TEMP/pw"; mkdir -p "$PW_DIR"
+            ( cd "$PW_DIR" && npm init -y >/dev/null && npm i --silent --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium >/dev/null ) \
+              && node crawler/discord.js render || echo "::warning::No se pudo preparar la imagen para Discord: el mensaje sale sin ella."
+          fi
+          node crawler/discord.js post
       - name: Subir el archivo
         if: steps.gate.outputs.go == 'true'
         env:

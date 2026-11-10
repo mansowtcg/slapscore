@@ -1784,11 +1784,13 @@ async function obsSheet(P, mode) {
   const onR = () => { if (!$('#obs-sc')) { removeEventListener('resize', onR); return; } draw(); };
   addEventListener('resize', onR, { passive: true });
 }
+// La dirección que sale en las imágenes: la de la web (ajuste «home»), aunque se generen desde otra (pruebas, robot)
+function siteHost() { try { return new URL(S.settings.home).host || location.host; } catch { return location.host; } }
 async function shareImage(kind, obj, fname) {
   openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Compartir imagen'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div><div class="share-pv" id="sh-pv"><div class="sk" style="width:100%;aspect-ratio:4/5"></div></div><div class="sheet-f" id="sh-f"></div>`, 'share-sheet');
   try {
     const Sh = await import('./share.js');
-    const X = { t, lang: LANG, loc: LOC, pct, teamL: TEAM_LETTER, host: location.host, fmtR, int, resLetter, typeLabel, region: regionLabel,
+    const X = { t, lang: LANG, loc: LOC, pct, teamL: TEAM_LETTER, host: siteHost(), fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
     const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : kind === 'summary' ? await Sh.summaryImage(obj, X) : await Sh.profileImage(obj, X);
