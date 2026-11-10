@@ -926,7 +926,10 @@ html.vt-same .days{view-transition-name:daybar}
 .fb-it{padding:12px 16px;border-top:1px solid var(--line)}
 .fb-it-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fb-it-h .muted{font-size:12.5px}
-.fb-it-h .btn{margin-left:auto}
+.fb-btns{margin-left:auto;display:inline-flex;gap:6px;flex-wrap:wrap}
+.fb-state{margin-bottom:10px;flex-wrap:wrap}
+.fb-it.done .fb-tx,.fb-it.done .fb-meta{opacity:.6}
+.pill.fb-ok{background:color-mix(in srgb,var(--win) 16%,transparent);color:var(--win)}
 .fb-tx{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45}
 .fb-meta{margin:6px 0 0;font-size:12.5px;overflow-wrap:anywhere}
 
@@ -1447,3 +1450,28 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .soc-kt{flex:1;min-width:0}
 .soc-kt pre{margin:0 0 8px;padding:8px 10px;max-height:150px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:12.5px;line-height:1.45;background:var(--surface-3);border-radius:8px}
 @media (max-width:420px){.soc-row{flex-direction:column;gap:2px}.soc-n{flex:none}}
+
+/* Overlay para OBS: elegir qué partidos cuentan */
+.obs-r .seg.off{opacity:.45}
+.obs-pick{border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.obs-pick summary{cursor:pointer;padding:11px 12px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;list-style:none}
+.obs-pick summary::-webkit-details-marker{display:none}
+.obs-pick summary::before{content:"";flex:none;width:7px;height:7px;margin:0 3px 2px 2px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s}
+.obs-pick[open] summary::before{transform:rotate(45deg)}
+.obs-pick summary .n{margin-left:auto;font-size:12.5px;color:var(--primary)}
+.obs-pk-b{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.obs-pk-b p{margin:0;font-size:13px;line-height:1.45}
+.obs-pk-list{align-self:stretch;display:flex;flex-direction:column;max-height:268px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.obs-pk-it{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:7px 10px;font-size:13px;cursor:pointer;border-top:1px solid var(--line)}
+.obs-pk-it:first-child{border-top:0}
+.obs-pk-it input{width:17px;height:17px;margin:0;accent-color:var(--primary)}
+.obs-pk-it .d{font-weight:700}
+.obs-pk-it .d,.obs-pk-it .y{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obs-pk-it .y{color:var(--muted)}
+.obs-pk-it .s{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.obs-pk-it .s.w{color:var(--win)}.obs-pk-it .s.l{color:var(--loss)}
+.obs-pk-it:has(input:not(:checked))>:not(input){opacity:.45}
+.obs-pk-none{padding:12px}
+.obs-pk-acts{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap}
+.obs-pk-acts:not(:has(button:not([hidden]))){display:none}
+.fb-state .n{font-weight:600;opacity:.7}

@@ -402,4 +402,20 @@ export default {
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',
+  // overlay para OBS: fechas y elegir partidos
+  "Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo. También puedes poner la fecha de cada partido y elegir qué partidos cuentan: por ejemplo, solo los de una liga.": "Show any player's latest match ratings and average rating on your stream. On their profile, tap \"OBS overlay\", choose how it looks and copy the link. It updates itself. You can also show the date of each match and choose which matches count: for example, only the ones from a league.",
+  "Fechas": "Dates",
+  "Elegir qué partidos cuentan": "Choose which matches count",
+  "Los últimos": "The latest",
+  "Los que yo elija": "Only the ones I pick",
+  "Cuentan los últimos partidos. Desmarca los que no quieras: desaparecen de la lista y de la nota media. Los nuevos se añaden solos.": "The latest matches count. Untick the ones you don’t want: they disappear from the list and from the average rating. New matches are added automatically.",
+  "Solo cuentan los partidos que marques; los nuevos no se añaden. Para enseñar los de una liga o un torneo.": "Only the matches you tick count; new ones are not added. Handy for showing just a league or a tournament.",
+  "Marca al menos un partido.": "Tick at least one match.",
+  "{n} elegidos": "{n} picked",
+  "{n} quitados": "{n} removed",
+  "Marcar todos": "Tick all",
+  "Desmarcar todos": "Untick all",
+  "Ver más partidos": "Show more matches",
+  "Como mucho {n} partidos.": "At most {n} matches.",
+  "Sin partidos todavía": "No matches yet",
 };

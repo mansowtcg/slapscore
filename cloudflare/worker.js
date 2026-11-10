@@ -134,6 +134,20 @@ async function feedback(request, env, path) {
     }))).filter(Boolean);
     return json({ items, total: keys.length }, 200, request, env);
   }
+  // marcar una petición como cumplida (o volver a dejarla pendiente)
+  const mark = /^\/api\/feedback\/(fb:[0-9]{13}-[0-9a-f]{8})\/(done|open)$/.exec(path);
+  if (request.method === 'POST' && mark) {
+    if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);
+    try {
+      const v = await KV.get(mark[1]); let item = null; try { item = v ? JSON.parse(v) : null; } catch {}
+      if (!item || typeof item !== 'object') return json({ error: 'not found' }, 404, request, env);
+      if (mark[2] === 'done') item.done = Date.now(); else delete item.done;
+      // se conserva la caducidad: un año desde que llegó (y, como poco, un día más)
+      const now = Math.floor(Date.now() / 1000), exp = Math.max(now + 86400, Math.floor((Number(item.t) || Date.now()) / 1000) + 365 * 86400);
+      await KV.put(mark[1], JSON.stringify(item), { expiration: exp });
+      return json({ ok: true, done: item.done || 0 }, 200, request, env);
+    } catch { return json({ error: 'unavailable' }, 503, request, env); }
+  }
   const del = /^\/api\/feedback\/(fb:[0-9]{13}-[0-9a-f]{8})$/.exec(path);
   if (request.method === 'DELETE' && del) {
     if (!(await isAdmin(request, env))) return json({ error: 'auth' }, 401, request, env);

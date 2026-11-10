@@ -1705,15 +1705,17 @@ const BUILD_Q = (() => { try { const b = new URL(import.meta.url).searchParams.g
 // Ventana flotante (uso personal): el mismo overlay en una ventana pequeña que se queda encima de las demás, para ver
 // tus últimas notas mientras juegas. Chrome y Edge de ordenador tienen ventanas «siempre encima» (Document
 // Picture-in-Picture); en los demás navegadores se abre una ventana normal. Hay que pedirla en el mismo clic.
-const OV_DEF = { n: 10, m: 'pub', v: 'full', th: 'dark', l: 'en', rk: 1, st: 1 };   // como OV_DEFAULTS de overlay.js
+const OV_DEF = { n: 10, m: 'pub', v: 'full', th: 'dark', l: 'en', rk: 1, st: 1, d: 0 };   // como OV_DEFAULTS de overlay.js
 const floatOk = () => 'documentPictureInPicture' in window || matchMedia('(pointer:fine) and (min-width:900px)').matches;
 async function floatOverlay(P, o) {
-  const sz = o.v === 'compact' ? { w: 620, h: 72 } : { w: 480, h: o.st ? 216 : 162 };
+  const sz = o.v === 'compact' ? { w: 620, h: 72 + (o.d ? 12 : 0) } : { w: 480, h: (o.st ? 216 : 162) + (o.d ? 16 : 0) };
   const dp = window.documentPictureInPicture;
   let win = null;
   if (dp) { try { win = await dp.requestWindow({ width: sz.w, height: sz.h }); } catch {} }
   if (!win) {
-    const q = new URLSearchParams(); for (const k of Object.keys(OV_DEF)) if (o[k] !== OV_DEF[k]) q.set(k, String(o[k])); q.set('win', '1');
+    const q = new URLSearchParams(); for (const k of Object.keys(OV_DEF)) if (o[k] !== OV_DEF[k]) q.set(k, String(o[k]));
+    if (o.k && o.k.length) q.set('k', o.k.join('.')); else if (o.x && o.x.length) q.set('x', o.x.join('.'));
+    q.set('win', '1');
     const w = window.open(`/overlay/${encodeURIComponent(P.id)}?${q}`, 'slapscore-float', `popup=yes,width=${sz.w},height=${sz.h}`);
     toast(w ? t('Ventana abierta. Para que se quede siempre encima del juego, usa Chrome o Edge en el ordenador.') : t('El navegador ha bloqueado la ventana: permite las ventanas emergentes de SlapScore.'), 6500);
     if (w) trackEvent('float');
@@ -1733,7 +1735,9 @@ async function obsSheet(P, mode) {
   let css = $('#ov-css');
   if (!css) { css = document.createElement('link'); css.id = 'ov-css'; css.rel = 'stylesheet'; css.href = '/assets/overlay.css' + BUILD_Q; document.head.appendChild(css); }
   const cssReady = css.sheet ? Promise.resolve() : new Promise((ok) => { css.addEventListener('load', ok, { once: true }); css.addEventListener('error', ok, { once: true }); setTimeout(ok, 3000); });
-  const o = { ...O.OV_DEFAULTS, l: LANG, m: mode === 'cus' ? 'cus' : 'pub' };
+  const o = { ...O.OV_DEFAULTS, l: LANG, m: mode === 'cus' ? 'cus' : 'pub', x: [], k: [] };
+  // qué partidos cuentan: los últimos quitando los desmarcados (auto) o solo los marcados (fixed)
+  let pk = 'auto', pkRows = 30;
   const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-ov="${k}" data-v="${v}" aria-pressed="${String(o[k]) === String(v)}">${esc(l)}</button>`).join('')}</div>`;
   const row = (label, html) => `<div class="obs-r"><span class="lbl">${esc(label)}</span>${html}</div>`;
   const chk = (k, label) => `<label class="obs-chk"><input type="checkbox" data-ovc="${k}"${o[k] ? ' checked' : ''}> ${esc(label)}</label>`;
@@ -1743,9 +1747,16 @@ async function obsSheet(P, mode) {
       <div class="obs-opts">
         ${row(t('Partidos'), seg('n', [[5, '5'], [10, '10'], [20, '20']]))}
         ${row(t('Tipo de partida'), seg('m', [['pub', t('Pública')], ['cus', t('Custom')], ['all', t('Todas')]]))}
+        <details class="obs-pick" id="obs-pick"><summary><span>${esc(t('Elegir qué partidos cuentan'))}</span><span class="n" id="obs-pk-n"></span></summary>
+          <div class="obs-pk-b">
+            <div class="seg" role="group" aria-label="${esc(t('Elegir qué partidos cuentan'))}">${[['auto', t('Los últimos')], ['fixed', t('Los que yo elija')]].map(([v, l]) => `<button type="button" data-pkm="${v}" aria-pressed="${v === pk}">${esc(l)}</button>`).join('')}</div>
+            <p class="muted" id="obs-pk-help"></p>
+            <div class="obs-pk-list" id="obs-pk-list"></div>
+            <div class="obs-pk-acts"><button type="button" class="tbtn" id="obs-pk-reset"></button><button type="button" class="tbtn" id="obs-pk-more">${esc(t('Ver más partidos'))}</button></div>
+          </div></details>
         ${row(t('Diseño'), seg('v', [['full', t('Completo')], ['compact', t('Compacto')]]))}
         ${row(t('Fondo'), seg('th', [['dark', t('Oscuro')], ['light', t('Claro')], ['clear', t('Transparente')]]))}
-        ${row(t('Mostrar'), `<div class="obs-chks">${chk('rk', t('Rango y MMR'))}${chk('st', t('Estadísticas'))}</div>`)}
+        ${row(t('Mostrar'), `<div class="obs-chks">${chk('rk', t('Rango y MMR'))}${chk('st', t('Estadísticas'))}${chk('d', t('Fechas'))}</div>`)}
         ${row(t('Idioma'), `<select class="select" id="obs-l" aria-label="${esc(t('Idioma'))}">${LANGS.map(([k, n]) => `<option value="${k}"${k === o.l ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
       </div>
       <div class="obs-url"><input class="input" id="obs-u" readonly aria-label="${esc(t('Enlace del overlay'))}"><button type="button" class="btn primary" id="obs-copy">${esc(t('Copiar enlace'))}</button></div>
@@ -1767,19 +1778,55 @@ async function obsSheet(P, mode) {
     $('#obs-u', ovl).value = url();
     const z = O.ovSize(o); $('#obs-size', ovl).textContent = t('Pega el enlace y pon de tamaño {w} × {h}.', { w: z.w, h: z.h });
     $$('[data-ovc="st"]', ovl).forEach((c) => { c.disabled = o.v === 'compact'; c.closest('label').classList.toggle('off', o.v === 'compact'); });
+    // con selección fija no hay «últimos N»
+    $$('[data-ov="n"]', ovl).forEach((b) => { b.disabled = o.k.length > 0; }); const ns = $('[data-ov="n"]', ovl); if (ns) ns.parentElement.classList.toggle('off', o.k.length > 0);
+  }
+  // textos del selector (sin rehacer la lista: al marcar una casilla no se pierde el foco ni el sitio)
+  function pickInfo() {
+    if (!$('#obs-pk-help', ovl)) return;
+    $('#obs-pk-help', ovl).textContent = pk === 'fixed' ? t('Solo cuentan los partidos que marques; los nuevos no se añaden. Para enseñar los de una liga o un torneo.') + (o.k.length ? '' : ' ' + t('Marca al menos un partido.')) : t('Cuentan los últimos partidos. Desmarca los que no quieras: desaparecen de la lista y de la nota media. Los nuevos se añaden solos.');
+    $('#obs-pk-n', ovl).textContent = pk === 'fixed' ? t('{n} elegidos', { n: o.k.length }) : o.x.length ? t('{n} quitados', { n: o.x.length }) : '';
+    const rs = $('#obs-pk-reset', ovl); rs.textContent = pk === 'fixed' ? t('Desmarcar todos') : t('Marcar todos'); rs.hidden = !(pk === 'fixed' ? o.k.length : o.x.length);
+  }
+  function drawPick() {
+    const box = $('#obs-pk-list', ovl); if (!box) return;
+    const all = O.ovGames(P, o.m), X = new Set(pk === 'fixed' ? o.k : o.x);
+    const on = (g) => (pk === 'fixed') === X.has(O.ovKey(g));
+    box.innerHTML = all.slice(0, pkRows).map((g) => `<label class="obs-pk-it"><input type="checkbox" data-pk="${esc(O.ovKey(g))}"${on(g) ? ' checked' : ''}><span class="d">${esc(shortDate(g.t))} · ${esc(DF_TIME.format(new Date(g.t)))}</span><span class="y">${esc(typeLabel(g.y))}${g.f ? ' ' + esc(g.f) : ''}</span><span class="s ${g.r === 'W' ? 'w' : g.r === 'L' ? 'l' : ''}">${esc(resLetter(g.r))} ${esc(g.gf)}–${esc(g.ga)}</span>${badge(g.rt)}</label>`).join('') || `<p class="muted obs-pk-none">${esc(t('Sin partidos todavía'))}</p>`;
+    $('#obs-pk-more', ovl).hidden = all.length <= pkRows;
+    pickInfo();
   }
   ovl.addEventListener('click', (e) => {
     const b = e.target.closest('[data-ov]');
-    if (b) { const k = b.dataset.ov, v = b.dataset.v; o[k] = k === 'n' ? Number(v) : v; $$(`[data-ov="${k}"]`, ovl).forEach((x) => x.setAttribute('aria-pressed', String(x === b))); draw(); }
+    if (b) {
+      const k = b.dataset.ov, v = b.dataset.v; o[k] = k === 'n' ? Number(v) : v; $$(`[data-ov="${k}"]`, ovl).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      if (k === 'm') { o.x = []; o.k = []; pkRows = 30; }   // otro tipo de partida: otra lista
+      draw(); drawPick(); return;
+    }
+    const pm = e.target.closest('[data-pkm]');
+    if (pm && pm.dataset.pkm !== pk) {
+      // al pasar a selección fija se parte de los partidos que se están viendo
+      pk = pm.dataset.pkm; o.k = pk === 'fixed' ? O.ovStats(P, { ...o, k: [] }).L.map(O.ovKey) : []; o.x = [];
+      $$('[data-pkm]', ovl).forEach((x) => x.setAttribute('aria-pressed', String(x === pm))); draw(); drawPick(); return;
+    }
+    if (e.target.closest('#obs-pk-reset')) { o.x = []; o.k = []; draw(); drawPick(); return; }
+    if (e.target.closest('#obs-pk-more')) { pkRows += 30; drawPick(); }
   });
   ovl.addEventListener('change', (e) => {
     const c = e.target.closest('[data-ovc]'); if (c) { o[c.dataset.ovc] = c.checked ? 1 : 0; draw(); }
+    const p = e.target.closest('[data-pk]');
+    if (p) {
+      const key = p.dataset.pk, list = pk === 'fixed' ? o.k : o.x, add = (pk === 'fixed') === p.checked, at = list.indexOf(key);
+      if (add && at < 0) { if (list.length >= O.OV_MAX_PICK) { p.checked = !p.checked; toast(t('Como mucho {n} partidos.', { n: O.OV_MAX_PICK })); return; } list.push(key); }
+      else if (!add && at >= 0) list.splice(at, 1);
+      draw(); pickInfo();
+    }
     if (e.target.id === 'obs-l') { o.l = e.target.value; draw(); }
   });
   $('#obs-copy', ovl).addEventListener('click', () => { const i = $('#obs-u', ovl); i.select(); copyText(i.value, i); trackEvent('obs'); });
   $('#obs-u', ovl).addEventListener('focus', (e) => e.target.select());
   const fb = $('#obs-float', ovl); if (fb) fb.addEventListener('click', () => floatOverlay(P, { ...o }));
-  draw(); cssReady.then(() => { draw(); requestAnimationFrame(draw); });
+  draw(); drawPick(); cssReady.then(() => { draw(); requestAnimationFrame(draw); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw).catch(() => {});
   const onR = () => { if (!$('#obs-sc')) { removeEventListener('resize', onR); return; } draw(); };
   addEventListener('resize', onR, { passive: true });

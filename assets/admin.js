@@ -277,7 +277,7 @@ async function loadKofi() {
 
 // ---------- buzón de sugerencias ----------
 const FB_LABEL = { idea: 'Idea', bug: 'Error', other: 'Otro' };
-let inboxFilter = '';
+let inboxFilter = '', inboxState = 'open';   // tipo y estado (pendientes, cumplidas o todos)
 async function inboxApi(path = '', opts = {}) {
   let r;
   try { r = await fetch(X.apiBase() + '/api/feedback' + path, { ...opts, cache: 'no-store', headers: { Authorization: `Bearer ${token()}` } }); }
@@ -296,16 +296,26 @@ async function loadInbox() {
   try { items = (await inboxApi()).items || []; }
   catch (e) { el.innerHTML = `<div class="card-b err">${esc(e.message)}</div>`; return; }
   const draw = () => {
-    const n = (k) => items.filter((x) => !k || x.type === k).length;
-    const list = items.filter((x) => !inboxFilter || x.type === inboxFilter);
-    el.innerHTML = `<div class="card-b" style="padding-bottom:6px"><div class="chips">${[['', 'Todos'], ['idea', 'Ideas'], ['bug', 'Errores'], ['other', 'Otros']].map(([k, l]) => `<button type="button" class="chip" data-ibf="${k}" aria-pressed="${inboxFilter === k}">${l} <span class="n">${n(k)}</span></button>`).join('')}</div></div>
-      ${list.length ? `<div class="fb-list">${list.map((x) => `<div class="fb-it" data-id="${esc(x.id)}">
-        <div class="fb-it-h"><span class="pill ${x.type === 'bug' ? 'ot' : x.type === 'idea' ? 'live' : ''}">${esc(FB_LABEL[x.type] || x.type)}</span><span class="muted">${esc(ago(x.t))} · ${new Date(x.t).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${x.lang === 'en' ? ' · EN' : ''}</span>
-          <button class="btn sm" type="button" data-del="${esc(x.id)}">Borrar</button></div>
+    const inState = (x) => inboxState === 'all' || (inboxState === 'done') === !!x.done;
+    const n = (k) => items.filter((x) => inState(x) && (!k || x.type === k)).length;
+    const ns = (k) => items.filter((x) => k === 'all' || (k === 'done') === !!x.done).length;
+    const list = items.filter((x) => inState(x) && (!inboxFilter || x.type === inboxFilter));
+    el.innerHTML = `<div class="card-b" style="padding-bottom:6px"><div class="seg fb-state" role="group" aria-label="Estado">${[['open', 'Pendientes'], ['done', 'Cumplidas'], ['all', 'Todos']].map(([k, l]) => `<button type="button" data-ibs="${k}" aria-pressed="${inboxState === k}">${l} <span class="n">${ns(k)}</span></button>`).join('')}</div>
+      <div class="chips">${[['', 'Todos'], ['idea', 'Ideas'], ['bug', 'Errores'], ['other', 'Otros']].map(([k, l]) => `<button type="button" class="chip" data-ibf="${k}" aria-pressed="${inboxFilter === k}">${l} <span class="n">${n(k)}</span></button>`).join('')}</div></div>
+      ${list.length ? `<div class="fb-list">${list.map((x) => `<div class="fb-it${x.done ? ' done' : ''}" data-id="${esc(x.id)}">
+        <div class="fb-it-h"><span class="pill ${x.type === 'bug' ? 'ot' : x.type === 'idea' ? 'live' : ''}">${esc(FB_LABEL[x.type] || x.type)}</span>${x.done ? `<span class="pill fb-ok" title="${esc(new Date(x.done).toLocaleString('es-ES'))}">✓ Cumplida</span>` : ''}<span class="muted">${esc(ago(x.t))} · ${new Date(x.t).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${x.lang === 'en' ? ' · EN' : ''}</span>
+          <span class="fb-btns"><button class="btn sm${x.done ? '' : ' primary'}" type="button" data-done="${esc(x.id)}">${x.done ? 'Reabrir' : '✓ Cumplida'}</button><button class="btn sm" type="button" data-del="${esc(x.id)}">Borrar</button></span></div>
         <p class="fb-tx">${esc(x.text)}</p>
         ${x.contact || x.page ? `<p class="muted fb-meta">${x.contact ? `Contacto: <b>${esc(x.contact)}</b>` : ''}${x.contact && x.page ? ' · ' : ''}${x.page ? `Página: ${/^#[\w\-:.%/]*$/.test(x.page) ? `<a href="${esc(x.page)}">${esc(x.page)}</a>` : esc(x.page)}` : ''}</p>` : ''}
-      </div>`).join('')}</div>` : `<div class="empty">${items.length ? 'Ningún mensaje de este tipo.' : 'Todavía no ha llegado ningún mensaje.'}</div>`}`;
+      </div>`).join('')}</div>` : `<div class="empty">${!items.length ? 'Todavía no ha llegado ningún mensaje.' : inboxState === 'open' && !inboxFilter ? 'Nada pendiente: todo cumplido.' : 'Ningún mensaje así.'}</div>`}`;
     $$('[data-ibf]', el).forEach((b) => b.addEventListener('click', () => { inboxFilter = b.getAttribute('data-ibf'); draw(); }));
+    $$('[data-ibs]', el).forEach((b) => b.addEventListener('click', () => { inboxState = b.getAttribute('data-ibs'); draw(); }));
+    $$('[data-done]', el).forEach((b) => b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-done'), it = items.find((x) => x.id === id); if (!it) return;
+      b.disabled = true;
+      try { const r = await inboxApi(`/${id}/${it.done ? 'open' : 'done'}`, { method: 'POST' }); if (r && r.done) it.done = r.done; else delete it.done; draw(); X.toast(it.done ? 'Marcada como cumplida' : 'Vuelve a estar pendiente'); }
+      catch (e) { X.toast(e.message); b.disabled = false; }
+    }));
     $$('[data-del]', el).forEach((b) => b.addEventListener('click', async () => {
       // dos pasos: el primer clic pide confirmación en el propio botón
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = '¿Seguro? Borrar'; b.classList.add('danger'); setTimeout(() => { if (b.isConnected) { b.dataset.sure = ''; b.textContent = 'Borrar'; b.classList.remove('danger'); } }, 4000); return; }
