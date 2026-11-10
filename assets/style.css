@@ -1399,3 +1399,13 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .eq-m{padding:2px 0 10px;background:var(--surface-2)}
 @media (max-width:560px){.sess{flex-direction:column;align-items:stretch;gap:10px}.sess-avg{flex-direction:row;justify-content:center;gap:10px}.eq summary{grid-template-columns:20px minmax(0,1fr) auto 16px}.eq-sub{display:none}.ach-nx{grid-template-columns:26px minmax(0,1fr) auto}.ach-nx .bar{display:none}#btn-fb{display:none}}
 .eq-m .nc .rt{opacity:.45}
+
+/* ---------- Discord de la comunidad ---------- */
+.dc-card .card-b{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.dc-card b{display:flex;align-items:center;gap:8px;font-size:15px}
+.dc-card b svg{width:18px;height:18px;color:#5865F2}
+.dc-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.btn.discord{background:#5865F2;border-color:#5865F2;color:#fff}
+.btn.discord:hover{background:#4752C4;border-color:#4752C4}
+.btn.discord svg{width:16px;height:16px}
+.fb-dc{margin:2px 0 0}

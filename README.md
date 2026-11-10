@@ -68,6 +68,7 @@ La rama `data` tiene un solo commit que se reescribe en cada pasada. Los archivo
 - `weights`: pesos de la nota que cambian respecto a los de `assets/core.js`. Al cambiarlos se recalculan las notas de los partidos no archivados.
 - `retainDays`: días con el detalle completo en la web (por defecto 60).
 - `support`: enlace de apoyo (Ko-fi, Patreon…). Si está, aparece un recuadro en la portada y un enlace en el pie.
+- `discord`: invitación al servidor de Discord de la comunidad (`https://discord.gg/...`, que no caduque). Si está, sale un recuadro en la portada, un enlace en el pie, en el buzón de sugerencias y en Novedades. El panel de tráfico cuenta los clics.
 - `supporters`: IDs con la insignia ♥ puestos a mano. Los de **Ko-fi** van aparte y solos: Ko-fi avisa al Worker de cada apoyo (`/api/kofi`, con la clave de verificación que se pega en el panel); si el mensaje lleva el ID o el enlace del perfil, la insignia se pone sola, y si no, se asigna desde el panel. El robot baja esa lista en cada pasada.
 - `home`: dirección nueva de la web si se muda; la de GitHub Pages redirige a ella.
 

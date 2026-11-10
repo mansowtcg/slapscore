@@ -531,6 +531,9 @@ function drawExtra(set) {
     <form id="x-sup" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-url">Enlace de apoyo (Ko-fi, Patreon…)</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-url" type="url" placeholder="https://ko-fi.com/tu-usuario" value="${esc(set.support || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
       <p class="muted" style="margin:8px 0 0;font-size:13px">Si lo rellenas, aparece un recuadro discreto en la portada y un enlace en el pie. Vacío, no se muestra nada.</p></form>
+    <form id="x-dc" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-dcurl">Invitación al servidor de Discord</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-dcurl" type="url" placeholder="https://discord.gg/abc123" value="${esc(set.discord || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
+      <p class="muted" style="margin:8px 0 0;font-size:13px">Usa una invitación que no caduque. Si lo rellenas, sale un recuadro en la portada, un enlace en el pie y en el buzón de sugerencias. Vacío, no se muestra nada.</p></form>
     <form id="x-home" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--line)"><div class="field"><label for="x-hurl">Dirección principal de la web</label>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input" id="x-hurl" type="url" placeholder="https://slapscore.tu-nombre.workers.dev" value="${esc(set.home || '')}" style="flex:1 1 220px"><button class="btn" type="submit">Guardar</button></div></div>
       <p class="muted" style="margin:8px 0 0;font-size:13px">Si la web se muda (por ejemplo a Cloudflare o a un dominio propio), escribe aquí la dirección nueva: quien entre por ${esc(location.host)} irá allí automáticamente. Ábrela antes para comprobar que funciona.</p></form>`;
@@ -551,6 +554,15 @@ function drawExtra(set) {
     try { if (u && new URL(u).origin === location.origin) { X.toast('Esa es la dirección en la que ya estás.'); return; } } catch { X.toast('Esa dirección no es válida.'); return; }
     const b = $('#x-home button'); b.disabled = true;
     try { await writeSettings((x) => { if (u) x.home = u; else delete x.home; return x; }, u ? `Dirección principal: ${u}` : 'Quitar la dirección principal'); X.toast(u ? 'Guardado: en unos minutos esta dirección llevará a la nueva.' : 'Quitado: ya no se redirige.'); }
+    catch (ex) { X.toast(ex.message); }
+    b.disabled = false;
+  });
+  $('#x-dc').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const u = $('#x-dcurl').value.trim();
+    if (u && !/^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]{2,40}$/.test(u)) { X.toast('Pega una invitación como https://discord.gg/abc123'); return; }
+    const b = $('#x-dc button'); b.disabled = true;
+    try { await writeSettings((x) => { if (u) x.discord = u; else delete x.discord; return x; }, u ? 'Añadir enlace de Discord' : 'Quitar enlace de Discord'); X.renderChrome(); X.toast(u ? 'Enlace guardado: ya se ve en la web.' : 'Enlace quitado.'); }
     catch (ex) { X.toast(ex.message); }
     b.disabled = false;
   });

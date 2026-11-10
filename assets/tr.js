@@ -762,4 +762,11 @@ export default {
   "Sesión en curso": "Oturum sürüyor",
   "Última sesión": "Son oturum",
   "Nuevo: tu perfil con resumen de sesión y de la semana, logros, «En racha» y notas de equipos.": "Yeni: oturum ve hafta özetleriyle profilin, başarımlar, «Formda» ve takım notları.",
+  "Únete al Discord de SlapScore": "SlapScore Discord'una katıl",
+  "Novedades, el equipo de la semana, sugerencias y gente con la que jugar.": "Yenilikler, haftanın takımı, öneriler ve birlikte oynayacak oyuncular.",
+  "Entrar al Discord": "Discord'a katıl",
+  "¿Prefieres hablarlo con la comunidad?": "Toplulukla konuşmayı mı tercih edersin?",
+  "Servidor de Discord": "Discord sunucusu",
+  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.": "SlapScore topluluğunun buluşma yeri: siteden yenilikler, haftanın takımı, öneriler, klipler ve birlikte oynayacak oyuncular. İngilizce ve İspanyolca kanallar var.",
+  "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "Yeni: SlapScore Discord sunucusu. Ayrıca oturum ve hafta özetleriyle profilin, başarımlar ve «Formda».",
 };

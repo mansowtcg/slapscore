@@ -358,13 +358,15 @@ function toast(msg, ms = 3800) {
 }
 // Enlace de apoyo (Ko-fi u otro) configurable desde el panel; si no hay, no se muestra nada
 function supportUrl() { const u = String((S.settings && S.settings.support) || '').trim(); return /^https:\/\/[^\s"'<>]+$/.test(u) ? u : ''; }
+// Servidor de Discord de la comunidad: enlace de invitación configurable desde el panel; si no hay, no se muestra nada
+function discordUrl() { const u = String((S.settings && S.settings.discord) || '').trim(); return /^https:\/\/(discord\.gg|discord\.com\/invite)\/[\w-]{2,40}$/.test(u) ? u : ''; }
 const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 300));
 function isAdmin() { try { return !!JSON.parse(localStorage.getItem(ADMIN_KEY) || 'null')?.token; } catch { return false; } }
 function renderChrome() {
   $('#btn-admin').hidden = !isAdmin();
   const i = S.index;
-  const sup = supportUrl();
-  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r"><button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><span class="foot-langs">${LANGS.map(([k, n]) => k === LANG ? `<b>${esc(n)}</b>` : `<a href="#" data-setlang="${k}" lang="${k}">${esc(n)}</a>`).join('')}</span></span>`;
+  const sup = supportUrl(), dc = discordUrl();
+  $('#foot').innerHTML = `<span>${t('Datos públicos de {a}', { a: '<a href="https://slapshot.gg" target="_blank" rel="noopener">slapshot.gg</a>' })}${i ? ` · ${esc(t('actualizado {x}', { x: ago(Date.parse(i.updated)) }))}` : ''} · ${esc(t('SlapScore no está afiliado a Oddshot Games.'))}</span><span class="foot-r">${dc ? `<a href="${esc(dc)}" target="_blank" rel="noopener" data-dc>Discord</a>` : ''}<button type="button" class="linkbtn" data-fb>${esc(t('Sugerencias'))}</button>${sup ? `<a href="${esc(sup)}" target="_blank" rel="noopener">${esc(t('Apoya el proyecto'))}</a>` : ''}<a href="#notas">${esc(t('Cómo puntuamos'))}</a><a href="#legal">${esc(t('Aviso legal y privacidad'))}</a><span class="foot-langs">${LANGS.map(([k, n]) => k === LANG ? `<b>${esc(n)}</b>` : `<a href="#" data-setlang="${k}" lang="${k}">${esc(n)}</a>`).join('')}</span></span>`;
 }
 // Si una transición se interrumpe (cambias de página muy rápido), el navegador la cancela: no es un error
 function quiet(tr) { if (tr) for (const k of ['ready', 'finished', 'updateCallbackDone']) if (tr[k]) tr[k].catch(() => {}); return tr; }
@@ -1006,6 +1008,12 @@ function supportCard(cls = '') {
     <div class="sup-perk"><span class="sp-ic">${ICON.bolt}</span><p><b>${esc(t('Prioridad para quien apoye'))}</b> ${esc(t('Con cualquier donación, aunque sea simbólica, y tu ID de jugador en el mensaje, tus partidos se cargan antes y llevas la insignia ♥ Supporter.'))}</p></div>
     <div class="sup-acts"><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a><button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></div></div></div>`;
 }
+// Invitación al servidor de Discord de la comunidad (portada)
+function discordCard(cls = '') {
+  const url = discordUrl(); if (!url) return '';
+  return `<div class="card in dc-card ${cls}"><div class="card-b"><b>${ICON.users}${esc(t('Únete al Discord de SlapScore'))}</b><p>${esc(t('Novedades, el equipo de la semana, sugerencias y gente con la que jugar.'))}</p><a class="btn discord" href="${esc(url)}" target="_blank" rel="noopener" data-dc>${esc(t('Entrar al Discord'))}${ICON.right}</a></div></div>`;
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-dc]')) trackEvent('discord'); });
 // Cómo conseguir la prioridad con Ko-fi: cualquier cantidad y el ID de jugador en el mensaje (cloudflare/kofi.js lo lee)
 function kofiHow(note = false) {
   const url = supportUrl(); if (!url) return;
@@ -1117,6 +1125,7 @@ function openFeedback() {
       <p class="muted fb-note">${esc(t('Junto al mensaje se envía la página en la que estás, para poder ver el error.'))} <a href="#legal">${esc(t('Privacidad'))}</a></p>
       <p class="err" id="fb-err" role="alert" hidden></p>
       <div class="fb-acts"><button class="btn primary" type="submit" id="fb-send">${esc(t('Enviar'))}</button></div>
+      ${discordUrl() ? `<p class="muted fb-note fb-dc">${esc(t('¿Prefieres hablarlo con la comunidad?'))} <a href="${esc(discordUrl())}" target="_blank" rel="noopener" data-dc>${esc(t('Entrar al Discord'))}</a></p>` : ''}
     </form>`, 'fb-sheet');
   const form = $('#fb-form', ovl), ta = $('#fb-text', ovl), ct = $('#fb-contact', ovl), err = $('#fb-err', ovl), send = $('#fb-send', ovl), cnt = $('#fb-n', ovl);
   const count = () => { cnt.textContent = ta.value.length > 1500 ? `${ta.value.length} / 2000` : ''; };
@@ -1238,6 +1247,7 @@ function drawRight(st, top) {
   html += `<div id="tw-slot">${teamWeekCard(top)}</div>`;
   html += hotCard(top);
   html += supportCard();
+  html += discordCard();
   html += feedbackCard();
   if (top && top.mmr && top.mmr.length) html += `<div class="card in"><div class="card-h"><h3>${esc(t('Top MMR'))}</h3><a href="#rankings">${esc(t('Ver rankings'))}</a></div><div style="padding-bottom:8px">${top.mmr.slice(0, 5).map((p, i) =>
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${rank(p.rk, 26)}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span>${esc(p.n)}${supMark(p.id)}</span><span class="sub">${esc(p.rank || '')}</span></span><span class="v">${int(p.mmr)}</span></a>`).join('')}</div></div>`;
@@ -2466,13 +2476,15 @@ function viewNews() {
   const go = (f) => (f.action === 'feedback' ? `<button type="button" class="tbtn nw-go" data-fb>${esc(t('Abrir el buzón'))}${ICON.right}</button>`
     : f.action === 'tour' ? `<button type="button" class="tbtn nw-go" data-tour>${esc(t('Ver el tutorial'))}${ICON.right}</button>`
     : f.action === 'me' ? (ME ? `<a class="tbtn nw-go" href="#j-${esc(ME[0])}">${esc(t('Mi perfil'))}${ICON.right}</a>` : `<button type="button" class="tbtn nw-go" data-me-pick>${esc(t('Elegir mi perfil'))}${ICON.right}</button>`)
+    : f.action === 'discord' ? `<a class="tbtn nw-go" href="${esc(discordUrl())}" target="_blank" rel="noopener" data-dc>${esc(t('Entrar al Discord'))}${ICON.right}</a>`
     : f.action === 'support' ? (supportUrl() ? `<button type="button" class="tbtn nw-go" data-kofi-how>${esc(t('¿Cómo funciona?'))}${ICON.right}</button>` : '')
     : f.href ? `<a class="tbtn nw-go" href="${esc(f.href)}">${esc(t('Abrir'))}${ICON.right}</a>` : '');
   const tile = (f, big) => `<div class="nw-item${big ? ' big' : ''}"><span class="nw-ic">${ICON[f.icon] || ICON.info}</span><div class="nw-b"><h3>${esc(t(f.title))}${!big && isNew(f) ? ` <span class="pill nw-new">${esc(t('Nuevo'))}</span>` : ''}</h3><p>${esc(t(f.text))}</p>${go(f)}</div></div>`;
-  const recent = FEATURES.filter(isNew).sort((a, b) => (b.nuevo > a.nuevo) - (b.nuevo < a.nuevo));
+  const FEATS = FEATURES.filter((f) => f.action !== 'discord' || discordUrl());
+  const recent = FEATS.filter(isNew).sort((a, b) => (b.nuevo > a.nuevo) - (b.nuevo < a.nuevo));
   const byDay = [...new Set(recent.map((f) => f.nuevo))];
   const latest = recent.length ? `<section class="card in nw-latest"><div class="card-h"><h2>${esc(t('Lo último'))}</h2></div>${byDay.map((d) => `<div class="nw-day"><span class="nw-d">${esc(DF_NEWS.format(new Date(d + 'T12:00:00Z')))}</span>${recent.filter((f) => f.nuevo === d).map((f) => tile(f, true)).join('')}</div>`).join('')}</section>` : '';
-  const all = GROUPS.map(([g, label]) => `<section class="nw-group"><h2 class="nw-gh">${esc(t(label))}</h2><div class="nw-grid">${FEATURES.filter((f) => f.g === g).map((f) => `<div class="card in">${tile(f, false)}</div>`).join('')}</div></section>`).join('');
+  const all = GROUPS.map(([g, label]) => `<section class="nw-group"><h2 class="nw-gh">${esc(t(label))}</h2><div class="nw-grid">${FEATS.filter((f) => f.g === g).map((f) => `<div class="card in">${tile(f, false)}</div>`).join('')}</div></section>`).join('');
   MAIN.innerHTML = `${infoTabs('novedades')}<h1 class="h1 in">${esc(t('Novedades'))}</h1><p class="lead">${esc(t('Todo lo que puedes hacer en SlapScore, y lo último que ha llegado.'))}</p>
     ${latest}<h2 class="nw-all">${esc(t('Todo lo que puedes hacer'))}</h2>${all}
     <p class="muted nw-foot">${esc(t('¿Echas algo en falta?'))} <button type="button" class="tbtn" data-fb>${esc(t('Cuéntanoslo'))}</button></p>`;

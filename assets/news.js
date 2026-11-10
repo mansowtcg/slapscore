@@ -4,9 +4,9 @@
 // a quien aún no lo haya visto le sale un punto en «Novedades» y un aviso en la portada.
 // Los textos van en español y se traducen con t() (en.js, fr.js, de.js, pt.js).
 
-export const NEWS_DATE = '2026-11-10T13';   // se compara como texto: vale cualquier valor mayor que el anterior
+export const NEWS_DATE = '2026-11-10T17';   // se compara como texto: vale cualquier valor mayor que el anterior
 // resumen de la última tanda, para el aviso de la portada
-export const NEWS_HEADLINE = 'Nuevo: tu perfil con resumen de sesión y de la semana, logros, «En racha» y notas de equipos.';
+export const NEWS_HEADLINE = 'Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».';
 
 export const GROUPS = [
   ['partidos', 'Partidos'],
@@ -39,6 +39,7 @@ export const FEATURES = [
   { g: 'ti', icon: 'bell', nuevo: '2026-11-06', title: 'Avisos en el móvil', text: 'Con la campana te avisamos cuando un favorito termina un partido o sube de rango. En iPhone funciona con la app instalada.' },
   { g: 'ti', icon: 'share', nuevo: '2026-11-06', title: 'Enlaces con vista previa', text: 'Los jugadores y los partidos tienen su propio enlace: en Discord o WhatsApp sale con su nombre, su rango y sus estadísticas. También puedes compartir una imagen.' },
   { g: 'ti', icon: 'chat', nuevo: '2026-11-07', title: '6 idiomas', text: 'English, Español, Français, Deutsch, Português y Türkçe. Se cambia en el menú de idioma de arriba.' },
+  { g: 'app', icon: 'users', action: 'discord', nuevo: '2026-11-10', title: 'Servidor de Discord', text: 'El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.' },
   { g: 'app', icon: 'install', title: 'Instálala como app', text: 'Añádela a la pantalla de inicio del móvil o al ordenador y ábrela como una app más.' },
   { g: 'app', icon: 'theme', title: 'Tema claro y oscuro', text: 'Sigue al de tu dispositivo, o elige el que prefieras con el botón de la luna.' },
   { g: 'app', icon: 'chat', action: 'feedback', title: 'Buzón de sugerencias', text: 'Cuéntanos ideas o fallos: lo lee la persona que hace SlapScore.' },

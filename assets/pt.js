@@ -762,4 +762,11 @@ export default {
   "Sesión en curso": "Sessão em andamento",
   "Última sesión": "Última sessão",
   "Nuevo: tu perfil con resumen de sesión y de la semana, logros, «En racha» y notas de equipos.": "Novo: seu perfil com resumo da sessão e da semana, conquistas, \"Em alta\" e notas das equipes.",
+  "Únete al Discord de SlapScore": "Entre no Discord do SlapScore",
+  "Novedades, el equipo de la semana, sugerencias y gente con la que jugar.": "Novidades, a equipe da semana, sugestões e gente para jogar junto.",
+  "Entrar al Discord": "Entrar no Discord",
+  "¿Prefieres hablarlo con la comunidad?": "Prefere conversar com a comunidade?",
+  "Servidor de Discord": "Servidor do Discord",
+  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.": "O ponto de encontro da comunidade do SlapScore: novidades do site, a equipe da semana, sugestões, clipes e gente para jogar junto. Há canais em inglês e em espanhol.",
+  "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "Novo: o servidor do Discord do SlapScore. E também seu perfil com resumo da sessão e da semana, conquistas e \"Em alta\".",
 };

@@ -386,6 +386,13 @@ export default {
   "Sesión en curso": "Session in progress",
   "Última sesión": "Last session",
   "Nuevo: tu perfil con resumen de sesión y de la semana, logros, «En racha» y notas de equipos.": "New: your profile with session and weekly summaries, achievements, \"On fire\" and team ratings.",
+  "Únete al Discord de SlapScore": "Join the SlapScore Discord",
+  "Novedades, el equipo de la semana, sugerencias y gente con la que jugar.": "News, the team of the week, suggestions and people to play with.",
+  "Entrar al Discord": "Join the Discord",
+  "¿Prefieres hablarlo con la comunidad?": "Would you rather talk it over with the community?",
+  "Servidor de Discord": "Discord server",
+  "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar. Hay canales en inglés y en español.": "The home of the SlapScore community: site news, the team of the week, suggestions, clips and people to play with. There are channels in English and Spanish.",
+  "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "New: the SlapScore Discord server. Plus your profile with session and weekly summaries, achievements and \"On fire\".",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',
