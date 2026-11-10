@@ -769,4 +769,10 @@ export default {
   "Servidor de Discord": "Discord-Server",
   "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar.": "Der Treffpunkt der SlapScore-Community: Neuigkeiten zur Seite, das Team der Woche, Vorschläge, Clips und Leute zum Mitspielen.",
   "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "Neu: der Discord-Server von SlapScore. Dazu dein Profil mit Session- und Wochenzusammenfassung, Erfolge und „In Form“.",
+  "Nuevo: Discord de SlapScore": "Neu: der SlapScore-Discord",
+  "SlapScore ya tiene servidor de Discord. Entra y forma parte de la comunidad:": "SlapScore hat jetzt einen Discord-Server. Komm rein und werde Teil der Community:",
+  "Novedades de la web y el equipo de la semana.": "Neuigkeiten zur Seite und das Team der Woche.",
+  "Sugerencias y errores: cuéntanos qué mejorarías.": "Vorschläge und Fehler: Sag uns, was du verbessern würdest.",
+  "Gente con la que jugar, clips y partidos custom.": "Leute zum Mitspielen, Clips und Custom-Matches.",
+  "Ahora no": "Nicht jetzt",
 };

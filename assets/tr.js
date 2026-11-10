@@ -769,4 +769,10 @@ export default {
   "Servidor de Discord": "Discord sunucusu",
   "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar.": "SlapScore topluluğunun buluşma yeri: siteden yenilikler, haftanın takımı, öneriler, klipler ve birlikte oynayacak oyuncular.",
   "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "Yeni: SlapScore Discord sunucusu. Ayrıca oturum ve hafta özetleriyle profilin, başarımlar ve «Formda».",
+  "Nuevo: Discord de SlapScore": "Yeni: SlapScore Discord'u",
+  "SlapScore ya tiene servidor de Discord. Entra y forma parte de la comunidad:": "SlapScore'un artık bir Discord sunucusu var. Katıl ve topluluğun parçası ol:",
+  "Novedades de la web y el equipo de la semana.": "Siteden yenilikler ve haftanın takımı.",
+  "Sugerencias y errores: cuéntanos qué mejorarías.": "Öneriler ve hatalar: neyi geliştirirdin, bize söyle.",
+  "Gente con la que jugar, clips y partidos custom.": "Birlikte oynayacak oyuncular, klipler ve özel maçlar.",
+  "Ahora no": "Şimdi değil",
 };

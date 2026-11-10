@@ -1409,3 +1409,12 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .btn.discord:hover{background:#4752C4;border-color:#4752C4}
 .btn.discord svg{width:16px;height:16px}
 .fb-dc{margin:2px 0 0}
+.dc-note{padding:0 18px 20px;display:flex;flex-direction:column;gap:12px}
+.dc-hero{display:flex;gap:12px;align-items:center}
+.dc-hero p{margin:0;line-height:1.45}
+.dc-ic{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:#5865F2;color:#fff}
+.dc-ic svg{width:24px;height:24px}
+.dc-list{list-style:none;margin:0;padding:12px 14px;display:flex;flex-direction:column;gap:9px;border-radius:12px;background:var(--surface-2)}
+.dc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.dc-list li svg{flex:none;width:18px;height:18px;margin-top:1px;color:#5865F2}
+.dc-note .btn{align-self:stretch;justify-content:center}

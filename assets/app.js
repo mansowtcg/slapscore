@@ -1033,7 +1033,7 @@ function kofiHow(note = false) {
 // Aviso de la prioridad de Ko-fi: sale una sola vez a cada navegador, también a quien ya había entrado antes.
 // Quien lo ha visto en el tutorial (paso de Ko-fi) no lo vuelve a ver; si se saltó el tutorial antes, le sale en otra visita.
 const KOFI_NOTE_KEY = 'slapscore-kofi-note';
-let tourThisVisit = false;
+let tourThisVisit = false, kofiNoteThisVisit = false;
 const kofiNoteSeen = () => { try { return !!localStorage.getItem(KOFI_NOTE_KEY) || localStorage.getItem('slapscore-tour') === 'done'; } catch { return true; } };
 function kofiNoteMark() { try { localStorage.setItem(KOFI_NOTE_KEY, String(Date.now())); } catch {} }
 function maybeKofiNote(tries = 0) {
@@ -1042,7 +1042,28 @@ function maybeKofiNote(tries = 0) {
   if (v === 'admin') return;
   // con el tutorial a punto de salir, o algo abierto, se espera un poco
   if (document.querySelector('.tour') || tourPending || $('#ovl') || $('#lang-menu') || (v === 'matches' && !tourDone())) { if (tries < 6) setTimeout(() => maybeKofiNote(tries + 1), 2500); return; }
-  kofiNoteMark(); hideTip(false); kofiHow(true);
+  kofiNoteMark(); kofiNoteThisVisit = true; hideTip(false); kofiHow(true);
+}
+// Aviso del servidor de Discord: sale una sola vez a cada navegador, también a quien ya había entrado antes.
+// Solo un aviso por visita: si en esta toca el tutorial o el aviso de Ko-fi, el de Discord sale en la siguiente.
+const DC_NOTE_KEY = 'slapscore-dc-note';
+const dcNoteSeen = () => { try { return !!localStorage.getItem(DC_NOTE_KEY); } catch { return true; } };
+function dcNoteMark() { try { localStorage.setItem(DC_NOTE_KEY, String(Date.now())); } catch {} }
+function discordNote() {
+  const url = discordUrl(); if (!url) return;
+  const li = (x) => `<li>${ICON.check}<span>${esc(t(x))}</span></li>`;
+  openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Nuevo: Discord de SlapScore'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="sheet-b dc-note"><div class="dc-hero"><span class="dc-ic">${ICON.users}</span><p>${esc(t('SlapScore ya tiene servidor de Discord. Entra y forma parte de la comunidad:'))}</p></div>
+      <ul class="dc-list">${li('Novedades de la web y el equipo de la semana.')}${li('Sugerencias y errores: cuéntanos qué mejorarías.')}${li('Gente con la que jugar, clips y partidos custom.')}</ul>
+      <a class="btn discord" href="${esc(url)}" target="_blank" rel="noopener" data-dc data-close autofocus>${esc(t('Entrar al Discord'))}${ICON.right}</a><button type="button" class="btn dc-later" data-close>${esc(t('Ahora no'))}</button></div>`, 'dc-sheet');
+}
+function maybeDiscordNote(tries = 0) {
+  if (!discordUrl() || dcNoteSeen() || tourThisVisit || kofiNoteThisVisit || isBot()) return;
+  if (supportUrl() && !kofiNoteSeen()) return;   // en esta visita toca el de Ko-fi
+  const v = route().view;
+  if (v === 'admin') return;
+  if (document.querySelector('.tour') || tourPending || $('#ovl') || $('#lang-menu') || (v === 'matches' && !tourDone())) { if (tries < 6) setTimeout(() => maybeDiscordNote(tries + 1), 2500); return; }
+  dcNoteMark(); hideTip(false); discordNote();
 }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-kofi-how]')) { e.preventDefault(); kofiHow(); } });
 // ---------- buzón de sugerencias ----------
@@ -2670,6 +2691,7 @@ document.addEventListener('click', (e) => { if (e.target.closest && e.target.clo
   renderChrome(); go({ instant: true }); S.booted = true;
   trackView(route());
   setTimeout(maybeKofiNote, 3000);
+  setTimeout(maybeDiscordNote, 3600);
 })();
 
 // ---------- app instalable ----------

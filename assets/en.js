@@ -393,6 +393,12 @@ export default {
   "Servidor de Discord": "Discord server",
   "El sitio de la comunidad de SlapScore: novedades de la web, el equipo de la semana, sugerencias, clips y gente con la que jugar.": "The home of the SlapScore community: site news, the team of the week, suggestions, clips and people to play with.",
   "Nuevo: servidor de Discord de SlapScore. Y además, tu perfil con resumen de sesión y de la semana, logros y «En racha».": "New: the SlapScore Discord server. Plus your profile with session and weekly summaries, achievements and \"On fire\".",
+  "Nuevo: Discord de SlapScore": "New: the SlapScore Discord",
+  "SlapScore ya tiene servidor de Discord. Entra y forma parte de la comunidad:": "SlapScore now has a Discord server. Come in and be part of the community:",
+  "Novedades de la web y el equipo de la semana.": "Site news and the team of the week.",
+  "Sugerencias y errores: cuéntanos qué mejorarías.": "Suggestions and bugs: tell us what you would improve.",
+  "Gente con la que jugar, clips y partidos custom.": "People to play with, clips and custom matches.",
+  "Ahora no": "Not now",
   // plurales
   'partido': 'match', 'partidos': 'matches', 'gol': 'goal', 'goles': 'goals', 'asistencia': 'assist', 'asistencias': 'assists', 'parada': 'save', 'paradas': 'saves',
   'pase': 'pass', 'pases': 'passes', 'robo': 'takeaway', 'robos': 'takeaways', 'partida': 'game', 'partidas': 'games', 'registro': 'record', 'registros': 'records', 'victoria': 'win', 'victorias': 'wins',
