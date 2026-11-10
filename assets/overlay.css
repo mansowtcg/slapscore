@@ -74,3 +74,9 @@ body.ov-page{padding:8px;-webkit-font-smoothing:antialiased}
 .ov-compact .ov-chip .rt{height:24px;font-size:14px}
 
 .ov-msg{display:inline-flex;align-items:center;gap:12px;padding:10px 14px;font-size:14px;font-weight:600}
+
+/* ventana flotante (uso personal): el overlay ocupa toda la ventana, con fondo propio */
+body.ov-win{padding:0;min-height:100vh;display:grid;place-items:center;background:#0F111C}
+body.ov-win-light{background:#FFFFFF}
+.ov-win .ov{border:0;border-radius:0;box-shadow:none;background:transparent;text-shadow:none}
+.ov-win .ov-clear{--ov-muted:#A3A9BC;--ov-soft:rgba(255,255,255,.07)}

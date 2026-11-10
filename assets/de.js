@@ -695,5 +695,12 @@ export default {
   "Listo: se actualiza solo y el fondo es transparente. Muévelo y escálalo como quieras.": "Fertig: Es aktualisiert sich von selbst und der Hintergrund ist transparent. Verschieb und skalier es, wie du willst.",
   "Consejo: los partidos de los supporters de Ko-fi se cargan antes, también en el overlay.": "Tipp: Die Spiele von Ko-fi-Unterstützern werden früher geladen, auch im Overlay.",
   "Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo.": "Zeig im Stream die Noten der letzten Spiele und die Durchschnittsnote jedes Spielers. Im Profil auf „OBS-Overlay\": Aussehen wählen und Link kopieren. Aktualisiert sich von selbst.",
-  "Nuevo: overlay para OBS con las últimas notas de cualquier jugador, para tus directos.": "Neu: ein OBS-Overlay mit den letzten Noten jedes Spielers, für deine Streams.",
+  "Ventana flotante": "Schwebendes Fenster",
+  "Ventana abierta. Para que se quede siempre encima del juego, usa Chrome o Edge en el ordenador.": "Fenster geöffnet. Damit es immer über dem Spiel bleibt, nutze Chrome oder Edge am Computer.",
+  "El navegador ha bloqueado la ventana: permite las ventanas emergentes de SlapScore.": "Dein Browser hat das Fenster blockiert: Erlaube Pop-ups für SlapScore.",
+  "Ventana flotante abierta: se queda encima de las demás y se actualiza sola. Deja esta pestaña abierta y pon el juego en ventana sin bordes.": "Schwebendes Fenster geöffnet: Es bleibt im Vordergrund und aktualisiert sich von selbst. Lass diesen Tab offen und stell das Spiel auf randlosen Fenstermodus.",
+  "¿Solo para ti?": "Nur für dich?",
+  "Ábrelo en una ventana flotante que se queda encima del juego.": "Öffne es in einem schwebenden Fenster, das über dem Spiel bleibt.",
+  "Tus últimas notas y tu nota media en una ventana pequeña que se queda encima del juego y se actualiza sola. En tu perfil, «Ventana flotante» (en Chrome o Edge de ordenador).": "Deine letzten Noten und deine Durchschnittsnote in einem kleinen Fenster, das über dem Spiel bleibt und sich von selbst aktualisiert. In deinem Profil auf „Schwebendes Fenster\" (Chrome oder Edge am Computer).",
+  "Nuevo: ventana flotante con tus últimas notas mientras juegas, y overlay para OBS.": "Neu: ein schwebendes Fenster mit deinen letzten Noten beim Spielen und ein OBS-Overlay.",
 };

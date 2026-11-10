@@ -94,7 +94,7 @@ export const BOT = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed
 
 // ---------- validación de lo que manda la web ----------
 const PAGES = new Set(['home', 'dia', 'partido', 'tabla', 'rankings', 'records', 'premios', 'novedades', 'eusl', 'notas', 'cmp', 'legal']);
-const EVENTS = new Set(['share', 'fav', 'install', 'feedback', 'push', 'tour', 'tourskip', 'obs']);
+const EVENTS = new Set(['share', 'fav', 'install', 'feedback', 'push', 'tour', 'tourskip', 'obs', 'float']);
 export function cleanHit(b, { ip, ua, cc }) {
   if (!b || typeof b !== 'object') return null;
   const k = Number(b.k);

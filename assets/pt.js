@@ -695,5 +695,12 @@ export default {
   "Listo: se actualiza solo y el fondo es transparente. Muévelo y escálalo como quieras.": "Pronto: atualiza sozinho e o fundo é transparente. Mova e redimensione como quiser.",
   "Consejo: los partidos de los supporters de Ko-fi se cargan antes, también en el overlay.": "Dica: as partidas de quem apoia no Ko-fi carregam antes, no overlay também.",
   "Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo.": "Mostre na sua live as notas das últimas partidas de qualquer jogador e a nota média. No perfil, \"Overlay para OBS\": escolha o visual e copie o link. Atualiza sozinho.",
-  "Nuevo: overlay para OBS con las últimas notas de cualquier jugador, para tus directos.": "Novo: overlay para OBS com as últimas notas de qualquer jogador, para suas lives.",
+  "Ventana flotante": "Janela flutuante",
+  "Ventana abierta. Para que se quede siempre encima del juego, usa Chrome o Edge en el ordenador.": "Janela aberta. Para ela ficar sempre por cima do jogo, use o Chrome ou o Edge no computador.",
+  "El navegador ha bloqueado la ventana: permite las ventanas emergentes de SlapScore.": "O navegador bloqueou a janela: permita pop-ups do SlapScore.",
+  "Ventana flotante abierta: se queda encima de las demás y se actualiza sola. Deja esta pestaña abierta y pon el juego en ventana sin bordes.": "Janela flutuante aberta: fica por cima das outras e atualiza sozinha. Deixe esta aba aberta e coloque o jogo em janela sem bordas.",
+  "¿Solo para ti?": "Só para você?",
+  "Ábrelo en una ventana flotante que se queda encima del juego.": "Abra em uma janela flutuante que fica por cima do jogo.",
+  "Tus últimas notas y tu nota media en una ventana pequeña que se queda encima del juego y se actualiza sola. En tu perfil, «Ventana flotante» (en Chrome o Edge de ordenador).": "Suas últimas notas e sua nota média em uma janela pequena que fica por cima do jogo e atualiza sozinha. No seu perfil, \"Janela flutuante\" (Chrome ou Edge no computador).",
+  "Nuevo: ventana flotante con tus últimas notas mientras juegas, y overlay para OBS.": "Novo: janela flutuante com suas últimas notas enquanto você joga, e overlay para OBS.",
 };

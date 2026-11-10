@@ -695,5 +695,12 @@ export default {
   "Listo: se actualiza solo y el fondo es transparente. Muévelo y escálalo como quieras.": "Hazır: kendiliğinden güncellenir ve arka planı şeffaftır. İstediğin gibi taşı ve boyutlandır.",
   "Consejo: los partidos de los supporters de Ko-fi se cargan antes, también en el overlay.": "İpucu: Ko-fi destekçilerinin maçları daha erken yüklenir, katmanda da.",
   "Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo.": "Herhangi bir oyuncunun son maç notlarını ve not ortalamasını yayınında göster. Profilinde «OBS katmanı»: görünümü seç ve bağlantıyı kopyala. Kendiliğinden güncellenir.",
-  "Nuevo: overlay para OBS con las últimas notas de cualquier jugador, para tus directos.": "Yeni: yayınların için herhangi bir oyuncunun son notlarını gösteren OBS katmanı.",
+  "Ventana flotante": "Yüzen pencere",
+  "Ventana abierta. Para que se quede siempre encima del juego, usa Chrome o Edge en el ordenador.": "Pencere açıldı. Her zaman oyunun üstünde kalması için bilgisayarda Chrome veya Edge kullan.",
+  "El navegador ha bloqueado la ventana: permite las ventanas emergentes de SlapScore.": "Tarayıcın pencereyi engelledi: SlapScore için açılır pencerelere izin ver.",
+  "Ventana flotante abierta: se queda encima de las demás y se actualiza sola. Deja esta pestaña abierta y pon el juego en ventana sin bordes.": "Yüzen pencere açıldı: diğerlerinin üstünde kalır ve kendiliğinden güncellenir. Bu sekmeyi açık bırak ve oyunu kenarlıksız pencere modunda çalıştır.",
+  "¿Solo para ti?": "Sadece kendin için mi?",
+  "Ábrelo en una ventana flotante que se queda encima del juego.": "Oyunun üstünde kalan yüzen bir pencerede aç.",
+  "Tus últimas notas y tu nota media en una ventana pequeña que se queda encima del juego y se actualiza sola. En tu perfil, «Ventana flotante» (en Chrome o Edge de ordenador).": "Son notların ve not ortalaman, oyunun üstünde kalan ve kendiliğinden güncellenen küçük bir pencerede. Profilinde «Yüzen pencere» (bilgisayarda Chrome veya Edge).",
+  "Nuevo: ventana flotante con tus últimas notas mientras juegas, y overlay para OBS.": "Yeni: oynarken son notlarını gösteren yüzen pencere ve OBS katmanı.",
 };

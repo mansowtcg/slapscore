@@ -33,6 +33,8 @@ export function ovQuery(o) {
   const s = q.toString(); return s ? '?' + s : '';
 }
 // tamaño recomendado para la fuente de navegador de OBS
+// tamaño de la ventana flotante (sin márgenes)
+export const ovWinSize = (o) => (o.v === 'compact' ? { w: 620, h: 72 } : { w: 480, h: o.st ? 216 : 162 });
 export const ovSize = (o) => (o.v === 'compact' ? { w: 720, h: 90 } : { w: 500, h: o.st ? 250 : 200 });
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -97,7 +99,7 @@ async function gunzipText(buf) {
   if (typeof DecompressionStream === 'function') return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   const z = await import('./vendor/gunzip.js'); return z.strFromU8(z.gunzipSync(buf));
 }
-async function fetchPlayer(pid) {
+export async function fetchPlayer(pid) {
   const r = await fetch(`/data/p/${bucketOf(pid)}.json.gz?v=${Date.now()}`, { cache: 'no-store' });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -110,6 +112,9 @@ export async function boot() {
   const m = /^\/overlay\/(\d{1,12})\/?$/.exec(location.pathname), pid = m ? m[1] : new URLSearchParams(location.search).get('p');
   document.documentElement.lang = o.l;
   const root = document.getElementById('ov');
+  // ?win: ventana pequeña normal (navegadores sin ventana siempre encima): con fondo y ajustada al tamaño de la ventana
+  const asWin = new URLSearchParams(location.search).has('win');
+  if (asWin) { document.body.classList.add('ov-win', 'ov-win-' + o.th); addEventListener('resize', () => fitWin(window, root)); }
   if (!pid || !/^\d{1,12}$/.test(pid)) { root.innerHTML = renderOverlay(null, o, { noid: true }); return; }
   try { setOfficial(await (await fetch('/assets/ranks/index.json?v=' + Date.now(), { cache: 'no-store' })).json()); } catch {}
   let lastId = null, lastJson = '';
@@ -118,11 +123,47 @@ export async function boot() {
       const P = await fetchPlayer(pid);
       const top = P && P.games && P.games[0] ? P.games[0][1] : null;
       const json = P ? JSON.stringify([P.meta, P.games && P.games.slice(0, 25)]) : 'null';
-      if (json !== lastJson) { root.innerHTML = renderOverlay(P, o, { fresh: lastId != null && top !== lastId }); lastJson = json; lastId = top; }
+      if (json !== lastJson) { root.innerHTML = renderOverlay(P, o, { fresh: lastId != null && top !== lastId }); lastJson = json; lastId = top; if (asWin) { document.title = (P ? P.n + ' · ' : '') + 'SlapScore'; fitWin(window, root); } }
     } catch { /* sin conexión: se queda lo último que se vio */ }
   }
   await tick();
   // la web se actualiza cada 3-4 minutos; aquí se mira cada minuto (y al volver a la escena)
   setInterval(tick, 60_000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+}
+
+// ---------- ventana flotante (uso personal) ----------
+// El overlay en una ventana pequeña que se queda encima de las demás (también del juego, si no está en pantalla
+// completa exclusiva). La abre el perfil con la API «Document Picture-in-Picture» (Chrome y Edge de ordenador) y aquí
+// se rellena y se mantiene al día; en los demás navegadores se abre /overlay/<id>?win como ventana normal.
+// El contenido se escala para ocupar la ventana, se cambie al tamaño que se cambie.
+export function fitWin(win, root) {
+  const el = root.firstElementChild; if (!el) return;
+  el.style.zoom = 1;
+  const w = el.offsetWidth, h = el.offsetHeight; if (!w || !h) return;
+  el.style.zoom = Math.max(0.3, Math.min(win.innerWidth / w, win.innerHeight / h));
+}
+export function mountFloat(win, P0, o, cssHref) {
+  const d = win.document, origin = location.origin;
+  d.title = `${P0.n} · SlapScore`; d.documentElement.lang = o.l; d.documentElement.className = 'ov-html';
+  const link = d.createElement('link'); link.rel = 'stylesheet'; link.href = cssHref; d.head.appendChild(link);
+  d.body.className = `ov-page ov-win ov-win-${o.th}`;
+  const root = d.createElement('div'); root.id = 'ov'; d.body.appendChild(root);
+  const fit = () => fitWin(win, root);
+  const draw = (P, fresh) => { root.innerHTML = renderOverlay(P, o, { fresh }).replace(/src="\//g, `src="${origin}/`); fit(); };
+  let lastId = P0.games && P0.games[0] ? P0.games[0][1] : null, lastJson = JSON.stringify([P0.meta, P0.games && P0.games.slice(0, 25)]);
+  draw(P0, false);
+  link.addEventListener('load', fit); win.addEventListener('resize', fit);
+  if (d.fonts && d.fonts.ready) d.fonts.ready.then(fit).catch(() => {});
+  async function tick() {
+    try {
+      const P = await fetchPlayer(String(P0.id)); if (!P) return;
+      const top = P.games && P.games[0] ? P.games[0][1] : null, json = JSON.stringify([P.meta, P.games && P.games.slice(0, 25)]);
+      if (json !== lastJson) { draw(P, top !== lastId); lastJson = json; lastId = top; }
+    } catch { /* sin conexión: se queda lo último */ }
+  }
+  // el reloj es el de la ventana flotante: está siempre a la vista, así que el navegador no lo frena
+  const timer = win.setInterval(tick, 60_000);
+  win.addEventListener('pagehide', () => win.clearInterval(timer));
+  return { tick };
 }

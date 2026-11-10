@@ -252,6 +252,7 @@ const ICON = {
   admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg>',
   left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+  float: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="15" rx="2.5"/><rect x="11.5" y="10.5" width="7.5" height="6" rx="1.2" fill="currentColor" stroke="none"/></svg>',
   obs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2.5"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10.5" r="1.6" fill="currentColor"/><path d="M8.6 7.6a4.6 4.6 0 0 0 0 5.8M15.4 7.6a4.6 4.6 0 0 1 0 5.8"/></svg>',
   globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
@@ -1521,6 +1522,30 @@ function statPlain(st) {
 }
 // ---------- overlay para OBS (overlay.js): configurador con vista previa en el perfil ----------
 const BUILD_Q = (() => { try { const b = new URL(import.meta.url).searchParams.get('b'); return b ? '?b=' + b : ''; } catch { return ''; } })();
+// Ventana flotante (uso personal): el mismo overlay en una ventana pequeña que se queda encima de las demás, para ver
+// tus últimas notas mientras juegas. Chrome y Edge de ordenador tienen ventanas «siempre encima» (Document
+// Picture-in-Picture); en los demás navegadores se abre una ventana normal. Hay que pedirla en el mismo clic.
+const OV_DEF = { n: 10, m: 'pub', v: 'full', th: 'dark', l: 'en', rk: 1, st: 1 };   // como OV_DEFAULTS de overlay.js
+const floatOk = () => 'documentPictureInPicture' in window || matchMedia('(pointer:fine) and (min-width:900px)').matches;
+async function floatOverlay(P, o) {
+  const sz = o.v === 'compact' ? { w: 620, h: 72 } : { w: 480, h: o.st ? 216 : 162 };
+  const dp = window.documentPictureInPicture;
+  let win = null;
+  if (dp) { try { win = await dp.requestWindow({ width: sz.w, height: sz.h }); } catch {} }
+  if (!win) {
+    const q = new URLSearchParams(); for (const k of Object.keys(OV_DEF)) if (o[k] !== OV_DEF[k]) q.set(k, String(o[k])); q.set('win', '1');
+    const w = window.open(`/overlay/${encodeURIComponent(P.id)}?${q}`, 'slapscore-float', `popup=yes,width=${sz.w},height=${sz.h}`);
+    toast(w ? t('Ventana abierta. Para que se quede siempre encima del juego, usa Chrome o Edge en el ordenador.') : t('El navegador ha bloqueado la ventana: permite las ventanas emergentes de SlapScore.'), 6500);
+    if (w) trackEvent('float');
+    return;
+  }
+  try {
+    const O = await import('./overlay.js');
+    O.mountFloat(win, P, o, location.origin + '/assets/overlay.css' + BUILD_Q);
+    closeSheet(); trackEvent('float');
+    toast(t('Ventana flotante abierta: se queda encima de las demás y se actualiza sola. Deja esta pestaña abierta y pon el juego en ventana sin bordes.'), 7500);
+  } catch { try { win.close(); } catch {} toast(t('No se pudieron cargar los datos.')); }
+}
 async function obsSheet(P, mode) {
   let O;
   try { O = await import('./overlay.js'); } catch (e) { toast(t('No se pudieron cargar los datos.')); return; }
@@ -1544,6 +1569,7 @@ async function obsSheet(P, mode) {
         ${row(t('Idioma'), `<select class="select" id="obs-l" aria-label="${esc(t('Idioma'))}">${LANGS.map(([k, n]) => `<option value="${k}"${k === o.l ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
       </div>
       <div class="obs-url"><input class="input" id="obs-u" readonly aria-label="${esc(t('Enlace del overlay'))}"><button type="button" class="btn primary" id="obs-copy">${esc(t('Copiar enlace'))}</button></div>
+      ${floatOk() ? `<div class="obs-float"><span class="t"><b>${esc(t('¿Solo para ti?'))}</b> ${esc(t('Ábrelo en una ventana flotante que se queda encima del juego.'))}</span><button type="button" class="btn sm" id="obs-float">${ICON.float}${esc(t('Ventana flotante'))}</button></div>` : ''}
       <ol class="tour-kofi obs-how">
         <li>${esc(t('En OBS, añade una fuente nueva: «+» → «Navegador».'))}</li>
         <li id="obs-size"></li>
@@ -1572,6 +1598,7 @@ async function obsSheet(P, mode) {
   });
   $('#obs-copy', ovl).addEventListener('click', () => { const i = $('#obs-u', ovl); i.select(); copyText(i.value, i); trackEvent('obs'); });
   $('#obs-u', ovl).addEventListener('focus', (e) => e.target.select());
+  const fb = $('#obs-float', ovl); if (fb) fb.addEventListener('click', () => floatOverlay(P, { ...o }));
   draw(); cssReady.then(() => { draw(); requestAnimationFrame(draw); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw).catch(() => {});
   const onR = () => { if (!$('#obs-sc')) { removeEventListener('resize', onR); return; } draw(); };
@@ -1687,7 +1714,7 @@ async function viewPlayer(pid, tok) {
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
         <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
-      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button><button class="btn sm" type="button" id="p-obs">${ICON.obs}${esc(t('Overlay para OBS'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
+      <div class="ph-acts"><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${floatOk() ? `<button class="btn sm" type="button" id="p-float">${ICON.float}${esc(t('Ventana flotante'))}</button>` : ''}<button class="btn sm" type="button" id="p-obs">${ICON.obs}${esc(t('Overlay para OBS'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
       ${supportUrl() && !(S.sup && S.sup.has(String(P.id))) ? `<button type="button" class="ph-prio" data-kofi-how><span class="sp-ic">${ICON.bolt}</span><span class="t"><b>${esc(t('¿Es tu perfil?'))}</b> ${esc(t('Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.'))}</span>${ICON.right}</button>` : ''}
       <div class="ranks">${curRank}${peakRank}</div>
       ${modeSwitch(P, mode)}
@@ -1720,6 +1747,7 @@ async function viewPlayer(pid, tok) {
   const sh = $('[data-share]', MAIN); if (sh) sh.addEventListener('click', () => copyText(pageUrl('#j-' + P.id), sh));
   const fb = $('#p-follow'); if (fb) fb.addEventListener('click', () => adminFollow(P.id, !seed, fb));
   $('#p-obs').addEventListener('click', () => obsSheet(P, mode));
+  const pf = $('#p-float'); if (pf) pf.addEventListener('click', () => floatOverlay(P, { ...OV_DEF, l: LANG, m: mode === 'cus' ? 'cus' : 'pub' }));
   $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games, _a: a, _mode: mode }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games, a);
   // su equipo de la EUSL, si su nombre en la liga coincide con este jugador

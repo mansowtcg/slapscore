@@ -1318,3 +1318,8 @@ html.touring{scroll-behavior:auto}
 .obs-how li::before{background:var(--primary-soft);color:var(--primary)}
 .obs-note{font-size:13px}
 @media (max-width:560px){.obs-r{grid-template-columns:1fr;gap:6px}.obs-url{flex-direction:column}}
+.obs-float{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-size:13.5px;line-height:1.4}
+.obs-float .t{flex:1;min-width:0}
+.obs-float .btn{flex:none}
+.obs-float .btn svg,.ph-acts #p-float svg,.ph-acts #p-obs svg{width:15px;height:15px}
+@media (max-width:560px){.obs-float{flex-direction:column;align-items:stretch}}
