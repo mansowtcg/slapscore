@@ -1418,3 +1418,18 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .dc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
 .dc-list li svg{flex:none;width:18px;height:18px;margin-top:1px;color:#5865F2}
 .dc-note .btn{align-self:stretch;justify-content:center}
+
+/* ---------- hojas: siempre se pueden desplazar y cerrar ---------- */
+/* La altura va con la de la pantalla visible (dvh) y no con un porcentaje, que en algunos móviles no limitaba la hoja:
+   salía más alta que la pantalla y no se podía bajar. La cabecera y los botones de abajo se quedan siempre a la vista. */
+.sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sheet-h{position:sticky;top:0;z-index:2;background:var(--surface)}
+.sheet-f{position:sticky;bottom:0;z-index:2;background:var(--surface);padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+.sheet:has(.sheet-f){padding-bottom:0}
+@supports (height:100dvh){
+  .sheet{max-height:calc(100dvh - 44px - env(safe-area-inset-top,0px))}
+  @media (min-width:640px){.sheet{max-height:calc(100dvh - 32px)}}
+}
+@media (hover:none) and (pointer:coarse){html.sheet-open{overflow:hidden}}
+
+.sheet-h small{flex-wrap:wrap;row-gap:2px}

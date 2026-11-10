@@ -282,7 +282,9 @@ const ICON = {
 // ---------- interfaz base ----------
 document.body.insertAdjacentHTML('afterbegin', emblemDefs());
 const APP = $('#app');
-const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings'], ['records', 'Récords'], ['premios', 'Premios'], ['racha', 'En racha'], ['eusl', 'EUSL'], ['notas', 'Cómo puntuamos'], ['novedades', 'Novedades']];
+// Menú de arriba: pocas entradas, como la barra inferior del móvil. Récords, premios y «En racha» van como pestañas
+// dentro de Rankings; «Cómo puntuamos» y Novedades, dentro de Info.
+const NAV = [['partidos', 'Partidos'], ['jugadores', 'Jugadores'], ['rankings', 'Rankings', 'records,premios,racha'], ['eusl', 'EUSL'], ['novedades', 'Info', 'notas,legal']];
 // Novedades: punto en el menú y aviso en la portada hasta que se vean (news.js)
 const NEWS_KEY = 'slapscore-news';
 const newsUnseen = () => { try { return (localStorage.getItem(NEWS_KEY) || '') < NEWS_DATE; } catch { return false; } };
@@ -304,7 +306,7 @@ APP.innerHTML = `
     </div>
   </div>
   <nav class="wrap nav" aria-label="${esc(t('Secciones'))}">
-    ${NAV.map(([k, l]) => `<a href="#${k}" data-nav="${k}">${esc(t(l))}${k === 'novedades' ? newsDot() : ''}</a>`).join('')}
+    ${NAV.map(([k, l, also]) => `<a href="#${k}" data-nav="${k}"${also ? ` data-also="${also}"` : ''}>${esc(t(l))}${k === 'novedades' ? newsDot() : ''}</a>`).join('')}
   </nav>
 </header>
 <div class="pbar" id="pbar" aria-hidden="true"></div>
@@ -388,15 +390,17 @@ function openSheet(html, cls = '') {
   sheetPrevFocus = document.activeElement;
   $('#sheet-root').innerHTML = `<div class="ovl" id="ovl"><div class="sheet ${cls}" role="dialog" aria-modal="true" aria-labelledby="sheet-title">${html}</div></div>`;
   const ovl = $('#ovl');
+  document.documentElement.classList.add('sheet-open');   // en el móvil, la página de detrás no se mueve mientras hay una hoja abierta
   ovl.addEventListener('click', (e) => { if (e.target === ovl || e.target.closest('[data-close]')) closeSheet(); });
   const f = $('[autofocus]', ovl) || $('[data-close]', ovl); if (f) f.focus({ preventScroll: true });
   return ovl;
 }
 function closeSheet(instant) {
   const ovl = $('#ovl'); if (!ovl) return;
-  if (instant || REDUCED.matches) { ovl.remove(); return; }
+  const gone = () => { ovl.remove(); if (!$('#ovl')) document.documentElement.classList.remove('sheet-open'); };
+  if (instant || REDUCED.matches) { gone(); return; }
   ovl.classList.add('closing'); $('.sheet', ovl).classList.add('closing');
-  setTimeout(() => ovl.remove(), 220);
+  setTimeout(gone, 220);
   if (sheetPrevFocus && sheetPrevFocus.focus) sheetPrevFocus.focus();
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
