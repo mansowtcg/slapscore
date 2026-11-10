@@ -216,3 +216,59 @@ export async function awardImage(kind, A, X) {
   }
   return cv;
 }
+
+// Resumen de una sesión de juego o de los últimos 7 días: nota media, V-D, MMR, goles, mejor partido y últimas notas.
+// o: { kind: 'session' | 'week', P, list (partidos, del más nuevo al más viejo), sum, dm (cambio de MMR o null), pos (puesto o null), label, cus }
+export async function summaryImage(o, X) {
+  await loadFonts();
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const { P, sum: s, list } = o, meta = P.meta || {};
+  frame(c, X, (o.kind === 'session' ? X.t('Resumen de sesión') : X.t('Mi semana')) + (o.cus ? ' · Custom' : ''));
+  avatar(c, P.n, P.id, 60, 184, 170);
+  fit(c, P.n, 262, 262, 560, 800, 76);
+  const cur = await loadImg(X.rankSrc(meta.rk));
+  c.font = F(600, 30); c.fillStyle = COL.muted; c.textAlign = 'left';
+  c.fillText(meta.rk ? `${meta.rank || X.rankName(meta.rk)} · ${X.int(meta.mmr)} MMR` : X.t('Sin rango'), 262, 312);
+  fit(c, o.label, 262, 354, 560, 600, 30, 'left', COL.muted);
+  if (cur) c.drawImage(cur, W - 60 - 160, 184, 160, 160);
+  // nota media (y, a la derecha, el puesto de la semana o el cambio de MMR)
+  c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, 410, W - 120, 210, 28); c.fill();
+  badge(c, s.avg, 96, 448, 230, 134, X.fmtR);
+  c.font = F(800, 44); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Nota media'), 364, 502);
+  c.font = F(600, 30); c.fillStyle = COL.muted; c.fillText(X.t('{n} partidos', { n: X.int(s.k) }), 364, 550);
+  const sign = (d) => `${d > 0 ? '+' : '−'}${X.int(Math.abs(d))}`;
+  if (o.pos) {
+    c.textAlign = 'right'; c.fillStyle = '#fff'; c.font = F(800, 84, true); c.fillText('#' + X.int(o.pos.pos), W - 96, 528);
+    fit(c, X.t('de {n} por nota media', { n: X.int(o.pos.total) }), W - 96, 576, 380, 600, 26, 'right', COL.muted);
+  } else if (o.dm) {
+    c.textAlign = 'right'; c.fillStyle = o.dm > 0 ? '#3DDC6E' : '#FF5A50'; c.font = F(800, 84, true); c.fillText(sign(o.dm), W - 96, 528);
+    c.fillStyle = COL.muted; c.font = F(600, 26); c.fillText('MMR', W - 96, 576);
+  }
+  // cifras
+  const third = o.pos && o.dm ? [sign(o.dm), 'MMR', o.dm > 0 ? '#3DDC6E' : '#FF5A50'] : [X.int(s.mvp), 'MVP'];
+  const cells = [[`${s.w}-${s.l}`, X.t('V-D')], [X.pct(s.k ? s.w / s.k : 0), X.t('Victorias')], third, [X.int(s.g), X.t('Goles')], [X.int(s.as), X.t('Asistencias')], [X.int(s.sv), X.t('Paradas')]];
+  const cw = (W - 120 - 2 * 24) / 3;
+  cells.forEach(([v, l, col], i) => {
+    const x = 60 + (i % 3) * (cw + 24), y = 650 + Math.floor(i / 3) * 166;
+    c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, x, y, cw, 146, 22); c.fill();
+    c.fillStyle = col || '#fff'; c.textAlign = 'left'; c.font = F(800, 70, true); c.fillText(v, x + 28, y + 84);
+    c.fillStyle = COL.muted; c.font = F(600, 28); c.fillText(l, x + 28, y + 124);
+  });
+  // mejor partido
+  const b = s.best;
+  if (b) {
+    c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, 990, W - 120, 104, 22); c.fill();
+    c.font = F(800, 32); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Mejor partido'), 92, 1038);
+    fit(c, `${b.gf}-${b.ga} · ${b.st.goals || 0} ${X.t('G')} · ${b.st.assists || 0} ${X.t('A')}${b.mv ? ' · MVP' : ''} · ${X.date(b.t)}`, 92, 1074, W - 400, 600, 26, 'left', COL.muted);
+    badge(c, b.rt, W - 96 - 130, 1008, 130, 68, X.fmtR);
+  }
+  // últimas notas (las 10 más recientes, de la más antigua a la más nueva)
+  const last = list.slice(0, 10).reverse(), bw = (W - 120 - 9 * 12) / 10;
+  last.forEach((g, i) => {
+    const x = 60 + i * (bw + 12);
+    badge(c, g.rt, x, 1124, bw, 60, X.fmtR);
+    c.fillStyle = g.r === 'W' ? COL.win : g.r === 'L' ? COL.loss : '#6E7385'; rr(c, x, 1194, bw, 8, 4); c.fill();
+  });
+  return cv;
+}
+

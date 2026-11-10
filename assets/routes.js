@@ -8,6 +8,7 @@ export const PAGES = {
   jugadores: { en: 'players', es: 'jugadores', fr: 'joueurs', de: 'spieler', pt: 'jogadores', tr: 'oyuncular' },
   rankings: { en: 'rankings', es: 'rankings', fr: 'classements', de: 'ranglisten', pt: 'rankings', tr: 'siralamalar' },
   records: { en: 'records', es: 'records', fr: 'records', de: 'rekorde', pt: 'recordes', tr: 'rekorlar' },
+  racha: { en: 'on-fire', es: 'en-racha', fr: 'en-forme', de: 'in-form', pt: 'em-alta', tr: 'formda' },
   premios: { en: 'awards', es: 'premios', fr: 'recompenses', de: 'auszeichnungen', pt: 'premios', tr: 'oduller' },
   eusl: { en: 'eusl', es: 'eusl', fr: 'eusl', de: 'eusl', pt: 'eusl', tr: 'eusl' },
   notas: { en: 'how-we-rate', es: 'como-puntuamos', fr: 'notation', de: 'bewertung', pt: 'como-avaliamos', tr: 'notlandirma' },

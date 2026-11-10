@@ -796,8 +796,13 @@ for (const [b, pids] of byBucket) {
     let bs = 0, run = 0; for (let i = pg.length - 1; i >= 0; i--) { if (pg[i][6] === 'W') { run++; if (run > bs) bs = run; } else run = 0; }
     if (bs >= 3) S.streak[pid] = bs; else delete S.streak[pid];
     if (r0 === 'W' && cs >= 3) S.cur[pid] = [cs, pg[0][2]]; else delete S.cur[pid];
+    // mejores marcas en un partido público, para los logros: [nota, goles, asistencias, paradas, racha de victorias].
+    // Se guardan en el perfil y solo suben: siguen ahí cuando el partido ya ha salido de su lista (se queda con los últimos 400)
+    const mx = Array.from({ length: 5 }, (_, i) => Number(prof.mx && prof.mx[i]) || 0);
+    for (const g of pg) { const st = g[15] || []; if (g[7] > mx[0]) mx[0] = g[7]; if ((st[0] || 0) > mx[1]) mx[1] = st[0]; if ((st[1] || 0) > mx[2]) mx[2] = st[1]; if ((st[5] || 0) > mx[3]) mx[3] = st[5]; }
+    if (bs > mx[4]) mx[4] = bs;
     // a: totales de partidas públicas; ac: de personalizadas (custom). Cada una puede faltar.
-    obj[pid] = { id: pid, n: displayName(pid), meta: meta(pid), ...(a ? { a } : {}), ...(ac ? { ac } : {}), names, cs: r0 === 'L' ? -cs : cs, bs, games };
+    obj[pid] = { id: pid, n: displayName(pid), meta: meta(pid), ...(a ? { a } : {}), ...(ac ? { ac } : {}), names, cs: r0 === 'L' ? -cs : cs, bs, mx, games };
     profiles++;
   }
   if (Object.keys(obj).length) await out.json(P.bucket(b), obj, oldText); else await out.rm(P.bucket(b));
@@ -853,8 +858,32 @@ let avgList = avgPool(TM, 5); if (avgList.length < 5) avgList = avgPool(TA, 3);
 const perf7 = [];
 for (const day of Object.keys(S.days)) if (day >= K7) { const mt = await readJSON(P.meta(day), null); if (mt && mt.perf) perf7.push(...mt.perf); }
 perf7.sort((a, b) => b.rt - a.rt || (b.g + b.as) - (a.g + a.as));
+// en racha (7 días): quién ha subido más de MMR (historial de rango de cada jugador) y quién ha mejorado más su nota
+// media frente a la que tenía antes de esta semana. Solo jugadores que han jugado en públicas estos 7 días.
+const hot = { mmr: [], rt: [] };
+{
+  const W7 = NOW - 7 * D, HOT_MIN = 10, HOT_PREV = 20;
+  for (const [pid, k] of TK) {
+    if (!(k[0] > 0) || hidP.has(pid)) continue;
+    const s = players[pid], inf = { id: pid, n: displayName(pid), rk: (s && s.rk) || '' };
+    if (s && s.mmr != null && Array.isArray(s.rh) && s.rh.length > 1 && s.rh[s.rh.length - 1][0] >= W7) {
+      let base = null; for (const e of s.rh) { if (e[0] <= W7) base = e[1]; else break; }
+      if (base == null) base = s.rh[0][1];
+      const d = s.mmr - base; if (d > 0) hot.mmr.push({ ...inf, mmr: s.mmr, d, gp: k[0] });
+    }
+    const a = TA.get(pid);
+    if (a && k[0] >= HOT_MIN && a[0] - k[0] >= HOT_PREV) {
+      const now7 = k[5] / k[0], before = (a[5] - k[5]) / (a[0] - k[0]), d = Math.round((now7 - before) * 100) / 100;
+      if (d > 0) hot.rt.push({ ...inf, avg: Math.round(now7 * 100) / 100, prev: Math.round(before * 100) / 100, d, gp: k[0] });
+    }
+  }
+  hot.mmr = hot.mmr.sort((x, y) => y.d - x.d || y.mmr - x.mmr).slice(0, 20);
+  hot.rt = hot.rt.sort((x, y) => y.d - x.d || y.gp - x.gp).slice(0, 20);
+  hot.min = HOT_MIN;
+}
 verOf.top = (await out.json(path.join(DATA, 'top.json'), {
   mmr: rankings.mmr,
+  hot,
   avg: avgList.slice(0, 10).map(([id, a]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', avg: Math.round(a[5] / a[0] * 100) / 100, gp: a[0] })),
   perf: perf7.slice(0, 10),
   active: [...TK.entries()].sort((x, y) => y[1][0] - x[1][0]).slice(0, 10).map(([id, a]) => ({ id, n: displayName(id), rk: (players[id] && players[id].rk) || '', gp: a[0], avg: Math.round(a[5] / a[0] * 100) / 100 })),

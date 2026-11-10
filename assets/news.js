@@ -4,9 +4,9 @@
 // a quien aún no lo haya visto le sale un punto en «Novedades» y un aviso en la portada.
 // Los textos van en español y se traducen con t() (en.js, fr.js, de.js, pt.js).
 
-export const NEWS_DATE = '2026-11-10';   // se compara como texto: vale cualquier valor mayor que el anterior
+export const NEWS_DATE = '2026-11-10T13';   // se compara como texto: vale cualquier valor mayor que el anterior
 // resumen de la última tanda, para el aviso de la portada
-export const NEWS_HEADLINE = 'Nuevo: ventana flotante con tus últimas notas mientras juegas, y overlay para OBS.';
+export const NEWS_HEADLINE = 'Nuevo: tu perfil con resumen de sesión y de la semana, logros, «En racha» y notas de equipos.';
 
 export const GROUPS = [
   ['partidos', 'Partidos'],
@@ -24,6 +24,11 @@ export const FEATURES = [
   { g: 'jugadores', icon: 'flame', href: '#notas', title: 'Notas de 3 a 10', text: 'Cada jugador recibe una nota en cada partido, calculada solo con sus estadísticas. El que más saca es el MVP.' },
   { g: 'jugadores', icon: 'users', href: '#jugadores', title: 'Perfil de cada jugador', text: 'Rango y MMR con su evolución, forma, notas por partido, atributos, mejores partidos, compañeros y rivales habituales y sus números en cada arena.' },
   { g: 'jugadores', icon: 'vs', href: '#jugadores', title: 'Comparar jugadores', text: 'Dos jugadores frente a frente: estadísticas por partido, atributos y cómo les va el uno contra el otro y jugando juntos.' },
+  { g: 'ti', icon: 'user', nuevo: '2026-11-10', action: 'me', title: 'Mi perfil', text: 'Elige quién eres una vez y ten tu perfil en el botón de arriba y tu resumen en la portada: tu última sesión, tu semana y tu ventana flotante.' },
+  { g: 'ti', icon: 'share', nuevo: '2026-11-10', title: 'Resumen de sesión y de la semana', text: 'En cada perfil, la última sesión de juego (partidos, nota media, MMR ganado o perdido y mejor partido) y los últimos 7 días con el puesto por nota media. Los dos, con imagen para compartir.' },
+  { g: 'jugadores', icon: 'trophy', nuevo: '2026-11-10', title: 'Logros', text: 'Insignias por partidos, victorias, goles, paradas, MVP, rachas, notas de 9 y de 10, rango y premios, con lo que falta para las siguientes.' },
+  { g: 'clasif', icon: 'flame', href: '#racha', nuevo: '2026-11-10', title: 'En racha', text: 'Quién ha subido más de MMR y quién ha mejorado más su nota media esta semana, y las rachas de victorias en curso.' },
+  { g: 'clasif', icon: 'league', href: '#eusl', nuevo: '2026-11-10', title: 'Notas de equipos', text: 'Los equipos de la EUSL ordenados por la nota media de sus jugadores en SlapScore, con la plantilla de cada uno.' },
   { g: 'jugadores', icon: 'float', nuevo: '2026-11-10', title: 'Ventana flotante', text: 'Tus últimas notas y tu nota media en una ventana pequeña que se queda encima del juego y se actualiza sola. En tu perfil, «Ventana flotante» (en Chrome o Edge de ordenador).' },
   { g: 'jugadores', icon: 'obs', nuevo: '2026-11-07', title: 'Overlay para OBS', text: 'Pon en tu directo las notas de los últimos partidos de cualquier jugador y su nota media. En su perfil, «Overlay para OBS»: eliges cómo se ve y copias el enlace. Se actualiza solo.' },
   { g: 'jugadores', icon: 'search', href: '#jugadores', title: 'Tabla y buscador', text: 'Encuentra a cualquiera por su nombre, su ID o el enlace de su perfil, y ordena la tabla de jugadores por la columna que quieras.' },

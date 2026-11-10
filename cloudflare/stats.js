@@ -93,8 +93,8 @@ export function system(ua) {
 export const BOT = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|gtmetrix|preview|facebookexternalhit|embedly|whatsapp\/|telegrambot|discordbot|python|curl\/|wget|httpclient|okhttp|axios|node-fetch|phantom|puppeteer|playwright|selenium|scrapy|monitor|uptime/i;
 
 // ---------- validación de lo que manda la web ----------
-const PAGES = new Set(['home', 'dia', 'partido', 'tabla', 'rankings', 'records', 'premios', 'novedades', 'eusl', 'notas', 'cmp', 'legal']);
-const EVENTS = new Set(['share', 'fav', 'install', 'feedback', 'push', 'tour', 'tourskip', 'obs', 'float']);
+const PAGES = new Set(['home', 'dia', 'partido', 'tabla', 'rankings', 'records', 'premios', 'racha', 'novedades', 'eusl', 'notas', 'cmp', 'legal']);
+const EVENTS = new Set(['share', 'fav', 'install', 'feedback', 'push', 'tour', 'tourskip', 'obs', 'float', 'me']);
 export function cleanHit(b, { ip, ua, cc }) {
   if (!b || typeof b !== 'object') return null;
   const k = Number(b.k);

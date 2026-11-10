@@ -31,6 +31,7 @@ const PAGE_META = {
   jugadores: ['Players', 'Every Slapshot: Rebound player with recorded matches: ratings, stats and form, sortable by any column.'],
   rankings: ['Rankings', 'The best Slapshot: Rebound players in every stat.'],
   records: ['Records', 'The best single-match performances and longest streaks in Slapshot: Rebound.'],
+  racha: ['On fire', 'Who is climbing this week in Slapshot: Rebound: biggest MMR gains, most improved ratings and win streaks.'],
   premios: ['Awards', 'Slapshot: Rebound team of the week and player of the month, by average rating.'],
   eusl: ['EUSL', 'European Slapshot League standings, results and top scorers.'],
   notas: ['How we rate', 'How SlapScore rates every Slapshot: Rebound player from 3 to 10 in every match.'],
