@@ -1,6 +1,12 @@
-// Overlay para OBS: las notas de los últimos partidos de un jugador y su nota media, para ponerlo en un directo.
-// La página /overlay/<id>?... (overlay.html + overlay-page.js) lo dibuja sobre fondo transparente y se actualiza sola;
-// el perfil de la web usa renderOverlay() para la vista previa del configurador. Ligero a propósito: no carga la web
+// Overlays para OBS, para ponerlos en un directo. La página /overlay/... (overlay.html + overlay-page.js) los dibuja
+// sobre fondo transparente y se actualiza sola; la web usa las funciones render…() para la vista previa de los
+// configuradores (obs.js). Lo que enseña cada dirección:
+//   /overlay/<id>                     un jugador: las notas de sus últimos partidos y su nota media
+//   /overlay/<id>,<id>,...            varios jugadores que van rotando (r = segundos con cada uno)
+//   /overlay/match/<id>               el último partido de ese jugador: marcador, notas y MVP
+//   /overlay/match/<AAAAMMDDHH>-<partido>   un partido concreto
+//   /overlay/vs?t1=<ids>&t2=<ids>     dos equipos frente a frente, con la nota media de cada jugador
+//   /overlay/s/<clave>                enlace fijo: enseña lo que haya guardado su dueño (cualquiera de los anteriores) Ligero a propósito: no carga la web
 // entera ni los diccionarios (sus textos van aquí, en los 6 idiomas).
 import { bucketOf, gameObj, parseRank } from './core.js';
 import { setOfficial, officialSrc } from './emblems.js';
@@ -8,12 +14,12 @@ import { setOfficial, officialSrc } from './emblems.js';
 export const OV_LANGS = ['en', 'es', 'fr', 'de', 'pt', 'tr'];
 const LOCS = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-BR', tr: 'tr-TR' };
 const TX = {
-  en: { avg: 'Avg rating', last: 'Last {n} matches', sel: '{n} matches', wl: 'W-L', win: 'Win %', g: 'G/GP', a: 'A/GP', mvp: 'MVP', pub: 'Public', cus: 'Custom', all: 'All', none: 'No matches yet', nf: 'Player not found', noid: 'Missing player ID', W: 'W', L: 'L', D: 'D' },
-  es: { avg: 'Nota media', last: 'Últimos {n} partidos', sel: '{n} partidos', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Sin partidos todavía', nf: 'Jugador no encontrado', noid: 'Falta el ID del jugador', W: 'V', L: 'D', D: 'E' },
-  fr: { avg: 'Note moyenne', last: '{n} derniers matchs', sel: '{n} matchs', wl: 'V-D', win: '% V', g: 'B/MJ', a: 'A/MJ', mvp: 'MVP', pub: 'Publiques', cus: 'Custom', all: 'Toutes', none: 'Aucun match pour le moment', nf: 'Joueur introuvable', noid: "ID du joueur manquant", W: 'V', L: 'D', D: 'N' },
-  de: { avg: 'Ø Note', last: 'Letzte {n} Spiele', sel: '{n} Spiele', wl: 'S-N', win: '% S', g: 'T/SP', a: 'V/SP', mvp: 'MVP', pub: 'Öffentlich', cus: 'Custom', all: 'Alle', none: 'Noch keine Spiele', nf: 'Spieler nicht gefunden', noid: 'Spieler-ID fehlt', W: 'S', L: 'N', D: 'U' },
-  pt: { avg: 'Nota média', last: 'Últimas {n} partidas', sel: '{n} partidas', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Ainda sem partidas', nf: 'Jogador não encontrado', noid: 'Falta o ID do jogador', W: 'V', L: 'D', D: 'E' },
-  tr: { avg: 'Ort. not', last: 'Son {n} maç', sel: '{n} maç', wl: 'G-M', win: 'G %', g: 'G/OM', a: 'A/OM', mvp: 'MVP', pub: 'Açık', cus: 'Özel', all: 'Tümü', none: 'Henüz maç yok', nf: 'Oyuncu bulunamadı', noid: 'Oyuncu ID\'si eksik', W: 'G', L: 'M', D: 'B' },
+  en: { home: 'Home', away: 'Away', fin: 'Final', tavg: 'Team average', nm: 'Match not found', gone: 'This link no longer exists', avg: 'Avg rating', last: 'Last {n} matches', sel: '{n} matches', wl: 'W-L', win: 'Win %', g: 'G/GP', a: 'A/GP', mvp: 'MVP', pub: 'Public', cus: 'Custom', all: 'All', none: 'No matches yet', nf: 'Player not found', noid: 'Missing player ID', W: 'W', L: 'L', D: 'D' },
+  es: { home: 'Local', away: 'Visitante', fin: 'Final', tavg: 'Media del equipo', nm: 'Partido no encontrado', gone: 'Este enlace ya no existe', avg: 'Nota media', last: 'Últimos {n} partidos', sel: '{n} partidos', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Sin partidos todavía', nf: 'Jugador no encontrado', noid: 'Falta el ID del jugador', W: 'V', L: 'D', D: 'E' },
+  fr: { home: 'Domicile', away: 'Extérieur', fin: 'Final', tavg: 'Moyenne de l’équipe', nm: 'Match introuvable', gone: 'Ce lien n’existe plus', avg: 'Note moyenne', last: '{n} derniers matchs', sel: '{n} matchs', wl: 'V-D', win: '% V', g: 'B/MJ', a: 'A/MJ', mvp: 'MVP', pub: 'Publiques', cus: 'Custom', all: 'Toutes', none: 'Aucun match pour le moment', nf: 'Joueur introuvable', noid: "ID du joueur manquant", W: 'V', L: 'D', D: 'N' },
+  de: { home: 'Heim', away: 'Gast', fin: 'Endstand', tavg: 'Teamschnitt', nm: 'Spiel nicht gefunden', gone: 'Diesen Link gibt es nicht mehr', avg: 'Ø Note', last: 'Letzte {n} Spiele', sel: '{n} Spiele', wl: 'S-N', win: '% S', g: 'T/SP', a: 'V/SP', mvp: 'MVP', pub: 'Öffentlich', cus: 'Custom', all: 'Alle', none: 'Noch keine Spiele', nf: 'Spieler nicht gefunden', noid: 'Spieler-ID fehlt', W: 'S', L: 'N', D: 'U' },
+  pt: { home: 'Casa', away: 'Fora', fin: 'Final', tavg: 'Média da equipe', nm: 'Partida não encontrada', gone: 'Este link não existe mais', avg: 'Nota média', last: 'Últimas {n} partidas', sel: '{n} partidas', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Ainda sem partidas', nf: 'Jogador não encontrado', noid: 'Falta o ID do jogador', W: 'V', L: 'D', D: 'E' },
+  tr: { home: 'Ev sahibi', away: 'Deplasman', fin: 'Maç sonu', tavg: 'Takım ortalaması', nm: 'Maç bulunamadı', gone: 'Bu bağlantı artık yok', avg: 'Ort. not', last: 'Son {n} maç', sel: '{n} maç', wl: 'G-M', win: 'G %', g: 'G/OM', a: 'A/OM', mvp: 'MVP', pub: 'Açık', cus: 'Özel', all: 'Tümü', none: 'Henüz maç yok', nf: 'Oyuncu bulunamadı', noid: 'Oyuncu ID\'si eksik', W: 'G', L: 'M', D: 'B' },
 };
 
 // Opciones (todas van en la dirección, para que OBS las recuerde): n partidos, m tipo, v diseño, th fondo, l idioma,
@@ -49,6 +55,44 @@ export function ovQuery(o) {
 // tamaño de la ventana flotante (sin márgenes)
 export const ovWinSize = (o) => (o.v === 'compact' ? { w: 620, h: 72 + (o.d ? 12 : 0) } : { w: 480, h: (o.st ? 216 : 162) + (o.d ? 16 : 0) });
 export const ovSize = (o) => (o.v === 'compact' ? { w: 720, h: o.d ? 100 : 90 } : { w: 500, h: (o.st ? 250 : 200) + (o.d ? 16 : 0) });
+
+// ---------- qué enseña una dirección ----------
+export const OV_ROT = 10;   // segundos con cada jugador, si rotan
+const idList = (v) => [...new Set(String(v || '').split(',').filter((x) => /^\d{1,12}$/.test(x)))].slice(0, 8);
+const rot = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 5 && n <= 120 ? Math.round(n) : OV_ROT; };
+// nombres de equipo que escribe quien configura: cortos y sin nada raro (al dibujarlos se escapan igualmente)
+export const ovName = (v) => String(v || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+export function ovSpec(pathname, search) {
+  const q = new URLSearchParams(search || ''), o = ovOptions(search);
+  const p = String(pathname || '').replace(/\/+$/, ''), names = { n1: ovName(q.get('n1')), n2: ovName(q.get('n2')) };
+  const type = (d) => (['pub', 'cus', 'all'].includes(q.get('m')) ? q.get('m') : d);
+  let m;
+  if ((m = /^\/overlay\/s\/([a-z0-9]{8})$/.exec(p))) return { kind: 'saved', sid: m[1], o };
+  if (p === '/overlay/vs') return { kind: 'vs', t1: idList(q.get('t1')), t2: idList(q.get('t2')), ...names, o };
+  if ((m = /^\/overlay\/match\/(\d{1,12})$/.exec(p))) return { kind: 'match', pid: m[1], ...names, o: { ...o, m: type('all') } };
+  if ((m = /^\/overlay\/match\/(\d{4})(\d\d)(\d\d)(\d\d)-([0-9a-f-]{8,40})$/.exec(p))) return { kind: 'match', key: `${m[1]}-${m[2]}-${m[3]}/${m[4]}`, mid: m[5], ...names, o };
+  if ((m = /^\/overlay\/(\d{1,12}(?:,\d{1,12}){1,7})$/.exec(p)) && idList(m[1]).length > 1) return { kind: 'team', ids: idList(m[1]), r: rot(q.get('r')), o };
+  if ((m = /^\/overlay\/(\d{1,12})(?:,|$)/.exec(p))) return { kind: 'player', pid: m[1], o };
+  const pid = q.get('p'); if (pid && /^\d{1,12}$/.test(pid)) return { kind: 'player', pid, o };
+  return { kind: 'none', o };
+}
+// La dirección (ruta y opciones) de lo que describe spec: la usan los configuradores
+export function ovHref(spec) {
+  const o = spec.o, q = new URLSearchParams(), put = (k, v, d) => { if (v != null && v !== '' && v !== d) q.set(k, String(v)); };
+  const look = () => { put('th', o.th, OV_DEFAULTS.th); put('l', o.l, OV_DEFAULTS.l); }, names = () => { put('n1', ovName(spec.n1), ''); put('n2', ovName(spec.n2), ''); };
+  const end = (path) => { const s = q.toString(); return path + (s ? '?' + s : ''); };
+  if (spec.kind === 'player') return `/overlay/${spec.pid}${ovQuery(o)}`;
+  if (spec.kind === 'team') { for (const k of Object.keys(OV_DEFAULTS)) put(k, o[k], OV_DEFAULTS[k]); put('r', spec.r, OV_ROT); return end(`/overlay/${spec.ids.join(',')}`); }
+  if (spec.kind === 'match') { if (spec.pid) put('m', o.m, 'all'); look(); names(); return end(spec.pid ? `/overlay/match/${spec.pid}` : `/overlay/match/${String(spec.key).replace(/[-/]/g, '')}-${spec.mid}`); }
+  if (spec.kind === 'vs') { q.set('t1', spec.t1.join(',')); q.set('t2', spec.t2.join(',')); put('n', o.n, OV_DEFAULTS.n); put('m', o.m, OV_DEFAULTS.m); look(); names(); return end('/overlay/vs').replace(/%2C/g, ','); }
+  if (spec.kind === 'saved') return `/overlay/s/${spec.sid}`;
+  return '/overlay';
+}
+// tamaño recomendado para la fuente de navegador de OBS, según lo que se enseñe (rows: jugadores del equipo más largo)
+export function ovSizeOf(spec, rows = 3) {
+  if (spec.kind === 'match' || spec.kind === 'vs') return { w: 580, h: 130 + 32 * Math.max(1, Math.min(8, rows)) };
+  return ovSize(spec.o);
+}
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const rcls = (r) => (r >= 9 ? 'elite' : r >= 8 ? 'great' : r >= 7 ? 'good' : r >= 6.5 ? 'ok' : r >= 6 ? 'meh' : 'bad');
@@ -118,42 +162,152 @@ export function renderOverlay(P, o, opts = {}) {
     ${stats}</div>`;
 }
 
+// ---------- varios jugadores que rotan ----------
+// Todas las tarjetas van apiladas en el mismo hueco y solo se ve una (la página va cambiando cuál)
+export function renderTeam(list, o, idx = 0) {
+  const ok = list.filter(Boolean);
+  if (!ok.length) return renderOverlay(null, o);
+  return `<div class="ov-rot">${ok.map((P, i) => `<div class="ov-slide${i === idx % ok.length ? ' on' : ''}">${renderOverlay(P, o)}</div>`).join('')}</div>`;
+}
+
+// ---------- partido: marcador, notas y MVP ----------
+// De la ficha resumida de un partido (la de los archivos de cada día) a lo que hace falta para dibujarlo
+export function matchOf(e) {
+  if (!e || !Array.isArray(e.p) || !Array.isArray(e.s)) return null;
+  return { id: e.i, t: e.t, type: e.y, format: e.f, ot: !!e.o, score: [e.s[0], e.s[1]], winner: e.w, mvp: e.v,
+    players: e.p.map((p) => ({ pid: p[0], name: p[1], team: p[2] === 0 ? 0 : 1, rating: p[3], g: p[4] || 0, a: p[5] || 0, rk: p[6] || '' })) };
+}
+function fmt(o) {
+  const loc = LOCS[o.l] || 'en-GB';
+  return { T: TX[o.l] || TX.en, loc, n1: (x) => new Intl.NumberFormat(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.round(x * 10) / 10) };
+}
+const brandHTML = `<span class="ov-brand"><i class="ov-puck"></i>SlapScore</span>`;
+const emb = (rk, name, id) => { const src = parseRank(rk) ? officialSrc(rk, 64) : null; return src ? `<img class="ov-emb" src="${esc(src)}" alt="">` : `<span class="ov-av" style="--h:${hue(id || name)}">${esc(initials(name))}</span>`; };
+const shortDay = (ms, loc) => { const p = new Intl.DateTimeFormat(loc, { day: 'numeric', month: 'short' }).formatToParts(new Date(ms)), f = (t) => (p.find((x) => x.type === t) || {}).value || ''; return `${f('day')} ${f('month').replace(/\./g, '')}`; };
+// una fila de jugador: emblema, nombre, dato pequeño y nota
+const plRow = (p, extra, rt, cls = '') => `<div class="ov-pl${cls}">${emb(p.rk, p.name, p.pid)}<span class="nm">${esc(p.name)}</span>${extra}${rt}</div>`;
+export function renderMatch(M, o, names = {}) {
+  const { T, loc, n1 } = fmt(o), cls = `ov ov-duel ov-${o.th}`;
+  if (!M) return `<div class="${cls} ov-msg">${brandHTML}<span>${esc(T.nm)}</span></div>`;
+  const side = (tm) => M.players.map((p, i) => ({ ...p, i })).filter((p) => p.team === tm).sort((a, b) => b.rating - a.rating)
+    .map((p) => plRow(p, `<span class="x">${p.g || p.a ? `${p.g}G ${p.a}A` : ''}</span>`, `<b class="rt ${rcls(p.rating)}">${n1(p.rating)}</b>`, p.i === M.mvp ? ' mvp' : '')).join('');
+  const lose = (tm) => (M.winner === 0 || M.winner === 1) && M.winner !== tm ? ' lose' : '';
+  const tag = [M.type === 'custom' ? T.cus : '', M.format].filter(Boolean).join(' ');
+  return `<div class="${cls}">
+    <div class="ov-top">${brandHTML}${tag ? `<span class="ov-tag">${esc(tag)}</span>` : ''}<span class="ov-last">${esc(T.fin)}${M.ot ? ' · OT' : ''}${M.t ? ' · ' + esc(shortDay(M.t, loc)) : ''}</span></div>
+    <div class="ov-sb"><b class="ov-tn">${esc(ovName(names.n1) || T.home)}</b><span class="ov-sc"><b class="${lose(0).trim()}">${esc(M.score[0])}</b><i>–</i><b class="${lose(1).trim()}">${esc(M.score[1])}</b></span><b class="ov-tn r">${esc(ovName(names.n2) || T.away)}</b></div>
+    <div class="ov-teams"><div class="ov-tm">${side(0)}</div><div class="ov-tm r">${side(1)}</div></div></div>`;
+}
+
+// ---------- dos equipos frente a frente ----------
+// A y B: listas de jugadores (los que no existen llegan como null y no salen)
+export function renderVs(A, B, o, names = {}) {
+  const { T, n1 } = fmt(o), cls = `ov ov-duel ov-${o.th}`;
+  const team = (list) => { const rows = list.filter(Boolean).map((P) => ({ P, s: ovStats(P, { ...o, x: [], k: [], a: 0 }) })); const r = rows.filter((x) => x.s.avg != null); return { rows, avg: r.length ? r.reduce((t, x) => t + x.s.avg, 0) / r.length : null }; };
+  const a = team(A), b = team(B);
+  if (!a.rows.length && !b.rows.length) return `<div class="${cls} ov-msg">${brandHTML}<span>${esc(T.nf)}</span></div>`;
+  const side = (tm) => tm.rows.sort((x, y) => (y.s.avg ?? -1) - (x.s.avg ?? -1)).map(({ P, s }) => plRow({ rk: (P.meta || {}).rk, name: P.n, pid: P.id }, `<span class="x">${s.k ? `${s.w}-${s.l}` : ''}</span>`, s.avg != null ? `<b class="rt ${rcls(s.avg)}">${n1(s.avg)}</b>` : `<b class="rt none">–</b>`)).join('');
+  const big = (v) => (v != null ? `<b class="rt ${rcls(v)}">${n1(v)}</b>` : `<b class="rt none">–</b>`);
+  const mode = o.m === 'pub' ? '' : `<span class="ov-tag">${esc(o.m === 'cus' ? T.cus : T.all)}</span>`;
+  return `<div class="${cls} ov-vs">
+    <div class="ov-top">${brandHTML}${mode}<span class="ov-last">${esc(T.avg)} · ${esc(T.last.replace('{n}', o.n))}</span></div>
+    <div class="ov-sb"><b class="ov-tn">${esc(ovName(names.n1) || T.home)}</b><span class="ov-sc avg">${big(a.avg)}<i>VS</i>${big(b.avg)}</span><b class="ov-tn r">${esc(ovName(names.n2) || T.away)}</b></div>
+    <div class="ov-teams"><div class="ov-tm">${side(a)}</div><div class="ov-tm r">${side(b)}</div></div></div>`;
+}
+
 // ---------- la página para OBS ----------
 async function gunzipText(buf) {
   if (typeof DecompressionStream === 'function') return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   const z = await import('./vendor/gunzip.js'); return z.strFromU8(z.gunzipSync(buf));
 }
-export async function fetchPlayer(pid) {
-  const r = await fetch(`/data/p/${bucketOf(pid)}.json.gz?v=${Date.now()}`, { cache: 'no-store' });
+// JSON (comprimido o no) sin caché; null si no existe
+async function getData(url) {
+  const r = await fetch(url, { cache: 'no-store' });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const buf = new Uint8Array(await r.arrayBuffer());
-  const j = JSON.parse(buf[0] === 0x1f && buf[1] === 0x8b ? await gunzipText(buf) : new TextDecoder().decode(buf));
-  return j[pid] || null;
+  return JSON.parse(buf[0] === 0x1f && buf[1] === 0x8b ? await gunzipText(buf) : new TextDecoder().decode(buf));
+}
+export async function fetchPlayer(pid) {
+  const j = await getData(`/data/p/${bucketOf(pid)}.json.gz?v=${Date.now()}`);
+  return (j && j[pid]) || null;
+}
+// varios jugadores de una vez: un archivo por grupo, aunque compartan
+export async function fetchPlayers(ids) {
+  const files = new Map();
+  for (const id of ids) { const b = bucketOf(id); if (!files.has(b)) files.set(b, getData(`/data/p/${b}.json.gz?v=${Date.now()}`)); }
+  return Promise.all(ids.map(async (id) => { const j = await files.get(bucketOf(id)); return (j && j[id]) || null; }));
+}
+// La ficha resumida de un partido: está en el archivo de su día y su hora
+const inChunk = (c, hh) => c === 'all' || c === hh || (c.includes('-') && hh <= c.slice(0, 2) && hh >= c.slice(3, 5));
+export async function fetchMatch(key, id) {
+  const d = key.slice(0, 10), hh = key.slice(11);
+  const meta = await getData(`/data/days/${d}.json?v=${Date.now()}`); if (!meta) return null;
+  const c = (meta.chunks || []).find((x) => inChunk(x.c, hh)); if (!c) return null;
+  const list = await getData(`/data/days/${d}/${c.c}.json.gz?v=${encodeURIComponent(c.v || '')}`);
+  return (list || []).find((x) => x.i === id || (x.pd && x.pd.some((y) => y.i === id))) || null;
+}
+// Lo que hay que dibujar ahora para una dirección. st guarda lo que se recuerda entre una mirada y la siguiente.
+async function frame(spec, st) {
+  const o = spec.o;
+  if (spec.kind === 'player') {
+    const P = await fetchPlayer(spec.pid), top = P && P.games && P.games[0] ? P.games[0][1] : null;
+    const fresh = st.top !== undefined && top !== st.top && st.pid === spec.pid; st.top = top; st.pid = spec.pid; st.title = P ? P.n : '';
+    return renderOverlay(P, o, { fresh });
+  }
+  if (spec.kind === 'team') return renderTeam(await fetchPlayers(spec.ids), o, st.idx);
+  if (spec.kind === 'vs') { const all = await fetchPlayers([...spec.t1, ...spec.t2]); return renderVs(all.slice(0, spec.t1.length), all.slice(spec.t1.length), o, spec); }
+  if (spec.kind === 'match') {
+    let key = spec.key, mid = spec.mid;
+    if (spec.pid) { const P = await fetchPlayer(spec.pid), g = P ? ovGames(P, o.m)[0] : null; if (!g) return renderMatch(null, o); key = g.k; mid = g.i; }
+    // un partido terminado no cambia: se pide una vez
+    if (!st.match || st.match.id !== mid) { const e = await fetchMatch(key, mid); st.match = { id: mid, M: matchOf(e) }; }
+    return renderMatch(st.match.M, o, spec);
+  }
+  return renderOverlay(null, o, { noid: true });
 }
 export async function boot() {
-  const o = ovOptions(location.search);
-  const m = /^\/overlay\/(\d{1,12})\/?$/.exec(location.pathname), pid = m ? m[1] : new URLSearchParams(location.search).get('p');
+  const base = ovSpec(location.pathname, location.search), o = base.o;
   document.documentElement.lang = o.l;
   const root = document.getElementById('ov');
   // ?win: ventana pequeña normal (navegadores sin ventana siempre encima): con fondo y ajustada al tamaño de la ventana
   const asWin = new URLSearchParams(location.search).has('win');
   if (asWin) { document.body.classList.add('ov-win', 'ov-win-' + o.th); addEventListener('resize', () => fitWin(window, root)); }
-  if (!pid || !/^\d{1,12}$/.test(pid)) { root.innerHTML = renderOverlay(null, o, { noid: true }); return; }
+  if (base.kind === 'none') { root.innerHTML = renderOverlay(null, o, { noid: true }); return; }
   try { setOfficial(await (await fetch('/assets/ranks/index.json?v=' + Date.now(), { cache: 'no-store' })).json()); } catch {}
-  let lastId = null, lastJson = '';
-  async function tick() {
+  const st = { html: '', idx: 0, r: base.r || OV_ROT, saved: null, savedAt: 0 };
+  const show = (html) => { if (html === st.html) return; root.innerHTML = html; st.html = html; if (asWin) { document.title = (st.title ? st.title + ' · ' : '') + 'SlapScore'; fitWin(window, root); } };
+  async function tick(force) {
     try {
-      const P = await fetchPlayer(pid);
-      const top = P && P.games && P.games[0] ? P.games[0][1] : null;
-      const json = P ? JSON.stringify([P.meta, P.games && P.games.slice(0, 60)]) : 'null';
-      if (json !== lastJson) { root.innerHTML = renderOverlay(P, o, { fresh: lastId != null && top !== lastId }); lastJson = json; lastId = top; if (asWin) { document.title = (P ? P.n + ' · ' : '') + 'SlapScore'; fitWin(window, root); } }
+      let spec = base;
+      if (base.kind === 'saved') {
+        // enlace fijo: lo guardado se vuelve a pedir cada 3 minutos (o al volver a la escena)
+        if (!st.saved || Date.now() - st.savedAt > (force ? 30_000 : 170_000)) {
+          const r = await fetch('/api/ov/' + base.sid, { cache: 'no-store' });
+          if (r.status === 404) st.saved = { kind: 'none' };
+          else if (r.ok) { const u = String((await r.json()).u || ''), i = u.indexOf('?'); st.saved = ovSpec(i < 0 ? u : u.slice(0, i), i < 0 ? '' : u.slice(i)); }
+          if (r.ok || r.status === 404) st.savedAt = Date.now();
+        }
+        if (!st.saved) return;
+        if (st.saved.kind === 'none' || st.saved.kind === 'saved') { show(`<div class="ov ov-full ov-${o.th} ov-msg">${brandHTML}<span>${esc((TX[o.l] || TX.en).gone)}</span></div>`); return; }
+        spec = st.saved; document.documentElement.lang = spec.o.l;
+      }
+      st.r = spec.r || OV_ROT;
+      show(await frame(spec, st));
     } catch { /* sin conexión: se queda lo último que se vio */ }
   }
   await tick();
   // la web se actualiza cada 3-4 minutos; aquí se mira cada minuto (y al volver a la escena)
   setInterval(tick, 60_000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(true); });
+  // varios jugadores: cada r segundos se pasa al siguiente
+  (function turn() {
+    setTimeout(() => {
+      const slides = root.querySelectorAll('.ov-slide');
+      if (slides.length > 1) { st.idx = (st.idx + 1) % slides.length; slides.forEach((x, i) => x.classList.toggle('on', i === st.idx)); st.html = ''; }
+      turn();
+    }, Math.max(5, st.r) * 1000);
+  })();
 }
 
 // ---------- ventana flotante (uso personal) ----------

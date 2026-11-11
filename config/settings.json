@@ -12,7 +12,7 @@
   "support": "https://ko-fi.com/slapscoreapp",
   "discord": "https://discord.gg/RUUzZPQT2g",
   "discordRoles": { "totw": "1569727863492710410", "news": "1569727836279804005" },
-  "social": { "tiktok": true, "xLink": false, "tags": "#SlapshotRebound #SlapScore" },
+  "social": { "tiktok": true, "video": true, "xLink": false, "tags": "#SlapshotRebound #SlapScore" },
   "hiddenPlayers": [],
   "supporters": []
 }

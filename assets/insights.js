@@ -41,6 +41,30 @@ export function mmrDelta(meta, from) {
   return meta.mmr - base;
 }
 
+// MMR en un momento dado (el último dato de antes; si se le empezó a seguir después, el primero que hay)
+function mmrAt(meta, at) {
+  const rh = meta && Array.isArray(meta.rh) ? meta.rh : []; if (!rh.length) return null;
+  let v = rh[0][1]; for (const e of rh) { if (e[0] <= at) v = e[1]; else break; }
+  return v;
+}
+// Resumen de un mes (ym: 'AAAA-MM'; dayOf(t): el día de un partido, 'AAAA-MM-DD' en hora de Madrid).
+// Devuelve null si ese mes no hay partidos; si no: la lista, sus totales, los días jugados, la mejor racha de
+// victorias, el mejor día (por nota media, con 3 partidos o más si los hay) y cuánto cambió el MMR en el mes.
+export function monthRecap(games, ym, dayOf, meta, now = Date.now()) {
+  const list = (games || []).filter((g) => dayOf(g.t).startsWith(ym));
+  if (!list.length) return null;
+  const sum = sumGames(list), days = new Map();
+  for (const g of list) { const d = dayOf(g.t), x = days.get(d) || { d, k: 0, w: 0, l: 0, rs: 0 }; x.k++; x.rs += g.rt || 0; if (g.r === 'W') x.w++; else if (g.r === 'L') x.l++; days.set(d, x); }
+  const all = [...days.values()].map((x) => ({ ...x, avg: x.rs / x.k })), min = all.some((x) => x.k >= 3) ? 3 : 1;
+  const bestDay = all.filter((x) => x.k >= min).sort((a, b) => b.avg - a.avg || b.k - a.k)[0];
+  // mejor racha de victorias (los partidos van del más nuevo al más viejo)
+  let run = 0, best = { n: 0, from: 0, to: 0 }, end = 0;
+  for (const g of list) { if (g.r === 'W') { if (!run) end = g.t; run++; if (run > best.n) best = { n: run, from: g.t, to: end }; } else run = 0; }
+  const from = list[list.length - 1].t, to = Math.min(now, list[0].t + 3_600_000);
+  const m0 = mmrAt(meta, from), m1 = mmrAt(meta, to);
+  return { ym, list, sum, days: days.size, bestDay, streak: best, dm: meta && meta.mmr != null && m0 != null && m1 != null ? m1 - m0 : null };
+}
+
 // Puesto por nota media entre los jugadores con un mínimo de partidos (rows: tabla de 7 días, { id, a: { gp, rs } })
 export function rankAmong(rows, pid, min = 10) {
   const me = rows.find((r) => String(r.id) === String(pid));

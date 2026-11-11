@@ -1326,7 +1326,7 @@ async function viewMatch(r, tok) {
   MAIN.innerHTML = `
     <nav class="crumbs in" aria-label="${esc(t('Ruta'))}"><a href="#d-${m.key.slice(0, 10)}">${esc(t('Partidos'))}</a>${ICON.right}<span>${esc(typeLabel(m.type))} · ${esc(regionLabel(m.region))}</span>${ICON.right}<span>${esc(m.arena)}</span></nav>
     <section class="card evh in" aria-label="${esc(t('Marcador'))}">
-      <div class="evh-top"><span>${esc(cap(DF_FULL.format(new Date(m.t))))} · ${DF_TIME.format(new Date(m.t))}</span><span class="evh-acts"><button type="button" class="tbtn" id="m-share">${ICON.share}<span>${esc(t('Compartir'))}</span></button><a href="https://slapshot.gg/matches/${encodeURIComponent(m.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></span></div>
+      <div class="evh-top"><span>${esc(cap(DF_FULL.format(new Date(m.t))))} · ${DF_TIME.format(new Date(m.t))}</span><span class="evh-acts"><button type="button" class="tbtn" id="m-share">${ICON.share}<span>${esc(t('Compartir'))}</span></button><button type="button" class="tbtn" id="m-obs" title="${esc(t('Overlay para OBS'))}">${ICON.obs}<span>${esc(t('Overlay'))}</span></button><a href="https://slapshot.gg/matches/${encodeURIComponent(m.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></span></div>
       <div class="evh-main">
         <div class="evh-team">${crest('home', 56)}<b>${esc(HOME())}</b><span class="avg">${esc(t('Nota media'))} ${badge(avg(m, 'home'))}</span></div>
         <div class="evh-score"><div class="sc" aria-label="${esc(HOME())} ${m.score.home}, ${esc(AWAY())} ${m.score.away}"><span class="${lose('home')}">${m.score.home}</span><i>-</i><span class="${lose('away')}">${m.score.away}</span></div>
@@ -1364,6 +1364,7 @@ async function viewMatch(r, tok) {
   });
   MAIN.onclick = (e) => { const b = e.target.closest('[data-perf]'); if (b && S.curView) { const v = S.curView(); const p = v.players[Number(b.getAttribute('data-perf'))]; if (p) openPerf(v, p); } };
   $('#m-share').addEventListener('click', () => shareImage('match', m, `slapscore-${m.key.slice(0, 10)}-${m.id.slice(0, 8)}.png`));
+  $('#m-obs').addEventListener('click', () => matchObsSheet(m));
   const hb = $('#m-hide');
   if (hb) hb.addEventListener('click', async () => {
     hb.disabled = true;
@@ -1622,6 +1623,15 @@ async function shareSummary(kind, P, games, pub) {
   const slug = String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id;
   shareImage('summary', { kind, P, list, sum: IN.sumGames(list), dm: pub ? IN.mmrDelta(P.meta, from) : null, pos, label, cus: !pub }, `slapscore-${kind === 'session' ? 'sesion' : 'semana'}-${slug}.png`);
 }
+// Resumen del mes para compartir (el mes en curso o el anterior), con lo que trae el perfil
+const recapMonths = (games) => { const td = today(), cur = td.slice(0, 7), d = new Date(Date.UTC(+cur.slice(0, 4), +cur.slice(5, 7) - 2, 1)), prev = d.toISOString().slice(0, 7);
+  const n = (ym) => games.filter((g) => C.madrid(g.t).day.startsWith(ym)).length; return [prev, cur].filter((ym) => n(ym) >= 3); };
+function shareRecap(ym, P, games, pub) {
+  const rec = IN.monthRecap(games, ym, (ms) => C.madrid(ms).day, pub ? P.meta : null);
+  if (!rec) { toast(t('No hay partidos de ese mes.')); return; }
+  const slug = String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id;
+  shareImage('recap', { P, rec, label: awMonth(ym), cus: !pub }, `slapscore-mes-${ym}-${slug}.png`);
+}
 // Logros: el escalón más alto de cada familia y los tres que tiene más cerca
 function achCard(P) {
   const aw = awardsOf(String(P.id)) || { weeks: 0, months: [] };
@@ -1728,111 +1738,13 @@ async function floatOverlay(P, o, qs) {
     toast(t('Ventana flotante abierta: se queda encima de las demás y se actualiza sola. Deja esta pestaña abierta y pon el juego en ventana sin bordes.'), 7500);
   } catch { try { win.close(); } catch {} toast(t('No se pudieron cargar los datos.')); }
 }
+// Los configuradores de los overlays (obs.js) se cargan al abrirlos
+const obsCtx = () => ({ ...ctx(), $, $$, t, LANG, LANGS, ICON, BUILD_Q, openSheet, closeSheet, copyText, trackEvent, shortDate, DF_TIME, typeLabel, resLetter, fold, floatOk, floatOverlay, HOME, AWAY });
 async function obsSheet(P, mode) {
-  let O;
-  try { O = await import('./overlay.js'); } catch (e) { toast(t('No se pudieron cargar los datos.')); return; }
-  // estilos del overlay: la vista previa se mide cuando ya han cargado
-  let css = $('#ov-css');
-  if (!css) { css = document.createElement('link'); css.id = 'ov-css'; css.rel = 'stylesheet'; css.href = '/assets/overlay.css' + BUILD_Q; document.head.appendChild(css); }
-  const cssReady = css.sheet ? Promise.resolve() : new Promise((ok) => { css.addEventListener('load', ok, { once: true }); css.addEventListener('error', ok, { once: true }); setTimeout(ok, 3000); });
-  const o = { ...O.OV_DEFAULTS, l: LANG, m: mode === 'cus' ? 'cus' : 'pub', x: [], k: [], a: 0 };
-  // Qué partidos cuentan: los marcados (sel; null = sin tocar: los últimos n) y si los nuevos se añaden solos (auto)
-  let sel = null, auto = true, pkRows = 30;
-  const defKeys = () => O.ovGames(P, o.m).slice(0, o.n).map(O.ovKey);
-  const touched = () => { if (!sel) return false; const d = defKeys(); return !(sel.size === d.length && d.every((k) => sel.has(k))); };
-  // de ahí salen las opciones del enlace: nada (lo normal), k (selección fija) o k + a (selección y, además, los nuevos)
-  const sync = () => { const custom = touched(); o.x = []; if (auto && !custom) { o.k = []; o.a = 0; } else { o.k = [...(sel || defKeys())]; o.a = auto ? O.ovNewest(P) : 0; } };
-  const seg = (k, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button type="button" data-ov="${k}" data-v="${v}" aria-pressed="${String(o[k]) === String(v)}">${esc(l)}</button>`).join('')}</div>`;
-  const row = (label, html) => `<div class="obs-r"><span class="lbl">${esc(label)}</span>${html}</div>`;
-  const chk = (k, label) => `<label class="obs-chk"><input type="checkbox" data-ovc="${k}"${o[k] ? ' checked' : ''}> ${esc(label)}</label>`;
-  const ovl = openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Overlay para OBS'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
-    <div class="obs-b"><p class="muted">${esc(t('Pon en tu directo las notas de los últimos partidos de {n} y su nota media. Se actualiza solo cada minuto.', { n: P.n }))}</p>
-      <div class="obs-pv" id="obs-pv"><div class="obs-sc" id="obs-sc"></div></div>
-      <div class="obs-opts">
-        ${row(t('Partidos'), seg('n', [[5, '5'], [10, '10'], [20, '20']]))}
-        ${row(t('Tipo de partida'), seg('m', [['pub', t('Pública')], ['cus', t('Custom')], ['all', t('Todas')]]))}
-        <details class="obs-pick" id="obs-pick"><summary><span>${esc(t('Elegir qué partidos cuentan'))}</span><span class="n" id="obs-pk-n"></span></summary>
-          <div class="obs-pk-b">
-            <label class="obs-chk obs-pk-auto"><input type="checkbox" id="obs-pk-auto" checked><span>${esc(t('Añadir solos los partidos nuevos'))}</span></label>
-            <p class="muted" id="obs-pk-help"></p>
-            <div class="obs-pk-list" id="obs-pk-list"></div>
-            <div class="obs-pk-acts"><button type="button" class="tbtn" id="obs-pk-none">${esc(t('Desmarcar todos'))}</button><button type="button" class="tbtn" id="obs-pk-reset">${esc(t('Restablecer'))}</button><button type="button" class="tbtn" id="obs-pk-more">${esc(t('Ver más partidos'))}</button></div>
-          </div></details>
-        ${row(t('Diseño'), seg('v', [['full', t('Completo')], ['compact', t('Compacto')]]))}
-        ${row(t('Fondo'), seg('th', [['dark', t('Oscuro')], ['light', t('Claro')], ['clear', t('Transparente')]]))}
-        ${row(t('Mostrar'), `<div class="obs-chks">${chk('rk', t('Rango y MMR'))}${chk('st', t('Estadísticas'))}${chk('d', t('Fechas'))}</div>`)}
-        ${row(t('Idioma'), `<select class="select" id="obs-l" aria-label="${esc(t('Idioma'))}">${LANGS.map(([k, n]) => `<option value="${k}"${k === o.l ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`)}
-      </div>
-      <div class="obs-url"><input class="input" id="obs-u" readonly aria-label="${esc(t('Enlace del overlay'))}"><button type="button" class="btn primary" id="obs-copy">${esc(t('Copiar enlace'))}</button></div>
-      ${floatOk() ? `<div class="obs-float"><span class="t"><b>${esc(t('¿Solo para ti?'))}</b> ${esc(t('Ábrelo en una ventana flotante que se queda encima del juego.'))}</span><button type="button" class="btn sm" id="obs-float">${ICON.float}${esc(t('Ventana flotante'))}</button></div>` : ''}
-      <ol class="tour-kofi obs-how">
-        <li>${esc(t('En OBS, añade una fuente nueva: «+» → «Navegador».'))}</li>
-        <li id="obs-size"></li>
-        <li>${esc(t('Listo: se actualiza solo y el fondo es transparente. Muévelo y escálalo como quieras.'))}</li>
-      </ol>
-      <p class="muted obs-note">${esc(t('Consejo: los partidos de los supporters de Ko-fi se cargan antes, también en el overlay.'))} <button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></p>
-    </div>`, 'obs-sheet');
-  const url = () => `${location.origin}/overlay/${encodeURIComponent(P.id)}${O.ovQuery(o)}`;
-  function draw() {
-    const sc = $('#obs-sc', ovl); if (!sc) return;
-    sc.innerHTML = O.renderOverlay(P, o);
-    const pv = $('#obs-pv', ovl), el = sc.firstElementChild;
-    const k = Math.min(1, (pv.clientWidth - 24) / (el.offsetWidth || 1));
-    sc.style.transform = k < 1 ? `scale(${k})` : ''; pv.style.height = Math.ceil(el.offsetHeight * k + 24) + 'px';
-    $('#obs-u', ovl).value = url();
-    const z = O.ovSize(o); $('#obs-size', ovl).textContent = t('Pega el enlace y pon de tamaño {w} × {h}.', { w: z.w, h: z.h });
-    $$('[data-ovc="st"]', ovl).forEach((c) => { c.disabled = o.v === 'compact'; c.closest('label').classList.toggle('off', o.v === 'compact'); });
-    // con selección fija no hay «últimos N»
-    const noN = !auto && touched(); $$('[data-ov="n"]', ovl).forEach((b) => { b.disabled = noN; }); const ns = $('[data-ov="n"]', ovl); if (ns) ns.parentElement.classList.toggle('off', noN);
-  }
-  // textos del selector (sin rehacer la lista: al marcar una casilla no se pierde el foco ni el sitio)
-  function pickInfo() {
-    if (!$('#obs-pk-help', ovl)) return;
-    const custom = touched(), none = !!sel && sel.size === 0;
-    $('#obs-pk-help', ovl).textContent = auto
-      ? t('Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.', { n: o.n }) + (none ? ' ' + t('Sin ninguno marcado, empieza vacío y se va llenando.') : '')
-      : t('Solo cuentan los partidos que marques; los nuevos no se añaden. Para enseñar los de una liga o un torneo.') + (none ? ' ' + t('Marca al menos un partido.') : '');
-    $('#obs-pk-n', ovl).textContent = custom ? t(auto ? '{n} elegidos + nuevos' : '{n} elegidos', { n: sel.size }) : auto ? '' : t('Sin partidos nuevos');
-    $('#obs-pk-auto', ovl).checked = auto;
-    $('#obs-pk-none', ovl).hidden = none; $('#obs-pk-reset', ovl).hidden = !custom && auto;
-  }
-  function drawPick() {
-    const box = $('#obs-pk-list', ovl); if (!box) return;
-    const all = O.ovGames(P, o.m), X = sel || new Set(defKeys());
-    const on = (g) => X.has(O.ovKey(g));
-    box.innerHTML = all.slice(0, pkRows).map((g) => `<label class="obs-pk-it"><input type="checkbox" data-pk="${esc(O.ovKey(g))}"${on(g) ? ' checked' : ''}><span class="d">${esc(shortDate(g.t))} · ${esc(DF_TIME.format(new Date(g.t)))}</span><span class="y">${esc(typeLabel(g.y))}${g.f ? ' ' + esc(g.f) : ''}</span><span class="s ${g.r === 'W' ? 'w' : g.r === 'L' ? 'l' : ''}">${esc(resLetter(g.r))} ${esc(g.gf)}–${esc(g.ga)}</span>${badge(g.rt)}</label>`).join('') || `<p class="muted obs-pk-none">${esc(t('Sin partidos todavía'))}</p>`;
-    $('#obs-pk-more', ovl).hidden = all.length <= pkRows;
-    pickInfo();
-  }
-  ovl.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-ov]');
-    if (b) {
-      const k = b.dataset.ov, v = b.dataset.v; o[k] = k === 'n' ? Number(v) : v; $$(`[data-ov="${k}"]`, ovl).forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      if (k === 'm') { sel = null; pkRows = 30; }   // otro tipo de partida: otra lista
-      sync(); draw(); drawPick(); return;
-    }
-    if (e.target.closest('#obs-pk-none')) { sel = new Set(); sync(); draw(); drawPick(); return; }
-    if (e.target.closest('#obs-pk-reset')) { sel = null; auto = true; sync(); draw(); drawPick(); return; }
-    if (e.target.closest('#obs-pk-more')) { pkRows += 30; drawPick(); }
-  });
-  ovl.addEventListener('change', (e) => {
-    const c = e.target.closest('[data-ovc]'); if (c) { o[c.dataset.ovc] = c.checked ? 1 : 0; draw(); }
-    if (e.target.id === 'obs-pk-auto') { auto = e.target.checked; sync(); draw(); pickInfo(); return; }
-    const p = e.target.closest('[data-pk]');
-    if (p) {
-      if (!sel) sel = new Set(defKeys());
-      if (p.checked && sel.size >= O.OV_MAX_PICK) { p.checked = false; toast(t('Como mucho {n} partidos.', { n: O.OV_MAX_PICK })); return; }
-      if (p.checked) sel.add(p.dataset.pk); else sel.delete(p.dataset.pk);
-      sync(); draw(); pickInfo();
-    }
-  });
-  $('#obs-copy', ovl).addEventListener('click', () => { const i = $('#obs-u', ovl); i.select(); copyText(i.value, i); trackEvent('obs'); });
-  $('#obs-u', ovl).addEventListener('focus', (e) => e.target.select());
-  const fb = $('#obs-float', ovl); if (fb) fb.addEventListener('click', () => floatOverlay(P, { ...o }, O.ovQuery(o)));
-  draw(); drawPick(); cssReady.then(() => { draw(); requestAnimationFrame(draw); });
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw).catch(() => {});
-  const onR = () => { if (!$('#obs-sc')) { removeEventListener('resize', onR); return; } draw(); };
-  addEventListener('resize', onR, { passive: true });
+  try { (await import('./obs.js')).playerSheet(obsCtx(), P, mode); } catch (e) { toast(t('No se pudieron cargar los datos.')); }
+}
+async function matchObsSheet(m) {
+  try { (await import('./obs.js')).matchSheet(obsCtx(), m); } catch (e) { toast(t('No se pudieron cargar los datos.')); }
 }
 // La dirección que sale en las imágenes: la de la web (ajuste «home»), aunque se generen desde otra (pruebas, robot)
 function siteHost() { try { return new URL(S.settings.home).host || location.host; } catch { return location.host; } }
@@ -1843,7 +1755,8 @@ async function shareImage(kind, obj, fname) {
     const X = { t, lang: LANG, loc: LOC, pct, teamL: TEAM_LETTER, host: siteHost(), fmtR, int, resLetter, typeLabel, region: regionLabel,
       date: (ms) => `${shortDate(ms)} · ${DF_TIME.format(new Date(ms))}`, statLine: statPlain, rankSrc: (rk) => rk ? officialSrc(rk, 128) : null, rankName: (rk) => (C.parseRank(rk) || {}).name || '',
       endLabel: kind === 'match' ? endLabel(obj.endReason, obj.ot) + (obj.per ? ' · ' + obj.per.map((x) => `${x.score.home}-${x.score.away}`).join(' · ') : '') : '' };
-    const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : kind === 'summary' ? await Sh.summaryImage(obj, X) : await Sh.profileImage(obj, X);
+    X.day = (ms) => shortDate(ms);
+    const cv = kind === 'match' ? await Sh.matchImage(obj, X) : kind === 'week' || kind === 'month' ? await Sh.awardImage(kind, obj, X) : kind === 'summary' ? await Sh.summaryImage(obj, X) : kind === 'recap' ? await Sh.recapImage(obj, X) : await Sh.profileImage(obj, X);
     const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
     if (!$('#sh-pv')) return;
     const url = URL.createObjectURL(blob), file = new File([blob], fname, { type: 'image/png' });
@@ -1986,6 +1899,7 @@ async function viewPlayer(pid, tok) {
     go({ keepScroll: true, silent: true });
   });
   $$('[data-sum]', MAIN).forEach((b) => b.addEventListener('click', () => shareSummary(b.getAttribute('data-sum'), P, games, !cus)));
+  $$('[data-recap]', MAIN).forEach((b) => b.addEventListener('click', () => shareRecap(b.getAttribute('data-recap'), P, games, !cus)));
   const pf = $('#p-float'); if (pf) pf.addEventListener('click', () => floatOverlay(P, { ...OV_DEF, l: LANG, m: mode === 'cus' ? 'cus' : 'pub' }));
   $('#p-shimg').addEventListener('click', () => shareImage('profile', { ...P, _g: games, _a: a, _mode: mode }, `slapscore-${String(P.n).replace(/[^\p{L}\p{N}_-]+/gu, '') || P.id}.png`));
   drawStats(); drawHist(P, games, a);
@@ -2025,7 +1939,7 @@ function weekCard(games, share) {
   return `<div class="card in"><div class="card-h"><h3>${esc(t('Forma semanal'))}</h3><small>${esc(t('últimos 7 días'))}</small></div>
     <div class="wk">${cols}</div>
     <div class="wk-sum"><div><b>${int(cur.gp)}</b><span>${esc(t('Partidos'))}</span></div><div><b>${cur.gp ? pct(cur.w / cur.gp) : '–'}</b><span>${esc(t('Victorias'))}</span></div><div><b>${cur.gp ? fmtR(ca) : '–'} ${trend}</b><span>${esc(prev.gp ? t('Nota media (vs semana anterior)') : t('Nota media'))}</span></div></div>
-    ${share && cur.gp ? `<div class="card-f"><button type="button" class="tbtn" data-sum="week">${ICON.share}<span>${esc(t('Compartir mi semana'))}</span></button></div>` : ''}</div>`;
+    ${share && (cur.gp || recapMonths(games).length) ? `<div class="card-f wk-f">${cur.gp ? `<button type="button" class="tbtn" data-sum="week">${ICON.share}<span>${esc(t('Compartir mi semana'))}</span></button>` : ''}${recapMonths(games).map((ym) => `<button type="button" class="tbtn" data-recap="${ym}">${ICON.share}<span>${esc(t('Resumen de {m}', { m: DF_MON.format(new Date(ym + '-15T12:00:00Z')) }))}</span></button>`).join('')}</div>` : ''}</div>`;
 }
 // Sus mejores partidos (por nota) entre los guardados
 function bestGamesCard(P, games) {

@@ -116,7 +116,9 @@ jobs:
           if echo "$due" | grep -qE '^(totw|month)$'; then
             # la imagen es la misma que hace la web; si no se puede preparar, el mensaje sale sin ella
             export PW_DIR="$RUNNER_TEMP/pw"; mkdir -p "$PW_DIR"
-            ( cd "$PW_DIR" && npm init -y >/dev/null && npm i --silent --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium >/dev/null ) \
+            # para el vídeo vertical hace falta ffmpeg: el del sistema o, si no lo hay, el paquete ffmpeg-static
+            ( cd "$PW_DIR" && npm init -y >/dev/null && npm i --silent --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium >/dev/null \
+              && { command -v ffmpeg >/dev/null 2>&1 || npm i --silent --no-audit --no-fund ffmpeg-static@5.2.0 || true; } ) \
               && node crawler/discord.js render || echo "::warning::No se pudo preparar la imagen para Discord: el mensaje sale sin ella."
           fi
           node crawler/discord.js post
@@ -146,6 +148,8 @@ jobs:
               mkdir -p "$PW_DIR"
               ( cd "$PW_DIR" && npm init -y >/dev/null && npm i --silent --no-audit --no-fund playwright@1.63.0 && npx playwright install --with-deps chromium >/dev/null ) || echo "::warning::No se pudo instalar el navegador para preparar la imagen."
             fi
+            # para el vídeo vertical hace falta ffmpeg: el del sistema o, si no lo hay, el paquete ffmpeg-static
+            command -v ffmpeg >/dev/null 2>&1 || [ -d "$PW_DIR/node_modules/ffmpeg-static" ] || ( cd "$PW_DIR" && npm i --silent --no-audit --no-fund ffmpeg-static@5.2.0 ) || true
             node crawler/social.js render || echo "::warning::No se pudo preparar la imagen para las redes."
           fi
           node crawler/social.js post
@@ -184,7 +188,7 @@ jobs:
           sed -i "s/__BUILD__/$B/g" _site/sw.js
           sed -i -E "s#assets/(app\.js|core\.js|emblems\.js|i18n\.js|news\.js|routes\.js|insights\.js|style\.css)\"#assets/\1?b=$B\"#g" _site/index.html
           sed -i -E "s#assets/(overlay-page\.js|overlay\.css)\"#assets/\1?b=$B\"#g" _site/overlay.html
-          sed -i -E "s#from '\./(core|emblems|i18n|news|routes|overlay|insights)\.js'#from './\1.js?b=$B'#g; s#import\('\./(admin|vendor/gunzip|en|fr|de|pt|tr|share|traffic|legal|tour|overlay)\.js'\)#import('./\1.js?b=$B')#g" _site/assets/*.js
+          sed -i -E "s#from '\./(core|emblems|i18n|news|routes|overlay|insights)\.js'#from './\1.js?b=$B'#g; s#import\('\./(admin|vendor/gunzip|en|fr|de|pt|tr|share|traffic|legal|tour|overlay|obs)\.js'\)#import('./\1.js?b=$B')#g" _site/assets/*.js
           echo "Archivos: $(find _site -type f | wc -l) · tamaño: $(du -sh _site | cut -f1)"
       # La web está en https://slapscore.app (Cloudflare Workers). GitHub Pages ya no se usa.
       - name: Publicar la web (Cloudflare)

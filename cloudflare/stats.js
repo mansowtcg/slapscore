@@ -208,6 +208,7 @@ export class Stats {
       if (request.method === 'POST' && u.pathname === '/hit') { await this.hit(await request.json()); return new Response(null, { status: 204 }); }
       if (request.method === 'POST' && u.pathname === '/forget') return Response.json(await this.forget(String((await request.json()).id || '')));
       if (request.method === 'POST' && u.pathname === '/fb') return Response.json(this.fbAllow(String((await request.json()).ip || '')));
+      if (request.method === 'POST' && u.pathname === '/ov') return Response.json(this.ovAllow(String((await request.json()).ip || '')));
       if (request.method === 'GET' && u.pathname === '/stats') return Response.json(this.stats(u.searchParams.get('range') || '7d'));
     } catch (e) { return Response.json({ error: String(e && e.message || e) }, { status: 500 }); }
     return new Response('not found', { status: 404 });
@@ -254,6 +255,20 @@ export class Stats {
   }
 
   // buzón de sugerencias: ¿se puede guardar otro mensaje de esta conexión? (de uno en uno, sin carreras)
+  // Enlaces fijos del overlay: crear o guardar, uno cada 2 segundos y 60 al día por conexión; 600 al día en total
+  ovAllow(ip) {
+    const now = this.now(), day = dayOf(now);
+    if (!this.ov || this.ovDay !== day) { this.ov = new Map(); this.ovDay = day; }
+    const total = Number(this.meta('ov:' + day)) || 0;
+    if (total >= 600) return { ok: false, error: 'full' };
+    const x = this.ov.get(ip) || { last: 0, n: 0 };
+    if (now - x.last < 2000 || x.n >= 60) return { ok: false, error: 'wait' };
+    x.last = now; x.n++; this.ov.set(ip, x);
+    if (this.ov.size > 20000) this.ov.clear();
+    this.setMeta('ov:' + day, String(total + 1));
+    this.sql.exec("DELETE FROM meta WHERE k LIKE 'ov:%' AND k < ?", 'ov:' + addDays(day, -3));
+    return { ok: true };
+  }
   fbAllow(ip) {
     const now = this.now(), day = dayOf(now);
     if (this.fbDay !== day) { this.fb.clear(); this.fbDay = day; }

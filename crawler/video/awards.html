@@ -1,0 +1,120 @@
+<!doctype html>
+<!-- Plantilla del vídeo vertical (1080×1920) del equipo de la semana y del jugador del mes. No es una página de la web:
+     la abre el robot (crawler/video.js), le pasa los datos en window.__DATA y va pidiendo cada fotograma con
+     renderAt(ms), así el vídeo sale igual en cualquier máquina. Todo lo importante queda fuera de las zonas que
+     TikTok tapa con sus botones (abajo y a la derecha). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>SlapScore · video</title>
+<link rel="stylesheet" href="/assets/overlay.css">
+<style>
+  html,body{margin:0;width:1080px;height:1920px;overflow:hidden;background:#0F1320}
+  body{font-family:"Sofia Sans",system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  #bg{position:absolute;inset:0;background:linear-gradient(180deg,#1B2A7A 0%,#131A3A 34%,#0F1320 62%,#0B0E18 100%)}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px);will-change:transform}
+  #g1{width:760px;height:760px;left:-240px;top:-200px;background:rgba(79,104,255,.42)}
+  #g2{width:680px;height:680px;right:-300px;top:820px;background:rgba(10,147,168,.26)}
+  #stage{position:absolute;left:70px;top:0;width:880px;height:1920px}
+  #brand{position:absolute;left:0;top:118px;display:flex;align-items:center;gap:18px;font-weight:800;font-size:54px;letter-spacing:.01em}
+  #brand i{display:grid;place-items:center;width:72px;height:72px;border-radius:21px;background:#374DF5}
+  #brand i::before{content:"";width:40px;height:22px;border-radius:50%;background:#fff}
+  .ttl{position:absolute;left:0;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:168px;line-height:1;letter-spacing:-.01em;text-transform:uppercase;white-space:nowrap}
+  #t1{top:250px}#t2{top:404px;color:#8EA0FF}
+  #when{position:absolute;left:0;top:598px;padding:12px 26px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:800;font-size:38px;letter-spacing:.04em;text-transform:uppercase}
+  .card{position:absolute;left:0;width:880px;box-sizing:border-box;display:flex;align-items:center;gap:24px;padding:0 30px;border-radius:34px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.09);will-change:transform,opacity}
+  .card .pos{flex:none;display:grid;place-items:center;width:76px;height:76px;border-radius:22px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:46px;color:#1A1300}
+  .card .emb{flex:none;width:132px;height:132px;object-fit:contain}
+  .card .av{flex:none;display:grid;place-items:center;width:116px;height:116px;border-radius:50%;font-weight:800;font-size:44px;text-transform:uppercase}
+  .card .who{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+  .card .nm{font-weight:800;font-size:58px;line-height:1.05;white-space:nowrap}
+  .card .st{font-weight:600;font-size:30px;color:#A9B1C9;white-space:nowrap}
+  .card .rt{flex:none;display:grid;place-items:center;width:178px;height:106px;border-radius:24px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:70px}
+  #c1{top:726px;height:270px;background:linear-gradient(135deg,rgba(245,183,0,.22),rgba(255,255,255,.07) 55%);border-color:rgba(245,183,0,.55)}
+  #c1 .nm{font-size:66px}#c1 .rt{width:196px;height:120px;font-size:80px}
+  #c2{top:1022px;height:218px}#c3{top:1266px;height:218px}
+  #c1 .pos{background:#F5B700}#c2 .pos{background:#C9CFDD}#c3 .pos{background:#D08A4E}
+  #halo{position:absolute;left:-14px;top:712px;width:908px;height:298px;border-radius:44px;box-shadow:0 0 0 4px rgba(245,183,0,.9),0 0 70px 14px rgba(245,183,0,.45);opacity:0}
+  #foot{position:absolute;left:0;top:1512px;width:880px;display:flex;flex-direction:column;gap:6px}
+  #foot b{font-weight:800;font-size:52px}
+  #foot span{font-weight:600;font-size:29px;color:#A9B1C9}
+</style>
+</head>
+<body>
+<div id="bg"></div><div class="glow" id="g1"></div><div class="glow" id="g2"></div>
+<div id="stage">
+  <div id="brand"><i></i>SlapScore</div>
+  <div class="ttl" id="t1"></div><div class="ttl" id="t2"></div>
+  <div id="when"></div>
+  <div id="halo"></div>
+  <div class="card" id="c1"></div><div class="card" id="c2"></div><div class="card" id="c3"></div>
+  <div id="foot"><b>slapscore.app</b><span id="why"></span></div>
+</div>
+<script type="module">
+import { parseRank } from '/assets/core.js';
+import { setOfficial, officialSrc } from '/assets/emblems.js';
+const D = window.__DATA || { kind: 'totw', label: '', min: 20, players: [] };
+const $ = (id) => document.getElementById(id);
+const RT = [[9, '#4F5EF5', '#fff'], [8, '#0A93A8', '#fff'], [7, '#1E9B3E', '#fff'], [6.5, '#E2B81E', '#251D00'], [6, '#D86A00', '#fff'], [-1, '#D7261B', '#fff']];
+const rtCol = (r) => RT.find(([m]) => r >= m) || RT[RT.length - 1];
+function hue(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 360; }
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const img = (src) => new Promise((ok) => { const i = new Image(); i.className = 'emb'; i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; });
+
+const isW = D.kind !== 'month';
+$('t1').textContent = isW ? 'Team of' : 'Player of'; $('t2').textContent = isW ? 'the week' : 'the month';
+$('when').textContent = D.label;
+$('why').textContent = `Best average rating · public matches · min. ${D.min}`;
+const top = D.players.slice(0, 3);
+window.ready = (async () => {
+  try { setOfficial(await (await fetch('/assets/ranks/index.json', { cache: 'no-store' })).json()); } catch {}
+  for (let i = 0; i < 3; i++) {
+    const p = top[i], card = $('c' + (i + 1)); if (!p) { card.remove(); continue; }
+    card.appendChild(el('span', 'pos', String(i + 1)));
+    const src = parseRank(p.rk) ? officialSrc(p.rk, 256) : null, pic = src ? await img(src) : null;
+    if (pic) card.appendChild(pic);
+    else { const a = el('span', 'av', (String(p.n).replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2) || '?')); a.style.background = `hsl(${hue(p.id || p.n)} 55% 46%)`; card.appendChild(a); }
+    const who = el('div', 'who'); who.appendChild(el('span', 'nm', p.n));
+    who.appendChild(el('span', 'st', `${p.gp} matches · ${p.w} W${p.mvp ? ` · ${p.mvp} MVP` : ''}`)); card.appendChild(who);
+    const rt = el('span', 'rt', '0.00'); const [, bg, ink] = rtCol(p.rt); rt.style.background = bg; rt.style.color = ink; card.appendChild(rt);
+  }
+  await document.fonts.ready; await Promise.all(['800 60px "Sofia Sans"', '800 60px "Sofia Sans Condensed"', '600 30px "Sofia Sans"'].map((f) => document.fonts.load(f, 'AaĞğŞş0123').catch(() => {})));
+  // los textos que no caben se encogen
+  for (const e of document.querySelectorAll('.nm, .st, .ttl')) { const max = e.classList.contains('ttl') ? 880 : e.parentElement.clientWidth; let s = parseFloat(getComputedStyle(e).fontSize); while (s > 20 && e.scrollWidth > max) { s -= 2; e.style.fontSize = s + 'px'; } }
+  renderAt(0);
+})();
+
+// ---- línea de tiempo (ms) ----
+// 3.º, 2.º y 1.º van entrando; al final se queda todo quieto con la dirección de la web
+const IN = [5300, 3600, 1900];           // cuándo entra la tarjeta del 1.º, 2.º y 3.º
+window.DURATION = 10500;
+const c01 = (x) => Math.max(0, Math.min(1, x)), out = (x) => 1 - Math.pow(1 - c01(x), 3), back = (x) => { const c = 1.6, y = c01(x) - 1; return 1 + (c + 1) * y * y * y + c * y * y; };
+const pr = (t, a, d) => c01((t - a) / d);
+function show(e, p, dx = 0, dy = 0, s0 = 1) { if (!e) return ''; const q = out(p); e.style.opacity = q.toFixed(3); e.style.transform = `translate(${(dx * (1 - q)).toFixed(1)}px,${(dy * (1 - q)).toFixed(1)}px) scale(${(s0 + (1 - s0) * q).toFixed(4)})`; return q.toFixed(3); }
+window.renderAt = (t) => {
+  const sig = [];
+  // el fondo se mueve despacio todo el rato
+  $('g1').style.transform = `translate(${(Math.sin(t / 2600) * 60).toFixed(1)}px,${(Math.cos(t / 3100) * 50).toFixed(1)}px)`;
+  $('g2').style.transform = `translate(${(Math.cos(t / 2900) * 70).toFixed(1)}px,${(Math.sin(t / 2300) * 60).toFixed(1)}px)`;
+  sig.push(Math.round(t / 100));   // el fondo cambia cada décima: se repite el fotograma dentro de ella
+  sig.push(show($('brand'), pr(t, 0, 600), 0, -30));
+  sig.push(show($('t1'), pr(t, 300, 700), 0, 70)); sig.push(show($('t2'), pr(t, 480, 700), 0, 70));
+  sig.push(show($('when'), pr(t, 1000, 500), 0, 0, 0.8));
+  for (let i = 0; i < 3; i++) {
+    const card = $('c' + (i + 1)), p = top[i]; if (!card || !p) continue;
+    const a = IN[i], q = pr(t, a, 650);
+    card.style.opacity = out(q).toFixed(3);
+    card.style.transform = i === 0 ? `scale(${(0.86 + 0.14 * back(q)).toFixed(4)})` : `translate(${(220 * (1 - out(q))).toFixed(1)}px,0)`;
+    const v = 5 + (p.rt - 5) * out(pr(t, a + 250, 900)), txt = (pr(t, a + 250, 900) >= 1 ? p.rt : v).toFixed(2);
+    const rt = card.querySelector('.rt'); if (rt.textContent !== txt) rt.textContent = txt;
+    sig.push(q.toFixed(3), txt);
+  }
+  // brillo dorado del primero: aparece y late una vez
+  const h = pr(t, IN[0] + 900, 500) * (1 - 0.55 * pr(t, IN[0] + 1500, 900)); $('halo').style.opacity = (top[0] ? h : 0).toFixed(3); sig.push(h.toFixed(3));
+  sig.push(show($('foot'), pr(t, 7500, 700), 0, 40));
+  return sig.join('|');
+};
+</script>
+</body>
+</html>

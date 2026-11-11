@@ -17,7 +17,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { plan as duePlan, render as renderShare, send as discordSend, newsInfo, hookOk, weekLabel, monthLabel } from './discord.js';
+import { plan as duePlan, render as renderShare, send as discordSend, newsInfo, hookOk, weekLabel, monthLabel, IMG as DISCORD_DIR } from './discord.js';
+import { renderVideo, VIDEO_NAMES, VIDEO_MAX } from './video.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = path.resolve(process.env.DATA_DIR || path.join(ROOT, 'data'));
@@ -61,6 +62,7 @@ export function keysOf(awards) {
   };
 }
 export const imageName = (kind, key) => `${kind}-${key}.jpg`;
+export const videoName = (kind, key) => `${kind}-${key}.mp4`;
 
 // Textos de cada red (en inglés, como el servidor de Discord)
 export function captions(kind, { awards, headline, opts = {} }) {
@@ -251,9 +253,14 @@ async function context() {
   return { x, ig, staff, cf: { token: env('CLOUDFLARE_API_TOKEN'), account: env('CLOUDFLARE_ACCOUNT_ID') }, opts, on, force, now, awards, state, news, safe };
 }
 const exists = async (f) => { try { return (await fs.stat(f)).size > 5000; } catch { return false; } };
-async function missingImages(jobs) {
+// Qué hay que preparar: la imagen que falte (y con ella va el vídeo). Si se fuerza a mano, también el vídeo que falte
+// aunque la imagen ya esté; en las pasadas normales no, para no intentarlo una y otra vez si el vídeo no se puede hacer.
+async function missingImages(jobs, video = false) {
   const need = new Map();
-  for (const j of jobs) if (j.kind !== 'news' && !need.has(j.kind) && !(await exists(path.join(DIR, imageName(j.kind, j.key))))) need.set(j.kind, j.key);
+  for (const j of jobs) {
+    if (j.kind === 'news' || need.has(j.kind)) continue;
+    if (!(await exists(path.join(DIR, imageName(j.kind, j.key)))) || (video && !(await exists(path.join(DIR, videoName(j.kind, j.key)))))) need.set(j.kind, j.key);
+  }
   return need;
 }
 // La imagen ya está en la web (Instagram la descarga de ahí)
@@ -266,13 +273,24 @@ async function main() {
   const C = await context();
   if (!NETS.some((n) => C.on[n])) { if (cmd !== 'plan') console.log('Redes: nada configurado.'); return; }
   const T = todo({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, on: C.on, force: C.force });
-  if (cmd === 'plan') { if ((await missingImages(T.jobs)).size) console.log('render'); return; }
+  const withVideo = !!C.force && C.opts.video !== false;
+  if (cmd === 'plan') { if ((await missingImages(T.jobs, withVideo)).size) console.log('render'); return; }
   if (cmd === 'render') {
-    const need = await missingImages(T.jobs); if (!need.size) return;
-    const names = Object.fromEntries([...need].map(([k, key]) => [k, imageName(k, key)]));
-    await renderShare([...need.keys()], { dir: DIR, names, jpeg: true });
-    // solo se guarda la última imagen de cada tipo
-    for (const f of await fs.readdir(DIR)) { const m = /^(totw|month)-.+\.jpg$/.exec(f); if (m && names[m[1]] && f !== names[m[1]]) await fs.rm(path.join(DIR, f)).catch(() => {}); }
+    const need = await missingImages(T.jobs, withVideo); if (!need.size) return;
+    const names = {}; for (const [k, key] of need) if (!(await exists(path.join(DIR, imageName(k, key))))) names[k] = imageName(k, key);
+    if (Object.keys(names).length) await renderShare(Object.keys(names), { dir: DIR, names, jpeg: true });
+    // y el vídeo vertical (para TikTok y Reels): el que acaba de hacer el paso de Discord en esta pasada, o uno nuevo
+    if (C.opts.video !== false) for (const [k, key] of need) {
+      const out = path.join(DIR, videoName(k, key)); if (await exists(out)) continue;
+      try {
+        const made = path.join(DISCORD_DIR, VIDEO_NAMES[k]), st = await fs.stat(made).catch(() => null);
+        if (st && st.size > 20000 && Date.now() - st.mtimeMs < 30 * 60000) { await fs.copyFile(made, out); console.log(`Vídeo de ${k}: el de Discord (${(st.size / 1048576).toFixed(1)} MB)`); }
+        else await renderVideo(k, C.awards, out);
+      } catch (e) { console.log(`::warning::No se pudo hacer el vídeo de ${k}: ${C.safe(e.message)}`); }
+    }
+    // solo se guarda lo último de cada tipo
+    const keep = new Set([...need].flatMap(([k, key]) => [imageName(k, key), videoName(k, key)]));
+    for (const f of await fs.readdir(DIR)) { const m = /^(totw|month)-.+\.(jpg|mp4)$/.exec(f); if (m && need.has(m[1]) && !keep.has(f)) await fs.rm(path.join(DIR, f)).catch(() => {}); }
     return;
   }
   if (cmd !== 'post') { console.error('Uso: node crawler/social.js plan|render|post'); process.exitCode = 2; return; }
@@ -282,8 +300,8 @@ async function main() {
   // textos al día (los usa el panel de administración para TikTok)
   for (const kind of ['totw', 'month']) {
     if (!K[kind]) continue;
-    const c = captions(kind, { awards: C.awards, opts: C.opts }), img = imageName(kind, K[kind]);
-    st.posts[kind] = { k: K[kind], label: c.label, img: (await exists(path.join(DIR, img))) ? img : (st.posts[kind] && st.posts[kind].k === K[kind] ? st.posts[kind].img : null) || null, x: c.x, ig: c.ig, tiktok: c.tiktok };
+    const c = captions(kind, { awards: C.awards, opts: C.opts }), img = imageName(kind, K[kind]), vid = videoName(kind, K[kind]), old = st.posts[kind] && st.posts[kind].k === K[kind] ? st.posts[kind] : {};
+    st.posts[kind] = { k: K[kind], label: c.label, img: (await exists(path.join(DIR, img))) ? img : old.img || null, ...((await exists(path.join(DIR, vid))) ? { vid } : old.vid ? { vid: old.vid } : {}), x: c.x, ig: c.ig, tiktok: c.tiktok };
   }
   let igTok = C.ig;
   if (C.on.ig && st.ig.fp !== fp(C.ig)) st.ig = { fp: fp(C.ig) };   // secreto nuevo: se empieza de cero
@@ -302,7 +320,10 @@ async function main() {
         if (!(await live(name))) { console.log(`Instagram: la imagen de ${j.kind} aún no está en la web; se publica en la siguiente pasada.`); continue; }
         out = await postInstagram(igTok, c.ig, PUBLIC + name); if (out.user) st.ig.user = String(out.user).slice(0, 40);
       } else if (C.staff) {
-        const ok = await discordSend(C.staff, { username: 'SlapScore', allowed_mentions: { parse: [] }, content: `📱 **Listo para TikTok** · ${c.label}\nGuarda la imagen y pega este texto:\n\`\`\`\n${c.tiktok}\n\`\`\`` }, { name, data: image });
+        let video = null; try { const data = await fs.readFile(path.join(DIR, videoName(j.kind, j.key))); if (data.length <= VIDEO_MAX) video = { name: videoName(j.kind, j.key), data }; } catch {}
+        const msg = { username: 'SlapScore', allowed_mentions: { parse: [] }, content: `📱 **Listo para TikTok** · ${c.label}\nGuarda ${video ? 'el vídeo (o la imagen)' : 'la imagen'} y pega este texto:\n\`\`\`\n${c.tiktok}\n\`\`\`` };
+        let ok = await discordSend(C.staff, msg, [{ name, data: image }, video]);
+        if (!ok && video) ok = await discordSend(C.staff, msg, { name, data: image });
         if (!ok) throw new Fail('Discord no aceptó el aviso del canal privado');
       }
       console.log(`Redes: ${id} ${j.net === 'kit' ? 'preparado' : out.dup ? 'ya estaba publicado' : 'publicado'}`);

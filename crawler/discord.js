@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = path.resolve(process.env.DATA_DIR || path.join(ROOT, 'data'));
-const IMG = path.resolve(process.env.DISCORD_IMG_DIR || path.join(process.env.RUNNER_TEMP || '/tmp', 'slapscore-discord'));
+export const IMG = path.resolve(process.env.DISCORD_IMG_DIR || path.join(process.env.RUNNER_TEMP || '/tmp', 'slapscore-discord'));
 const STATE = path.join(DATA, '_int', 'discord.json');
 const SITE = 'https://slapscore.app';
 export const POST_HOUR = 18;        // hora de Madrid a la que se publican los premios (tarde en Europa, mediodía en América)
@@ -90,16 +90,19 @@ export function buildMessage(kind, { awards, headline, roles = {}, hasImage }) {
 export const FILES = { totw: 'team-of-the-week.png', month: 'player-of-the-month.png' };
 
 // Envía un mensaje a un webhook; con imagen va como formulario. Devuelve true si Discord lo acepta.
+// file: un archivo { name, data } o varios (la imagen y el vídeo)
+const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mp4': 'video/mp4' };
 export async function send(url, payload, file) {
   let body, headers = {};
-  if (file) {
+  const files = (Array.isArray(file) ? file : [file]).filter(Boolean);
+  if (files.length) {
     const fd = new FormData();
-    fd.append('payload_json', JSON.stringify({ ...payload, attachments: [{ id: 0, filename: file.name }] }));
-    fd.append('files[0]', new Blob([file.data], { type: /\.jpe?g$/i.test(file.name) ? 'image/jpeg' : 'image/png' }), file.name);
+    fd.append('payload_json', JSON.stringify({ ...payload, attachments: files.map((f, i) => ({ id: i, filename: f.name })) }));
+    files.forEach((f, i) => fd.append(`files[${i}]`, new Blob([f.data], { type: MIME[path.extname(f.name).toLowerCase()] || 'application/octet-stream' }), f.name));
     body = fd;
   } else { body = JSON.stringify(payload); headers = { 'content-type': 'application/json' }; }
   for (let i = 0; i < 3; i++) {
-    let res; try { res = await fetch(url + '?wait=true', { method: 'POST', body, headers, signal: AbortSignal.timeout(30000) }); } catch (e) { console.log(`Discord: sin respuesta (${e.name})`); await new Promise((r) => setTimeout(r, 3000)); continue; }
+    let res; try { res = await fetch(url + '?wait=true', { method: 'POST', body, headers, signal: AbortSignal.timeout(60000) }); } catch (e) { console.log(`Discord: sin respuesta (${e.name})`); await new Promise((r) => setTimeout(r, 3000)); continue; }
     if (res.ok) return true;
     if (res.status === 429 || res.status >= 500) { const wait = Math.min(15, Number(res.headers.get('retry-after')) || 3); console.log(`Discord: respuesta ${res.status}, reintento en ${wait} s`); await new Promise((r) => setTimeout(r, wait * 1000)); continue; }
     console.log(`Discord: respuesta ${res.status}`); return false;   // 4xx: no se reintenta (webhook borrado, mensaje no válido...)
@@ -123,12 +126,15 @@ async function context() {
   const force = ['totw', 'month', 'news'].includes(process.env.DISCORD_FORCE) ? process.env.DISCORD_FORCE : '';
   const now = process.env.NOW ? Date.parse(process.env.NOW) : Date.now();
   const [awards, state, news] = [await readJSON(path.join(DATA, 'awards.json'), null), await readJSON(STATE, {}), await newsInfo()];
-  return { hooks, roles, force, now, awards, state, news };
+  // el vídeo vertical se puede apagar en los ajustes: "social": { "video": false }
+  const video = !(settings.social && settings.social.video === false);
+  return { hooks, roles, force, now, awards, state, news, video };
 }
 
 // Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana.
 // dir y names: dónde y con qué nombre se guardan; jpeg: en JPEG (lo que piden Instagram y TikTok) en vez de PNG.
-export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } = {}) {
+// Un servidor local con la web y los datos, y un navegador sin ventana para abrirla: fn({ browser, base })
+export async function withSite(fn) {
   const { chromium } = createRequire(path.join(path.resolve(process.env.PW_DIR || ROOT), 'x.js'))('playwright');
   const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' };
   const srv = http.createServer(async (req, res) => {
@@ -144,7 +150,10 @@ export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } =
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
   const base = `http://127.0.0.1:${srv.address().port}`;
   const browser = await chromium.launch();
-  try {
+  try { return await fn({ browser, base }); } finally { await browser.close(); srv.close(); }
+}
+export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } = {}) {
+  await withSite(async ({ browser, base }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
     await ctx.addInitScript(() => { try { localStorage.setItem('slapscore-lang', 'en'); localStorage.setItem('slapscore-tour', 'done'); localStorage.setItem('slapscore-kofi-note', '1'); localStorage.setItem('slapscore-dc-note', '1'); } catch {} });
     const page = await ctx.newPage();
@@ -170,7 +179,7 @@ export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } =
       console.log(`Imagen de ${k}: ${Math.round(buf.length / 1024)} KB`);
       await page.keyboard.press('Escape'); await page.waitForSelector('#ovl', { state: 'detached', timeout: 5000 }).catch(() => {});
     }
-  } finally { await browser.close(); srv.close(); }
+  });
 }
 
 async function main() {
@@ -179,16 +188,25 @@ async function main() {
   if (!C.hooks.totw && !C.hooks.news) { if (cmd !== 'plan') console.log('Discord: sin webhooks configurados.'); return; }
   const P = plan({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, hooks: C.hooks, force: C.force });
   if (cmd === 'plan') { if (P.due.length) console.log(P.due.join('\n')); return; }
-  if (cmd === 'render') { const k = P.due.filter((x) => FILES[x]); if (k.length) await render(k); return; }
+  if (cmd === 'render') {
+    const k = P.due.filter((x) => FILES[x]); if (!k.length) return;
+    await render(k);
+    // y el vídeo vertical (si se puede: hace falta ffmpeg); sin él, el mensaje sale solo con la imagen
+    if (C.video) for (const x of k) { try { const V = await import('./video.js'); await V.renderVideo(x, C.awards, path.join(IMG, V.VIDEO_NAMES[x])); } catch (e) { console.log(`::warning::No se pudo hacer el vídeo de ${x}: ${e.message}`); } }
+    return;
+  }
   if (cmd !== 'post') { console.error('Uso: node crawler/discord.js plan|render|post'); process.exitCode = 2; return; }
   const st = P.state; let failed = 0;
   for (const k of P.due) {
-    let file = null;
+    let file = null, video = null;
     if (FILES[k]) { try { file = { name: FILES[k], data: await fs.readFile(path.join(IMG, FILES[k])) }; } catch {} }
+    if (FILES[k] && C.video) { try { const V = await import('./video.js'), data = await fs.readFile(path.join(IMG, V.VIDEO_NAMES[k])); if (data.length <= V.VIDEO_MAX) video = { name: V.VIDEO_NAMES[k], data }; } catch {} }
     const msg = buildMessage(k, { awards: C.awards, headline: C.news.headline, roles: C.roles, hasImage: !!file });
-    if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
-    const ok = await send(k === 'news' ? C.hooks.news : C.hooks.totw, msg, file);
-    console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${file ? ' (con imagen)' : ''}`);
+    if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}${video ? ` (con vídeo de ${(video.data.length / 1048576).toFixed(1)} MB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
+    let ok = await send(k === 'news' ? C.hooks.news : C.hooks.totw, msg, [file, video]);
+    // si Discord no acepta el mensaje con el vídeo, se manda sin él
+    if (!ok && video) { video = null; ok = await send(C.hooks.totw, msg, file); }
+    console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${file ? ' (con imagen)' : ''}${ok && video ? ' (con vídeo)' : ''}`);
     if (!ok) { failed++; continue; }
     if (C.force === k) continue;   // forzado a mano: no cambia lo apuntado
     if (k === 'totw') st.totw = C.awards.week.last.f; else if (k === 'month') st.month = C.awards.month.last.m; else st.news = C.news.date;

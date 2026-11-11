@@ -263,6 +263,64 @@ async function kofi(request, env, path) {
   return kofiAdmin(request, env, path, exists);
 }
 
+// ---------- enlaces fijos del overlay (/api/ov) ----------
+// Quien configura un overlay puede guardarlo con un enlace fijo (/overlay/s/<clave>): pega ese enlace una vez en OBS y,
+// cuando cambia algo en el configurador y guarda, el overlay se actualiza solo. Se guarda en el KV, con la dirección
+// del overlay (ruta y opciones) y un resumen de la clave de edición, que solo tiene el navegador de quien lo creó.
+// Caducan a los 400 días de la última vez que se guardaron.
+const OV_PAGE = /^\/overlay\/(?:\d{1,12}(?:,\d{1,12}){0,7}|match\/(?:\d{1,12}|\d{10}-[0-9a-f-]{8,40})|vs|s\/[a-z0-9]{8})$/;
+const OV_TARGET = /^\/overlay\/(?:\d{1,12}(?:,\d{1,12}){0,7}|match\/(?:\d{1,12}|\d{10}-[0-9a-f-]{8,40})|vs)$/;
+const OV_TTL = 400 * 86400;
+function ovTarget(u) {
+  if (typeof u !== 'string' || u.length > 1200) return null;
+  const i = u.indexOf('?'), p = i < 0 ? u : u.slice(0, i), q = i < 0 ? '' : u.slice(i + 1);
+  return OV_TARGET.test(p) && /^[\w\-.,~%+=&]*$/.test(q) ? p + (q ? '?' + q : '') : null;
+}
+const rnd = (n, abc) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => abc[b % abc.length]).join('');
+async function ovLinks(request, env, path) {
+  if (request.method === 'OPTIONS') return preflight(request, env, 'GET, POST, PUT, DELETE, OPTIONS', 'content-type');
+  const KV = env.FEEDBACK;
+  if (!KV) return json({ error: 'unavailable' }, 503, request, env);
+  const m = /^\/api\/ov\/([a-z0-9]{8})$/.exec(path), key = m ? 'ov:' + m[1] : null;
+  try {
+    if (request.method === 'GET' && key) {
+      const v = await KV.get(key); let it = null; try { it = v ? JSON.parse(v) : null; } catch {}
+      return it && it.u ? json({ u: it.u }, 200, request, env) : json({ error: 'not found' }, 404, request, env);
+    }
+    if (!['POST', 'PUT', 'DELETE'].includes(request.method) || (request.method === 'POST') !== (path === '/api/ov') || (request.method !== 'POST' && !key)) return json({ error: 'not found' }, 404, request, env);
+    if (!allowedOrigin(request, env)) return json({ error: 'origin' }, 403, request, env);
+    if (tooBig(request)) return json({ error: 'bad' }, 413, request, env);
+    let b; try { b = JSON.parse((await request.text()).slice(0, MAX_BODY)); } catch { return json({ error: 'bad' }, 400, request, env); }
+    if (!b || typeof b !== 'object') return json({ error: 'bad' }, 400, request, env);
+    if (request.method === 'DELETE') {
+      const v = await KV.get(key); let it = null; try { it = v ? JSON.parse(v) : null; } catch {}
+      if (!it) return json({ ok: true }, 200, request, env);
+      if (typeof b.key !== 'string' || (await sha('ov:' + b.key)) !== it.h) return json({ error: 'key' }, 403, request, env);
+      await KV.delete(key); return json({ ok: true }, 200, request, env);
+    }
+    const u = ovTarget(b.u); if (!u) return json({ error: 'bad' }, 400, request, env);
+    // límites (los lleva el Durable Object): crear o guardar, uno cada 2 segundos y 60 al día por conexión; 600 al día en total
+    if (env.STATS) {
+      const r = await statsStub(env).fetch('https://stats/ov', { method: 'POST', body: JSON.stringify({ ip: ipKey(request.headers.get('cf-connecting-ip') || '') }) }).catch(() => null);
+      const v = r ? await r.json().catch(() => null) : null;
+      if (!v || !v.ok) return json({ error: v && v.error === 'full' ? 'full' : 'wait' }, 429, request, env);
+    }
+    if (request.method === 'PUT') {
+      const v = await KV.get(key); let it = null; try { it = v ? JSON.parse(v) : null; } catch {}
+      if (!it) return json({ error: 'not found' }, 404, request, env);
+      if (typeof b.key !== 'string' || (await sha('ov:' + b.key)) !== it.h) return json({ error: 'key' }, 403, request, env);
+      await KV.put(key, JSON.stringify({ ...it, u, m: Date.now() }), { expirationTtl: OV_TTL });
+      return json({ ok: true }, 200, request, env);
+    }
+    // nuevo: clave corta para la dirección y clave larga para poder cambiarlo
+    let id = ''; for (let i = 0; i < 4 && !id; i++) { const c = rnd(8, 'abcdefghjkmnpqrstuvwxyz23456789'); if (!(await KV.get('ov:' + c))) id = c; }
+    if (!id) return json({ error: 'unavailable' }, 503, request, env);
+    const edit = rnd(32, 'abcdefghijklmnopqrstuvwxyz0123456789');
+    await KV.put('ov:' + id, JSON.stringify({ u, h: await sha('ov:' + edit), t: Date.now() }), { expirationTtl: OV_TTL });
+    return json({ id, key: edit }, 200, request, env);
+  } catch { return json({ error: 'unavailable' }, 503, request, env); }
+}
+
 // La página del overlay (overlay.html) en /overlay/<id>: sin caché larga (OBS la recarga al cambiar de escena) y fuera de los buscadores
 async function overlayPage(request, env) {
   let r = await env.ASSETS.fetch(new Request(new URL('/overlay', request.url)));
@@ -284,7 +342,8 @@ export default {
     if (path === '/api/kofi' || path.startsWith('/api/kofi/')) return kofi(request, env, path);
     if (path.startsWith('/api/push/')) return push(request, env, path);
     // Overlay para OBS (/overlay/<id>): una página aparte, ligera, sin la web alrededor (overlay.html)
-    if ((request.method === 'GET' || request.method === 'HEAD') && /^\/overlay\/\d{1,12}\/?$/.test(path)) return overlayPage(request, env);
+    if ((request.method === 'GET' || request.method === 'HEAD') && OV_PAGE.test(path)) return overlayPage(request, env);
+    if (path === '/api/ov' || path.startsWith('/api/ov/')) return ovLinks(request, env, path);
     // Páginas de la web (/players, /jugador/123, /match/..., en cualquier idioma): index.html con el título, la descripción
     // y la imagen de esa página (vista previa de los enlaces). Lo que parece un archivo y no existe: 404 normal.
     if ((request.method === 'GET' || request.method === 'HEAD') && !path.startsWith('/api/') && !/\.[a-z0-9]{1,8}$/i.test(path)) return preview(request, env, ctx, path);

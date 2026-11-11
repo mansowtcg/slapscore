@@ -220,10 +220,10 @@ async function loadSocial() {
     : ig.rotate ? `<p class="err">Instagram cambió el token al renovarlo y no se pudo guardar: pon uno nuevo en el secreto IG_ACCESS_TOKEN${ig.exp ? ` antes del ${esc(day(ig.exp))}` : ' en las próximas semanas'}.</p>`
     : ig.exp ? `<p class="muted">${ig.user ? `@${esc(ig.user)} · ` : ''}token válido hasta el ${esc(day(ig.exp))}; se renueva solo cada semana.</p>` : '';
   const kit = ['totw', 'month'].filter((k) => posts[k] && posts[k].tiktok).map((k) => {
-    const p = posts[k], img = /^(totw|month)-[\w-]+\.jpg$/.test(String(p.img)) ? '/data/social/' + p.img : '';
+    const p = posts[k], img = /^(totw|month)-[\w-]+\.jpg$/.test(String(p.img)) ? '/data/social/' + p.img : '', vid = /^(totw|month)-[\w-]+\.mp4$/.test(String(p.vid)) ? '/data/social/' + p.vid : '';
     return `<div class="soc-kit" data-kit="${k}"><div class="soc-kh"><b>${esc(KIND_NAME[k])}</b><span class="muted">${esc(p.label || '')}</span></div>
       <div class="soc-kb">${img ? `<a href="${esc(img)}" target="_blank" rel="noopener"><img src="${esc(img)}" alt="Imagen de ${esc(KIND_NAME[k])}" loading="lazy" width="108" height="135"></a>` : ''}
-      <div class="soc-kt"><pre>${esc(p.tiktok)}</pre><div class="toolbar"><button class="btn sm" type="button" data-copy="${esc(p.tiktok)}">Copiar texto</button>${img ? `<button class="btn sm primary" type="button" data-kit-share="${esc(img)}">Compartir imagen</button>` : '<a class="btn sm" href="#premios">Sacar la imagen en Premios</a>'}</div></div></div></div>`;
+      <div class="soc-kt"><pre>${esc(p.tiktok)}</pre><div class="toolbar"><button class="btn sm" type="button" data-copy="${esc(p.tiktok)}">Copiar texto</button>${vid ? `<button class="btn sm primary" type="button" data-kit-share="${esc(vid)}">Compartir vídeo</button>` : ''}${img ? `<button class="btn sm${vid ? '' : ' primary'}" type="button" data-kit-share="${esc(img)}">Compartir imagen</button>` : '<a class="btn sm" href="#premios">Sacar la imagen en Premios</a>'}${vid ? `<a class="tbtn" href="${esc(vid)}" target="_blank" rel="noopener">Ver vídeo</a>` : ''}</div></div></div></div>`;
   }).join('');
   el.innerHTML = `<div class="card-b soc"><p class="muted" style="margin-top:0">Los lunes a las 18:00 (hora de Madrid) sale el equipo de la semana y el día 1, el jugador del mes. X e Instagram se publican solos cuando están sus claves en los secretos del repositorio. TikTok no deja publicar desde fuera: aquí tienes la imagen y el texto para subirlo desde el móvil.</p>
     ${row('x', 'Sin claves: no publica')}${row('ig', 'Sin token: no publica', igx)}${row('kit', 'Kit apagado')}
@@ -231,10 +231,10 @@ async function loadSocial() {
   $$('[data-kit-share]', el).forEach((b) => b.addEventListener('click', async () => {
     const url = b.getAttribute('data-kit-share'), name = url.split('/').pop();
     try {
-      const blob = await (await fetch(url)).blob(), file = new File([blob], name, { type: 'image/jpeg' });
+      const video = /\.mp4$/.test(name), blob = await (await fetch(url)).blob(), file = new File([blob], name, { type: video ? 'video/mp4' : 'image/jpeg' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'SlapScore' }); return; }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); X.toast('Imagen descargada');
-    } catch (e) { if (!e || e.name !== 'AbortError') X.toast('No se pudo preparar la imagen: prueba dentro de unos minutos.'); }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); X.toast(video ? 'Vídeo descargado' : 'Imagen descargada');
+    } catch (e) { if (!e || e.name !== 'AbortError') X.toast('No se pudo preparar el archivo: prueba dentro de unos minutos.'); }
   }));
 }
 

@@ -1476,3 +1476,36 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .obs-pk-acts:not(:has(button:not([hidden]))){display:none}
 .fb-state .n{font-weight:600;opacity:.7}
 .obs-pk-auto{font-weight:700}
+
+/* Overlay para OBS: más jugadores, equipos, nombres y enlace fijo */
+.obs-cap{margin:-6px 0 0;font-size:12.5px;overflow-wrap:anywhere}
+.obs-hint{margin:0;font-size:12.5px;line-height:1.45}
+.obs-team{display:flex;flex-direction:column;gap:6px;min-width:0}
+.obs-team small{font-size:12px}
+.obs-chips{display:flex;flex-wrap:wrap;gap:6px}
+.obs-chips:empty{display:none}
+.obs-chip{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:3px 4px 3px 10px;border-radius:999px;background:var(--surface-3);font-size:13px;font-weight:700}
+.obs-chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.obs-chip button{flex:none;width:22px;height:22px;border:0;border-radius:50%;background:none;color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+.obs-chip button:hover{background:var(--line);color:var(--text)}
+.obs-ms{position:relative;max-width:300px}
+.obs-ms .input{width:100%;height:36px;font-size:13.5px}
+.obs-ms-l{position:absolute;z-index:5;left:0;right:0;top:calc(100% + 4px);padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.obs-ms-l[hidden]{display:none}
+.obs-ms-l button{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border:0;border-radius:7px;background:none;color:inherit;font:inherit;font-size:13.5px;font-weight:600;text-align:left;cursor:pointer}
+.obs-ms-l button:hover,.obs-ms-l button:focus-visible{background:var(--surface-3)}
+.obs-ms-l button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.obs-ms-l p{margin:0;padding:8px;font-size:13px}
+.obs-names{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:340px}
+.obs-names .input{height:36px;font-size:13.5px;min-width:0}
+.obs-fix{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.obs-fix p{margin:0;font-size:12.5px;line-height:1.45}
+.obs-fx-h{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+.obs-fx-h .st{font-size:12.5px;font-weight:700}
+.obs-fx-h .st.ok{color:var(--win)}.obs-fx-h .st.dirty{color:var(--loss)}
+.obs-fx-acts{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px}
+.obs-fx-l{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.obs-fx-it{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0 0;font-size:13px}
+.obs-fx-it span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evh-acts #m-obs svg{width:15px;height:15px}
+.wk-f{display:flex;flex-wrap:wrap;gap:4px 16px}

@@ -272,3 +272,57 @@ export async function summaryImage(o, X) {
   return cv;
 }
 
+// Resumen del mes de un jugador (o: { P, rec (monthRecap de insights.js), label, cus, live })
+export async function recapImage(o, X) {
+  await loadFonts();
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const { P, rec } = o, s = rec.sum, meta = P.meta || {};
+  frame(c, X, X.t('Mi mes') + (o.cus ? ' · Custom' : ''));
+  avatar(c, P.n, P.id, 60, 178, 156);
+  fit(c, P.n, 246, 244, 590, 800, 72);
+  const cur = await loadImg(X.rankSrc(meta.rk));
+  c.font = F(600, 30); c.fillStyle = COL.muted; c.textAlign = 'left';
+  c.fillText(meta.rk ? `${meta.rank || X.rankName(meta.rk)} · ${X.int(meta.mmr)} MMR` : X.t('Sin rango'), 246, 292);
+  fit(c, o.label, 246, 338, 590, 800, 36, 'left', '#fff');
+  if (cur) c.drawImage(cur, W - 60 - 150, 180, 150, 150);
+  // nota media del mes y, a la derecha, lo que ha cambiado el MMR (o los MVP)
+  c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, 386, W - 120, 196, 28); c.fill();
+  badge(c, s.avg, 96, 420, 220, 128, X.fmtR);
+  c.font = F(800, 44); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Nota media'), 352, 474);
+  fit(c, `${X.t('{n} partidos', { n: X.int(s.k) })} · ${X.t('{n} días', { n: X.int(rec.days) })}`, 352, 522, 380, 600, 30, 'left', COL.muted);
+  const sign = (d) => `${d > 0 ? '+' : '−'}${X.int(Math.abs(d))}`;
+  if (rec.dm) {
+    c.textAlign = 'right'; c.fillStyle = rec.dm > 0 ? '#3DDC6E' : '#FF5A50'; c.font = F(800, 84, true); c.fillText(sign(rec.dm), W - 96, 502);
+    c.fillStyle = COL.muted; c.font = F(600, 26); c.fillText('MMR', W - 96, 548);
+  } else {
+    c.textAlign = 'right'; c.fillStyle = '#fff'; c.font = F(800, 84, true); c.fillText(X.int(s.mvp), W - 96, 502);
+    c.fillStyle = COL.muted; c.font = F(600, 26); c.fillText('MVP', W - 96, 548);
+  }
+  // cifras
+  const cells = [[`${s.w}-${s.l}`, X.t('V-D')], [X.pct(s.k ? s.w / s.k : 0), X.t('Victorias')], rec.dm ? [X.int(s.mvp), 'MVP'] : [X.fmtR(s.best ? s.best.rt : 0), X.t('Mejor nota')],
+    [X.int(s.g), X.t('Goles')], [X.int(s.as), X.t('Asistencias')], [X.int(s.sv), X.t('Paradas')]];
+  const cw = (W - 120 - 2 * 24) / 3;
+  cells.forEach(([v, l], i) => {
+    const x = 60 + (i % 3) * (cw + 24), y = 606 + Math.floor(i / 3) * 152;
+    c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, x, y, cw, 132, 22); c.fill();
+    c.fillStyle = '#fff'; c.textAlign = 'left'; c.font = F(800, 64, true); c.fillText(v, x + 28, y + 76);
+    c.fillStyle = COL.muted; c.font = F(600, 27); c.fillText(l, x + 28, y + 112);
+  });
+  // lo mejor del mes: mejor partido, mejor racha y mejor día
+  const rows = [], b = s.best, d = rec.bestDay, k = rec.streak;
+  if (b) rows.push([X.t('Mejor partido'), `${b.gf}-${b.ga} · ${b.st.goals || 0} ${X.t('G')} · ${b.st.assists || 0} ${X.t('A')}${b.mv ? ' · MVP' : ''} · ${X.date(b.t)}`, b.rt, null]);
+  if (k && k.n >= 2) rows.push([X.t('Mejor racha'), k.from && k.to && X.day(k.from) !== X.day(k.to) ? `${X.day(k.from)} – ${X.day(k.to)}` : X.day(k.to || k.from), null, X.t('{n} victorias', { n: X.int(k.n) })]);
+  if (d) rows.push([X.t('Mejor día'), `${X.day(Date.parse(d.d + 'T12:00:00Z'))} · ${X.t('{n} partidos', { n: X.int(d.k) })} · ${d.w}-${d.l}`, d.avg, null]);
+  const y0 = 918, rh = 92, bh = rows.length * rh + 22;
+  if (rows.length) { c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, y0, W - 120, bh, 22); c.fill(); }
+  rows.forEach(([title, text, rt, val], i) => {
+    const y = y0 + 11 + i * rh;
+    if (i) { c.fillStyle = COL.line; c.fillRect(92, y, W - 184, 2); }
+    c.font = F(800, 32); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(title, 92, y + 42);
+    fit(c, text, 92, y + 76, W - 420, 600, 26, 'left', COL.muted);
+    if (rt != null) badge(c, rt, W - 96 - 124, y + 15, 124, 62, X.fmtR);
+    else if (val) fit(c, val, W - 96, y + 60, 300, 800, 44, 'right', '#3DDC6E', true);
+  });
+  return cv;
+}
+
