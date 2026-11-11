@@ -791,4 +791,10 @@ export default {
   "Ver más partidos": "Voir plus de matchs",
   "Como mucho {n} partidos.": "{n} matchs au maximum.",
   "Sin partidos todavía": "Aucun match pour le moment",
+  "Añadir solos los partidos nuevos": "Ajouter automatiquement les nouveaux matchs",
+  "Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.": "Les matchs cochés comptent, plus les nouveaux au fur et à mesure : au maximum, les {n} derniers.",
+  "Sin ninguno marcado, empieza vacío y se va llenando.": "Sans aucun match coché, il démarre vide et se remplit au fil des matchs.",
+  "{n} elegidos + nuevos": "{n} choisis + les nouveaux",
+  "Sin partidos nuevos": "Sans nouveaux matchs",
+  "Restablecer": "Réinitialiser",
 };

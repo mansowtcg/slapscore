@@ -1475,3 +1475,4 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .obs-pk-acts{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap}
 .obs-pk-acts:not(:has(button:not([hidden]))){display:none}
 .fb-state .n{font-weight:600;opacity:.7}
+.obs-pk-auto{font-weight:700}

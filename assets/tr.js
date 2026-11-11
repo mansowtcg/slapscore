@@ -791,4 +791,10 @@ export default {
   "Ver más partidos": "Daha fazla maç göster",
   "Como mucho {n} partidos.": "En fazla {n} maç.",
   "Sin partidos todavía": "Henüz maç yok",
+  "Añadir solos los partidos nuevos": "Yeni maçları otomatik ekle",
+  "Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.": "İşaretli maçlar ve oynandıkça yeni maçlar sayılır: en fazla son {n} maç.",
+  "Sin ninguno marcado, empieza vacío y se va llenando.": "Hiçbiri işaretli değilse boş başlar ve maçlar oynandıkça dolar.",
+  "{n} elegidos + nuevos": "{n} seçildi + yeniler",
+  "Sin partidos nuevos": "Yeni maç yok",
+  "Restablecer": "Sıfırla",
 };

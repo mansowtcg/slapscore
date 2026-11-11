@@ -791,4 +791,10 @@ export default {
   "Ver más partidos": "Mehr Spiele anzeigen",
   "Como mucho {n} partidos.": "Höchstens {n} Spiele.",
   "Sin partidos todavía": "Noch keine Spiele",
+  "Añadir solos los partidos nuevos": "Neue Spiele automatisch hinzufügen",
+  "Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.": "Es zählen die angehakten Spiele und neue, sobald sie gespielt werden: höchstens die letzten {n}.",
+  "Sin ninguno marcado, empieza vacío y se va llenando.": "Ist keines angehakt, startet es leer und füllt sich mit den nächsten Spielen.",
+  "{n} elegidos + nuevos": "{n} ausgewählt + neue",
+  "Sin partidos nuevos": "Ohne neue Spiele",
+  "Restablecer": "Zurücksetzen",
 };

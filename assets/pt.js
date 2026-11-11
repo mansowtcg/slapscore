@@ -791,4 +791,10 @@ export default {
   "Ver más partidos": "Ver mais partidas",
   "Como mucho {n} partidos.": "No máximo {n} partidas.",
   "Sin partidos todavía": "Ainda sem partidas",
+  "Añadir solos los partidos nuevos": "Adicionar as partidas novas automaticamente",
+  "Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.": "Contam as partidas marcadas e as novas que forem sendo jogadas: no máximo, as últimas {n}.",
+  "Sin ninguno marcado, empieza vacío y se va llenando.": "Sem nenhuma marcada, começa vazio e vai enchendo.",
+  "{n} elegidos + nuevos": "{n} escolhidas + novas",
+  "Sin partidos nuevos": "Sem partidas novas",
+  "Restablecer": "Restaurar",
 };

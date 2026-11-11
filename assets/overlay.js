@@ -18,11 +18,16 @@ const TX = {
 
 // Opciones (todas van en la dirección, para que OBS las recuerde): n partidos, m tipo, v diseño, th fondo, l idioma,
 // rk rango y MMR, st estadísticas, d fecha debajo de cada partido.
-// Y qué partidos cuentan: x = partidos quitados (los nuevos siguen entrando) o k = solo estos (selección fija, p. ej. los
-// de una liga). Cada partido se nombra con los 8 primeros caracteres de su identificador, separados por puntos.
+// Y qué partidos cuentan: k = los partidos elegidos (p. ej. los de una liga) y a = añadir además, solos, los que se
+// jueguen después de ese momento (segundos en base 36). Con k sin a, la selección queda fija; con a, cuentan como mucho
+// los últimos n. (x = partidos quitados de «los últimos n»: lo usaban los primeros enlaces y sigue valiendo.)
+// Cada partido se nombra con los 8 primeros caracteres de su identificador, separados por puntos.
 export const OV_DEFAULTS = { n: 10, m: 'pub', v: 'full', th: 'dark', l: 'en', rk: 1, st: 1, d: 0 };
 export const OV_MAX_PICK = 40;
 export const ovKey = (g) => String((g && g.i) || '').slice(0, 8).toLowerCase();
+// momento desde el que un partido es «nuevo» para un enlace: justo después del último que se conoce
+export const ovNewest = (P) => Math.ceil(((P.games || []).reduce((m, g) => Math.max(m, Number(g[2]) || 0), 0) || Date.now()) / 1000);
+const since = (v) => { const n = parseInt(String(v || ''), 36); return Number.isFinite(n) && n > 1.5e9 && n < 4e9 ? n : 0; };
 const pickList = (v) => [...new Set(String(v || '').toLowerCase().split(/[^0-9a-z]+/).filter((x) => /^[0-9a-z]{8}$/.test(x)))].slice(0, OV_MAX_PICK);
 export function ovOptions(search) {
   const q = new URLSearchParams(search || '');
@@ -30,13 +35,14 @@ export function ovOptions(search) {
   return {
     n: Number(pick('n', ['5', '10', '20'])), m: pick('m', ['pub', 'cus', 'all']), v: pick('v', ['full', 'compact']),
     th: pick('th', ['dark', 'light', 'clear']), l: pick('l', OV_LANGS), rk: q.get('rk') === '0' ? 0 : 1, st: q.get('st') === '0' ? 0 : 1,
-    d: q.get('d') === '1' ? 1 : 0, x: pickList(q.get('x')), k: pickList(q.get('k')),
+    d: q.get('d') === '1' ? 1 : 0, x: pickList(q.get('x')), k: pickList(q.get('k')), a: since(q.get('a')),
   };
 }
 export function ovQuery(o) {
   const q = new URLSearchParams();
   for (const k of Object.keys(OV_DEFAULTS)) if (o[k] !== OV_DEFAULTS[k]) q.set(k, String(o[k]));
-  if (o.k && o.k.length) q.set('k', o.k.slice(0, OV_MAX_PICK).join('.')); else if (o.x && o.x.length) q.set('x', o.x.slice(0, OV_MAX_PICK).join('.'));
+  if ((o.k && o.k.length) || o.a) { if (o.k && o.k.length) q.set('k', o.k.slice(0, OV_MAX_PICK).join('.')); if (o.a) q.set('a', Number(o.a).toString(36)); }
+  else if (o.x && o.x.length) q.set('x', o.x.slice(0, OV_MAX_PICK).join('.'));
   const s = q.toString(); return s ? '?' + s : '';
 }
 // tamaño recomendado para la fuente de navegador de OBS
@@ -51,12 +57,16 @@ const initials = (n) => { const s = String(n || '?').replace(/[^\p{L}\p{N}]/gu, 
 
 // Partidos del tipo elegido, del más nuevo al más viejo (los que se pueden elegir en el configurador)
 export const ovGames = (P, m) => (P._g || (P.games || []).map(gameObj)).filter((g) => (m === 'all' ? true : m === 'cus' ? g.y === 'custom' : g.y !== 'custom'));
-// Cálculos sobre los partidos que cuentan: los últimos n del tipo elegido sin los quitados (x) o, con selección fija (k),
-// solo los elegidos, sean del tipo que sean
+const ofType = (g, m) => (m === 'all' ? true : m === 'cus' ? g.y === 'custom' : g.y !== 'custom');
+// Cálculos sobre los partidos que cuentan:
+//   · lo normal: los últimos n del tipo elegido (sin los quitados con x);
+//   · con partidos elegidos (k): solo esos, sean del tipo que sean;
+//   · con «a»: además, los del tipo elegido jugados después de ese momento, y como mucho los últimos n.
 export function ovStats(P, o) {
-  const fixed = !!(o.k && o.k.length), X = new Set(fixed ? o.k : o.x || []);
-  const all = ovGames(P, fixed ? 'all' : o.m);
-  const L = fixed ? all.filter((g) => X.has(ovKey(g))).slice(0, OV_MAX_PICK) : (X.size ? all.filter((g) => !X.has(ovKey(g))) : all).slice(0, o.n), k = L.length;
+  const fixed = !!((o.k && o.k.length) || o.a), X = new Set(fixed ? o.k || [] : o.x || []);
+  const all = ovGames(P, fixed ? 'all' : o.m), a = (Number(o.a) || 0) * 1000;
+  const L = fixed ? all.filter((g) => X.has(ovKey(g)) || (a && g.t > a && ofType(g, o.m))).slice(0, a ? o.n : OV_MAX_PICK)
+    : (X.size ? all.filter((g) => !X.has(ovKey(g))) : all).slice(0, o.n), k = L.length;
   const sum = (f) => L.reduce((s, g) => s + (f(g) || 0), 0);
   const w = L.filter((g) => g.r === 'W').length, l = L.filter((g) => g.r === 'L').length;
   let streak = 0; const r0 = L[0] && L[0].r;

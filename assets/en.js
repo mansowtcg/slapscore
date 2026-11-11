@@ -418,4 +418,10 @@ export default {
   "Ver más partidos": "Show more matches",
   "Como mucho {n} partidos.": "At most {n} matches.",
   "Sin partidos todavía": "No matches yet",
+  "Añadir solos los partidos nuevos": "Add new matches automatically",
+  "Cuentan los partidos marcados y los nuevos que se vayan jugando: como mucho, los últimos {n}.": "The ticked matches count, plus new ones as they are played: at most, the latest {n}.",
+  "Sin ninguno marcado, empieza vacío y se va llenando.": "With none ticked, it starts empty and fills up as matches are played.",
+  "{n} elegidos + nuevos": "{n} picked + new ones",
+  "Sin partidos nuevos": "No new matches",
+  "Restablecer": "Reset",
 };
