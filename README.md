@@ -134,6 +134,15 @@ Usa webhooks (sin bot). Cada webhook es la dirección secreta de un canal y va e
 `data/_int/discord.json`; si un premio lleva más de 6 días sin publicarse, se da por visto. La primera vez, las novedades
 no se publican (solo las que lleguen después). Para publicar algo a mano: «Run workflow» con `discord` = `totw`, `month` o `news`.
 
+**Resumen diario.** Cada día a las 12:00 (hora de Madrid) sale en Discord el resumen del día anterior, en un mensaje con
+tres tarjetas (`crawler/daily.js`, con las fichas de los partidos públicos de ese día): **Player of the Day** (los tres
+con mejor nota media, mínimo 8 partidos), **Match of the Day** (un 3 contra 3 terminado en juego, el más disputado y de más
+nivel: prórroga, un gol de diferencia, goles y rango medio) y **Post magnets** (los cinco con más tiros al poste por
+partido, mínimo 8 partidos). Sale en el canal de los premios (webhook `DISCORD_WEBHOOK_TOTW`) o, si existe el secreto
+`DISCORD_WEBHOOK_DAILY`, en el canal de ese webhook. No menciona a nadie salvo que se ponga un rol en
+`discordRoles.daily`. La primera vez no publica (empieza al día siguiente); se apaga con `"discordDaily": false` y se
+lanza a mano con «Run workflow» y `discord` = `daily`.
+
 ## Redes sociales
 
 El robot publica también en las redes (`crawler/social.js`, paso «Redes sociales» de la pasada), a la misma hora que en

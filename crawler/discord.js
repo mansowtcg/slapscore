@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import { DAILY_HOUR, loadDay, computeDaily } from './daily.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,6 +48,13 @@ export const monthLabel = (ym) => MON_YEAR.format(new Date(ym + '-15T12:00:00Z')
 // Qué toca publicar. Devuelve { due: [...], state } con el estado ya puesto al día en lo que se da por visto sin publicar.
 export function plan({ awards, newsDate, state, now, hooks, force }) {
   const st = { ...(state || {}) }, due = [], stamp = madridStamp(now);
+  // resumen diario: el de ayer, desde las 12:00 (si un día no sale, al siguiente ya toca el nuevo)
+  if (hooks.daily) {
+    const yday = dayAdd(stamp.slice(0, 10), -1);
+    if (force === 'daily') due.push('daily');
+    else if (st.daily == null) st.daily = yday;   // la primera vez no se publica: empieza con el del día siguiente
+    else if (st.daily !== yday && stamp >= stamp.slice(0, 10) + 'T' + String(DAILY_HOUR).padStart(2, '0')) due.push('daily');
+  }
   const W = awards && awards.week && awards.week.last, M = awards && awards.month && awards.month.last;
   if (hooks.totw && W && W.f && Array.isArray(W.list) && W.list.length >= 3) {
     const from = dayAdd(W.f, 7) + 'T' + String(POST_HOUR).padStart(2, '0'), until = dayAdd(W.f, 7 + FRESH_DAYS) + 'T23';
@@ -65,6 +73,29 @@ export function plan({ awards, newsDate, state, now, hooks, force }) {
     else if (String(newsDate) > String(st.news)) due.push('news');
   }
   return { due, state: st };
+}
+
+// El día del que habla el resumen diario que toca ahora (ayer, en hora de Madrid)
+export const dailyDay = (now) => dayAdd(madridStamp(now).slice(0, 10), -1);
+const DAY_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+// Resumen diario: tres tarjetas en un mensaje (null si ese día no hay nada que contar)
+export function dailyMessage(day, D, roles = {}) {
+  if (!D || (!D.potd.length && !D.motd && !D.posts.length)) return null;
+  const base = { username: 'SlapScore', avatar_url: `${SITE}/assets/icons/icon-512.png` };
+  const ping = roleOk(roles.daily) ? { content: `<@&${roles.daily}>`, allowed_mentions: { parse: [], roles: [roles.daily] } } : { allowed_mentions: { parse: [] } };
+  const who = (p) => `[${md(p.n)}](${SITE}/player/${p.id})`, when = DAY_LONG.format(new Date(day + 'T12:00:00Z')), embeds = [];
+  if (D.potd.length) embeds.push({ title: `⭐ Player of the Day · ${when}`, color: COLOR, description: D.potd.map(line).join('\n'),
+    footer: { text: `Best average rating in public matches (min. ${D.min}) · ${D.games.toLocaleString('en-GB')} matches played` } });
+  if (D.motd) {
+    const m = D.motd, names = (l) => l.map((p) => `${md(p.n)} ${Number(p.rt).toFixed(1)}`).join(' · ');
+    embeds.push({ title: `🔥 Match of the Day · ${m.score[0]}–${m.score[1]}${m.ot ? ' (OT)' : ''}`, url: `${SITE}/m/${String(m.key).replace(/[-/]/g, '')}-${m.id}`, color: 0xd86a00,
+      description: `**Home** · ${names(m.home)}\n**Away** · ${names(m.away)}${m.mvp ? `\n\nMVP: **${who(m.mvp)}** · ${Number(m.mvp.rt).toFixed(1)} · ${m.mvp.g}G ${m.mvp.a}A${m.mvp.sv ? ` ${m.mvp.sv}SV` : ''}` : ''}`,
+      footer: { text: `The closest, highest-level 3v3 of the day${m.arena ? ` · ${m.arena}` : ''}` } });
+  }
+  if (D.posts.length) embeds.push({ title: '🥅 Post magnets', color: 0x8a94a6,
+    description: D.posts.map((x, i) => `**${i + 1}. ${who(x)}** · ${x.per.toFixed(2)} per match · ${x.ph} posts in ${x.gp} matches`).join('\n'),
+    footer: { text: `Most shots off the post per match (min. ${D.min} matches) · slapscore.app` } });
+  return { ...base, ...ping, embeds };
 }
 
 const line = (x, i) => `**${i + 1}. [${md(x.n)}](${SITE}/player/${x.id})** · ${rating(x.rt)} avg · ${x.gp} matches · ${x.w} W${x.mvp ? ` · ${x.mvp} MVP` : ''}`;
@@ -120,15 +151,19 @@ export async function newsInfo() {
 }
 async function context() {
   const hooks = { totw: hookOk(process.env.DISCORD_WEBHOOK_TOTW) ? process.env.DISCORD_WEBHOOK_TOTW.trim() : '', news: hookOk(process.env.DISCORD_WEBHOOK_NEWS) ? process.env.DISCORD_WEBHOOK_NEWS.trim() : '' };
-  for (const [k, v] of [['DISCORD_WEBHOOK_TOTW', hooks.totw], ['DISCORD_WEBHOOK_NEWS', hooks.news]]) if (process.env[k] && !v) console.error(`::warning::${k} no parece la dirección de un webhook de Discord: se ignora.`);
+  for (const [k, v] of [['DISCORD_WEBHOOK_TOTW', hooks.totw], ['DISCORD_WEBHOOK_NEWS', hooks.news], ['DISCORD_WEBHOOK_DAILY', hookOk(process.env.DISCORD_WEBHOOK_DAILY)]]) if (process.env[k] && !v) console.error(`::warning::${k} no parece la dirección de un webhook de Discord: se ignora.`);
   const settings = await readJSON(path.join(ROOT, 'config', 'settings.json'), {});
   const roles = settings.discordRoles && typeof settings.discordRoles === 'object' ? settings.discordRoles : {};
-  const force = ['totw', 'month', 'news'].includes(process.env.DISCORD_FORCE) ? process.env.DISCORD_FORCE : '';
+  const force = ['totw', 'month', 'news', 'daily'].includes(process.env.DISCORD_FORCE) ? process.env.DISCORD_FORCE : '';
+  // resumen diario: en su propio canal si hay webhook para él (DISCORD_WEBHOOK_DAILY); si no, en el de los premios.
+  // Se apaga con "discordDaily": false en los ajustes.
+  hooks.daily = settings.discordDaily === false ? '' : hookOk(process.env.DISCORD_WEBHOOK_DAILY) ? process.env.DISCORD_WEBHOOK_DAILY.trim() : hooks.totw;
+  const hidden = new Set((Array.isArray(settings.hiddenPlayers) ? settings.hiddenPlayers : []).map((x) => String(x).trim()));
   const now = process.env.NOW ? Date.parse(process.env.NOW) : Date.now();
   const [awards, state, news] = [await readJSON(path.join(DATA, 'awards.json'), null), await readJSON(STATE, {}), await newsInfo()];
   // el vídeo vertical se puede apagar en los ajustes: "social": { "video": false }
   const video = !(settings.social && settings.social.video === false);
-  return { hooks, roles, force, now, awards, state, news, video };
+  return { hooks, roles, force, now, awards, state, news, video, hidden };
 }
 
 // Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana.
@@ -185,7 +220,7 @@ export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } =
 async function main() {
   const cmd = process.argv[2];
   const C = await context();
-  if (!C.hooks.totw && !C.hooks.news) { if (cmd !== 'plan') console.log('Discord: sin webhooks configurados.'); return; }
+  if (!C.hooks.totw && !C.hooks.news && !C.hooks.daily) { if (cmd !== 'plan') console.log('Discord: sin webhooks configurados.'); return; }
   const P = plan({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, hooks: C.hooks, force: C.force });
   if (cmd === 'plan') { if (P.due.length) console.log(P.due.join('\n')); return; }
   if (cmd === 'render') {
@@ -201,15 +236,21 @@ async function main() {
     let file = null, video = null;
     if (FILES[k]) { try { file = { name: FILES[k], data: await fs.readFile(path.join(IMG, FILES[k])) }; } catch {} }
     if (FILES[k] && C.video) { try { const V = await import('./video.js'), data = await fs.readFile(path.join(IMG, V.VIDEO_NAMES[k])); if (data.length <= V.VIDEO_MAX) video = { name: V.VIDEO_NAMES[k], data }; } catch {} }
-    const msg = buildMessage(k, { awards: C.awards, headline: C.news.headline, roles: C.roles, hasImage: !!file });
+    let msg;
+    if (k === 'daily') {
+      // el resumen de ayer se calcula ahora, con los partidos de ese día
+      const day = dailyDay(C.now), D = computeDaily(await loadDay(DATA, day), { hidden: C.hidden });
+      msg = dailyMessage(day, D, C.roles);
+      if (!msg) { console.log(`Discord: daily sin nada que contar (${day})`); if (C.force !== k) st.daily = day; continue; }
+    } else msg = buildMessage(k, { awards: C.awards, headline: C.news.headline, roles: C.roles, hasImage: !!file });
     if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}${video ? ` (con vídeo de ${(video.data.length / 1048576).toFixed(1)} MB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
-    let ok = await send(k === 'news' ? C.hooks.news : C.hooks.totw, msg, [file, video]);
+    let ok = await send(k === 'news' ? C.hooks.news : k === 'daily' ? C.hooks.daily : C.hooks.totw, msg, [file, video]);
     // si Discord no acepta el mensaje con el vídeo, se manda sin él
     if (!ok && video) { video = null; ok = await send(C.hooks.totw, msg, file); }
     console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${file ? ' (con imagen)' : ''}${ok && video ? ' (con vídeo)' : ''}`);
     if (!ok) { failed++; continue; }
     if (C.force === k) continue;   // forzado a mano: no cambia lo apuntado
-    if (k === 'totw') st.totw = C.awards.week.last.f; else if (k === 'month') st.month = C.awards.month.last.m; else st.news = C.news.date;
+    if (k === 'daily') st.daily = dailyDay(C.now); else if (k === 'totw') st.totw = C.awards.week.last.f; else if (k === 'month') st.month = C.awards.month.last.m; else st.news = C.news.date;
   }
   if (process.env.DRY_RUN !== '1' && JSON.stringify(st) !== JSON.stringify(C.state || {})) { await fs.mkdir(path.dirname(STATE), { recursive: true }); await fs.writeFile(STATE, JSON.stringify(st)); }
   if (failed) process.exitCode = 1;

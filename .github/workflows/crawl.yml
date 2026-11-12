@@ -17,7 +17,7 @@ on:
         description: 'Pasada automática encadenada (1) o manual (0)'
         default: '0'
       discord:
-        description: 'Publicar ahora en Discord aunque no toque: totw, month o news (vacío: lo normal)'
+        description: 'Publicar ahora en Discord aunque no toque: totw, month, news o daily (vacío: lo normal)'
         default: ''
       social:
         description: 'Publicar ahora en las redes (X, Instagram, kit de TikTok) aunque no toque: totw, month o news (vacío: lo normal)'
@@ -105,12 +105,14 @@ jobs:
           # direcciones secretas de los canales (webhooks): #team-of-the-week y #announcements
           DISCORD_WEBHOOK_TOTW: ${{ secrets.DISCORD_WEBHOOK_TOTW }}
           DISCORD_WEBHOOK_NEWS: ${{ secrets.DISCORD_WEBHOOK_NEWS }}
+          # opcional: canal propio para el resumen diario (si no está, sale en el de los premios)
+          DISCORD_WEBHOOK_DAILY: ${{ secrets.DISCORD_WEBHOOK_DAILY }}
           DISCORD_FORCE: ${{ github.event.inputs.discord }}
           DATA_DIR: data
         run: |
           # Equipo de la semana (lunes), jugador del mes (día 1) y novedades de la web: crawler/discord.js
-          [ -n "$DISCORD_WEBHOOK_TOTW$DISCORD_WEBHOOK_NEWS" ] || { echo "Sin webhooks de Discord: no se publica nada."; exit 0; }
-          case "$DISCORD_FORCE" in totw|month|news|'') ;; *) DISCORD_FORCE='' ;; esac
+          [ -n "$DISCORD_WEBHOOK_TOTW$DISCORD_WEBHOOK_NEWS$DISCORD_WEBHOOK_DAILY" ] || { echo "Sin webhooks de Discord: no se publica nada."; exit 0; }
+          case "$DISCORD_FORCE" in totw|month|news|daily|'') ;; *) DISCORD_FORCE='' ;; esac
           due=$(node crawler/discord.js plan)
           echo "Toca publicar: ${due:-nada}"
           if echo "$due" | grep -qE '^(totw|month)$'; then
