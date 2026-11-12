@@ -10,9 +10,9 @@
 // Variables: DATA_DIR, DISCORD_IMG_DIR, DISCORD_FORCE (totw|month|news: publica aunque no toque), DRY_RUN=1, NOW.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import http from 'node:http';
-import { createRequire } from 'node:module';
 import { DAILY_HOUR, loadDay, computeDaily } from './daily.js';
+import { withSite, weekLabel, monthLabel } from './lib.js';
+export { withSite, weekLabel, monthLabel };
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,14 +36,6 @@ const roleOk = (id) => typeof id === 'string' && /^\d{5,25}$/.test(id);
 const md = (s) => String(s).replace(/([\\*_~`|>\[\]()#-])/g, '\\$1').replace(/@/g, '@\u200b').slice(0, 80);   // nombres de jugadores: sin formato ni menciones
 const rating = (x) => Number(x).toFixed(2);
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' });
-const DAY_MON = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const MON_YEAR = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-export function weekLabel(f, t) {
-  const a = new Date(f + 'T12:00:00Z'), b = new Date(t + 'T12:00:00Z');
-  return `${a.getUTCMonth() === b.getUTCMonth() ? DAY.format(a) : DAY_MON.format(a)}–${DAY_MON.format(b)} ${b.getUTCFullYear()}`;
-}
-export const monthLabel = (ym) => MON_YEAR.format(new Date(ym + '-15T12:00:00Z'));
 
 // Qué toca publicar. Devuelve { due: [...], state } con el estado ya puesto al día en lo que se da por visto sin publicar.
 export function plan({ awards, newsDate, state, now, hooks, force }) {
@@ -78,21 +70,45 @@ export function plan({ awards, newsDate, state, now, hooks, force }) {
 // El día del que habla el resumen diario que toca ahora (ayer, en hora de Madrid)
 export const dailyDay = (now) => dayAdd(madridStamp(now).slice(0, 10), -1);
 const DAY_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-// Resumen diario: tres tarjetas en un mensaje (null si ese día no hay nada que contar)
-export function dailyMessage(day, D, roles = {}) {
+export const DAILY_FILES = { potd: 'player-of-the-day.jpg', motd: 'match-of-the-day.jpg', posts: 'post-magnets.jpg' };
+const DAY_PILL = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+// Las imágenes del resumen diario (1200×675, plantilla crawler/video/daily.html). Devuelve qué se ha dibujado.
+export async function renderDaily(day, D, dir = IMG) {
+  const kinds = [D.potd.length ? 'potd' : '', D.motd ? 'motd' : '', D.posts.length ? 'posts' : ''].filter(Boolean), made = [];
+  if (!kinds.length) return made;
+  await withSite(async ({ browser, base }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1200, height: 675 }, deviceScaleFactor: 1.5, serviceWorkers: 'block' });
+    await ctx.addInitScript((d) => { window.__DATA = d; }, { label: DAY_PILL.format(new Date(day + 'T12:00:00Z')).replace(',', ''), D });
+    const page = await ctx.newPage();
+    await page.goto(base + '/crawler/video/daily.html', { waitUntil: 'load' });
+    await page.waitForFunction(() => typeof window.show === 'function', null, { timeout: 30000 });
+    await fs.mkdir(dir, { recursive: true });
+    for (const k of kinds) {
+      await page.evaluate((x) => window.show(x), k);
+      const buf = await page.screenshot({ type: 'jpeg', quality: 90 });
+      if (buf.length < 5000) throw new Error('imagen vacía');
+      await fs.writeFile(path.join(dir, DAILY_FILES[k]), buf); made.push(k);
+      console.log(`Imagen de ${k}: ${Math.round(buf.length / 1024)} KB`);
+    }
+  });
+  return made;
+}
+// Resumen diario: tres tarjetas en un mensaje (null si ese día no hay nada que contar). has: qué imágenes van adjuntas.
+export function dailyMessage(day, D, roles = {}, has = {}) {
   if (!D || (!D.potd.length && !D.motd && !D.posts.length)) return null;
   const base = { username: 'SlapScore', avatar_url: `${SITE}/assets/icons/icon-512.png` };
   const ping = roleOk(roles.daily) ? { content: `<@&${roles.daily}>`, allowed_mentions: { parse: [], roles: [roles.daily] } } : { allowed_mentions: { parse: [] } };
   const who = (p) => `[${md(p.n)}](${SITE}/player/${p.id})`, when = DAY_LONG.format(new Date(day + 'T12:00:00Z')), embeds = [];
-  if (D.potd.length) embeds.push({ title: `⭐ Player of the Day · ${when}`, color: COLOR, description: D.potd.map(line).join('\n'),
+  const pic = (k) => (has[k] ? { image: { url: `attachment://${DAILY_FILES[k]}` } } : {});
+  if (D.potd.length) embeds.push({ title: `⭐ Player of the Day · ${when}`, color: COLOR, description: D.potd.map(line).join('\n'), ...pic('potd'),
     footer: { text: `Best average rating in public matches (min. ${D.min}) · ${D.games.toLocaleString('en-GB')} matches played` } });
   if (D.motd) {
     const m = D.motd, names = (l) => l.map((p) => `${md(p.n)} ${Number(p.rt).toFixed(1)}`).join(' · ');
     embeds.push({ title: `🔥 Match of the Day · ${m.score[0]}–${m.score[1]}${m.ot ? ' (OT)' : ''}`, url: `${SITE}/m/${String(m.key).replace(/[-/]/g, '')}-${m.id}`, color: 0xd86a00,
-      description: `**Home** · ${names(m.home)}\n**Away** · ${names(m.away)}${m.mvp ? `\n\nMVP: **${who(m.mvp)}** · ${Number(m.mvp.rt).toFixed(1)} · ${m.mvp.g}G ${m.mvp.a}A${m.mvp.sv ? ` ${m.mvp.sv}SV` : ''}` : ''}`,
+      ...pic('motd'), description: `**Home** · ${names(m.home)}\n**Away** · ${names(m.away)}${m.mvp ? `\n\nMVP: **${who(m.mvp)}** · ${Number(m.mvp.rt).toFixed(1)} · ${m.mvp.g}G ${m.mvp.a}A${m.mvp.sv ? ` ${m.mvp.sv}SV` : ''}` : ''}`,
       footer: { text: `The closest, highest-level 3v3 of the day${m.arena ? ` · ${m.arena}` : ''}` } });
   }
-  if (D.posts.length) embeds.push({ title: '🥅 Post magnets', color: 0x8a94a6,
+  if (D.posts.length) embeds.push({ title: '🥅 Post magnets', color: 0x8a94a6, ...pic('posts'),
     description: D.posts.map((x, i) => `**${i + 1}. ${who(x)}** · ${x.per.toFixed(2)} per match · ${x.ph} posts in ${x.gp} matches`).join('\n'),
     footer: { text: `Most shots off the post per match (min. ${D.min} matches) · slapscore.app` } });
   return { ...base, ...ping, embeds };
@@ -168,25 +184,6 @@ async function context() {
 
 // Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana.
 // dir y names: dónde y con qué nombre se guardan; jpeg: en JPEG (lo que piden Instagram y TikTok) en vez de PNG.
-// Un servidor local con la web y los datos, y un navegador sin ventana para abrirla: fn({ browser, base })
-export async function withSite(fn) {
-  const { chromium } = createRequire(path.join(path.resolve(process.env.PW_DIR || ROOT), 'x.js'))('playwright');
-  const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' };
-  const srv = http.createServer(async (req, res) => {
-    try {
-      const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-      if (p.includes('..')) throw 0;
-      let file = p.startsWith('/data/') ? path.join(DATA, p.slice(6)) : path.join(ROOT, p);
-      if (p.startsWith('/data/_int') || p.startsWith('/api/')) { res.writeHead(404).end(); return; }
-      let buf; try { buf = await fs.readFile(file); } catch { if (path.extname(p)) { res.writeHead(404).end(); return; } file = path.join(ROOT, 'index.html'); buf = await fs.readFile(file); }
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' }).end(buf);
-    } catch { res.writeHead(404).end(); }
-  });
-  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
-  const base = `http://127.0.0.1:${srv.address().port}`;
-  const browser = await chromium.launch();
-  try { return await fn({ browser, base }); } finally { await browser.close(); srv.close(); }
-}
 export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } = {}) {
   await withSite(async ({ browser, base }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
@@ -224,6 +221,11 @@ async function main() {
   const P = plan({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, hooks: C.hooks, force: C.force });
   if (cmd === 'plan') { if (P.due.length) console.log(P.due.join('\n')); return; }
   if (cmd === 'render') {
+    // resumen diario: sus tres imágenes
+    if (P.due.includes('daily')) {
+      try { const day = dailyDay(C.now); await renderDaily(day, computeDaily(await loadDay(DATA, day), { hidden: C.hidden })); }
+      catch (e) { console.log(`::warning::No se pudieron hacer las imágenes del resumen diario: ${e.message}`); }
+    }
     const k = P.due.filter((x) => FILES[x]); if (!k.length) return;
     await render(k);
     // y el vídeo vertical (si se puede: hace falta ffmpeg); sin él, el mensaje sale solo con la imagen
@@ -240,14 +242,17 @@ async function main() {
     if (k === 'daily') {
       // el resumen de ayer se calcula ahora, con los partidos de ese día
       const day = dailyDay(C.now), D = computeDaily(await loadDay(DATA, day), { hidden: C.hidden });
-      msg = dailyMessage(day, D, C.roles);
+      const pics = [];
+      for (const [x, name] of Object.entries(DAILY_FILES)) { try { pics.push({ k: x, name, data: await fs.readFile(path.join(IMG, name)) }); } catch {} }
+      msg = dailyMessage(day, D, C.roles, Object.fromEntries(pics.map((x) => [x.k, true])));
+      if (msg && pics.length) file = pics.map(({ name, data }) => ({ name, data }));
       if (!msg) { console.log(`Discord: daily sin nada que contar (${day})`); if (C.force !== k) st.daily = day; continue; }
     } else msg = buildMessage(k, { awards: C.awards, headline: C.news.headline, roles: C.roles, hasImage: !!file });
-    if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}${video ? ` (con vídeo de ${(video.data.length / 1048576).toFixed(1)} MB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
-    let ok = await send(k === 'news' ? C.hooks.news : k === 'daily' ? C.hooks.daily : C.hooks.totw, msg, [file, video]);
+    if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${Array.isArray(file) ? ` (con ${file.length} imágenes)` : file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}${video ? ` (con vídeo de ${(video.data.length / 1048576).toFixed(1)} MB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
+    let ok = await send(k === 'news' ? C.hooks.news : k === 'daily' ? C.hooks.daily : C.hooks.totw, msg, [...(Array.isArray(file) ? file : [file]), video]);
     // si Discord no acepta el mensaje con el vídeo, se manda sin él
     if (!ok && video) { video = null; ok = await send(C.hooks.totw, msg, file); }
-    console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${file ? ' (con imagen)' : ''}${ok && video ? ' (con vídeo)' : ''}`);
+    console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${Array.isArray(file) ? ` (con ${file.length} imágenes)` : file ? ' (con imagen)' : ''}${ok && video ? ' (con vídeo)' : ''}`);
     if (!ok) { failed++; continue; }
     if (C.force === k) continue;   // forzado a mano: no cambia lo apuntado
     if (k === 'daily') st.daily = dailyDay(C.now); else if (k === 'totw') st.totw = C.awards.week.last.f; else if (k === 'month') st.month = C.awards.month.last.m; else st.news = C.news.date;

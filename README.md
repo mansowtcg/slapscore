@@ -138,7 +138,8 @@ no se publican (solo las que lleguen después). Para publicar algo a mano: «Run
 tres tarjetas (`crawler/daily.js`, con las fichas de los partidos públicos de ese día): **Player of the Day** (los tres
 con mejor nota media, mínimo 8 partidos), **Match of the Day** (un 3 contra 3 terminado en juego, el más disputado y de más
 nivel: prórroga, un gol de diferencia, goles y rango medio) y **Post magnets** (los cinco con más tiros al poste por
-partido, mínimo 8 partidos). Sale en el canal de los premios (webhook `DISCORD_WEBHOOK_TOTW`) o, si existe el secreto
+partido, mínimo 8 partidos). Cada tarjeta lleva su imagen (1200×675, plantilla `crawler/video/daily.html`, sacada con el
+navegador sin ventana; si no se pueden hacer, sale solo el texto). Sale en el canal de los premios (webhook `DISCORD_WEBHOOK_TOTW`) o, si existe el secreto
 `DISCORD_WEBHOOK_DAILY`, en el canal de ese webhook. No menciona a nadie salvo que se ponga un rol en
 `discordRoles.daily`. La primera vez no publica (empieza al día siguiente); se apaga con `"discordDaily": false` y se
 lanza a mano con «Run workflow» y `discord` = `daily`.

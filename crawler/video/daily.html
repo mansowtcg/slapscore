@@ -1,0 +1,148 @@
+<!doctype html>
+<!-- Plantilla de las imágenes del resumen diario de Discord (1200×675): jugador del día, partido del día y ranking de
+     palos. No es una página de la web: la abre el robot (crawler/discord.js), le pasa los datos en window.__DATA y
+     pide cada imagen con show('potd' | 'motd' | 'posts'). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>SlapScore · daily</title>
+<link rel="stylesheet" href="/assets/overlay.css">
+<style>
+  html,body{margin:0;width:1200px;height:675px;overflow:hidden;background:#0F1320}
+  body{position:relative;font-family:"Sofia Sans",system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  #bg{position:absolute;inset:0;background:linear-gradient(160deg,#1B2A7A 0%,#131A3A 38%,#0F1320 70%,#0B0E18 100%)}
+  .glow{position:absolute;border-radius:50%;filter:blur(90px)}
+  #g1{width:620px;height:620px;left:-220px;top:-260px;background:rgba(79,104,255,.40)}
+  #g2{width:560px;height:560px;right:-220px;bottom:-280px;background:var(--tint,rgba(10,147,168,.24))}
+  #brand{position:absolute;left:48px;top:36px;display:flex;align-items:center;gap:12px;font-weight:800;font-size:30px}
+  #brand i{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#374DF5}
+  #brand i::before{content:"";width:23px;height:13px;border-radius:50%;background:#fff}
+  #when{position:absolute;right:48px;top:38px;padding:8px 18px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:800;font-size:21px;letter-spacing:.05em;text-transform:uppercase}
+  #title{position:absolute;left:48px;top:96px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:88px;line-height:1;text-transform:uppercase;white-space:nowrap}
+  #title b{color:#8EA0FF;font-weight:800}
+  #foot{position:absolute;left:48px;right:48px;bottom:30px;display:flex;justify-content:space-between;align-items:baseline;gap:20px}
+  #foot b{font-weight:800;font-size:26px}
+  #foot span{font-weight:600;font-size:19px;color:#A9B1C9;white-space:nowrap}
+  #main{position:absolute;left:48px;right:48px;top:206px;bottom:84px}
+  .rt{display:grid;place-items:center;border-radius:14px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800}
+  .emb{object-fit:contain}.av{display:grid;place-items:center;border-radius:50%;font-weight:800;text-transform:uppercase}
+  .nm{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .sub{font-weight:600;color:#A9B1C9;white-space:nowrap}
+  .pos{display:grid;place-items:center;border-radius:12px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;color:#1A1300}
+  .p1{background:#F5B700}.p2{background:#C9CFDD}.p3{background:#D08A4E}.pn{background:rgba(255,255,255,.16);color:#fff}
+
+  /* jugador del día: podio (2.º, 1.º, 3.º) */
+  .podium{display:flex;align-items:flex-end;gap:20px;height:100%}
+  .pc{flex:1;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 18px 20px;border-radius:26px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.09);height:318px}
+  .pc.first{height:385px;background:linear-gradient(160deg,rgba(245,183,0,.22),rgba(255,255,255,.07) 60%);border-color:rgba(245,183,0,.6);box-shadow:0 0 50px rgba(245,183,0,.22)}
+  .pc .top{align-self:stretch;display:flex;justify-content:space-between;align-items:flex-start;height:0}
+  .pc .pos{width:46px;height:46px;font-size:29px}
+  .pc .emb{width:104px;height:104px}.pc .av{width:92px;height:92px;font-size:34px;margin:6px 0}
+  .pc.first .emb{width:138px;height:138px}.pc.first .av{width:120px;height:120px;font-size:44px}
+  .pc .nm{font-size:36px;max-width:100%}.pc.first .nm{font-size:44px}
+  .pc .rt{width:132px;height:68px;font-size:46px}.pc.first .rt{width:156px;height:82px;font-size:56px}
+  .pc .sub{font-size:20px}
+
+  /* partido del día */
+  .duel{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:30px;align-items:center;height:100%}
+  .side{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .side h3{margin:0 0 2px;font-size:22px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#A9B1C9}
+  .side.r h3{text-align:right}
+  .pl{display:flex;align-items:center;gap:14px;height:78px;padding:0 16px;border-radius:20px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.08);min-width:0}
+  .side.r .pl{flex-direction:row-reverse}
+  .pl .emb{width:58px;height:58px;flex:none}.pl .av{width:50px;height:50px;font-size:19px;flex:none}
+  .pl .who{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.side.r .pl .who{align-items:flex-end}
+  .pl .nm{font-size:27px;max-width:100%}.pl .sub{font-size:17px}
+  .pl .rt{flex:none;width:76px;height:46px;font-size:31px}
+  .pl.mvp{border-color:rgba(245,183,0,.65);background:linear-gradient(120deg,rgba(245,183,0,.2),rgba(255,255,255,.07) 70%)}
+  .pl.mvp .sub::before{content:"MVP";display:inline-block;margin-right:7px;padding:1px 6px;border-radius:5px;background:#F5B700;color:#231A00;font-size:13px;font-weight:800;letter-spacing:.04em;vertical-align:1px}
+  .mid{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .score{display:flex;align-items:center;gap:16px;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:150px;line-height:.9}
+  .score i{font-style:normal;font-size:70px;color:#6F7A99}.score .lose{color:#7F8AAB}
+  .tags{display:flex;gap:8px}
+  .tag{padding:5px 13px;border-radius:999px;background:rgba(255,255,255,.12);font-weight:800;font-size:18px;letter-spacing:.05em;text-transform:uppercase}
+  .tag.ot{background:#D86A00}
+
+  /* ranking de palos */
+  .rank{display:flex;flex-direction:column;gap:9px;height:100%}
+  .row{flex:1;display:flex;align-items:center;gap:16px;padding:0 18px;border-radius:18px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.08);min-height:0}
+  .row .pos{flex:none;width:40px;height:40px;font-size:25px}
+  .row .emb{width:50px;height:50px;flex:none}.row .av{width:44px;height:44px;font-size:17px;flex:none}
+  .row .nm{flex:0 1 330px;min-width:0;font-size:28px;overflow:hidden;text-overflow:ellipsis}
+  .row .bar{flex:1;height:14px;border-radius:7px;background:rgba(255,255,255,.08);overflow:hidden}
+  .row .bar i{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,#8EA0FF,#4F5EF5)}
+  .row .val{flex:none;width:86px;text-align:right;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:40px}
+  .row .sub{flex:none;width:214px;font-size:19px}
+</style>
+</head>
+<body>
+<div id="bg"></div><div class="glow" id="g1"></div><div class="glow" id="g2"></div>
+<div id="brand"><i></i>SlapScore</div><div id="when"></div>
+<div id="title"></div><div id="main"></div>
+<div id="foot"><b>slapscore.app</b><span id="why"></span></div>
+<script type="module">
+import { parseRank } from '/assets/core.js';
+import { setOfficial, officialSrc } from '/assets/emblems.js';
+const X = window.__DATA || { label: '', D: { potd: [], posts: [], motd: null, min: 8 } }, D = X.D;
+const $ = (id) => document.getElementById(id);
+const RT = [[9, '#4F5EF5', '#fff'], [8, '#0A93A8', '#fff'], [7, '#1E9B3E', '#fff'], [6.5, '#E2B81E', '#251D00'], [6, '#D86A00', '#fff'], [-1, '#D7261B', '#fff']];
+function hue(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) % 360; }
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const rt = (v, d = 1) => { const e = el('span', 'rt', Number(v).toFixed(d)), [, bg, ink] = RT.find(([m]) => v >= m) || RT[RT.length - 1]; e.style.background = bg; e.style.color = ink; return e; };
+const loads = [];
+function face(p) {
+  const src = parseRank(p.rk) ? officialSrc(p.rk, 256) : null;
+  if (src) { const i = new Image(); i.className = 'emb'; loads.push(new Promise((ok) => { i.onload = i.onerror = ok; })); i.src = src; return i; }
+  const a = el('span', 'av', String(p.n).replace(/[^\p{L}\p{N}]/gu, '').slice(0, 2) || '?'); a.style.background = `hsl(${hue(p.id || p.n)} 55% 46%)`; return a;
+}
+const posCls = (i) => 'pos ' + (i < 3 ? 'p' + (i + 1) : 'pn');
+const DRAW = {
+  potd(main) {
+    $('title').innerHTML = 'Player of <b>the day</b>'; $('why').textContent = `Best average rating · public matches · min. ${D.min}`;
+    const box = el('div', 'podium');
+    for (const i of [1, 0, 2]) {
+      const p = D.potd[i]; if (!p) { box.appendChild(el('div')).style.flex = '1'; continue; }
+      const c = el('div', 'pc' + (i === 0 ? ' first' : '')), top = el('div', 'top'); top.appendChild(el('span', posCls(i), String(i + 1))); c.appendChild(top);
+      c.appendChild(face(p)); c.appendChild(el('span', 'nm', p.n)); c.appendChild(rt(p.rt, 2));
+      c.appendChild(el('span', 'sub', `${p.gp} matches · ${p.w} W${p.mvp ? ` · ${p.mvp} MVP` : ''}`)); box.appendChild(c);
+    }
+    main.appendChild(box);
+  },
+  motd(main) {
+    const m = D.motd; $('title').innerHTML = 'Match of <b>the day</b>'; $('why').textContent = 'The closest, highest-level 3v3 of the day';
+    document.documentElement.style.setProperty('--tint', 'rgba(216,106,0,.26)');
+    const box = el('div', 'duel'), win = m.score[0] > m.score[1] ? 0 : 1;
+    const side = (list, name, r) => { const s = el('div', 'side' + (r ? ' r' : '')); s.appendChild(el('h3', '', name));
+      for (const p of list) { const row = el('div', 'pl' + (m.mvp && p.id === m.mvp.id ? ' mvp' : '')), who = el('div', 'who'); row.appendChild(face(p)); who.appendChild(el('span', 'nm', p.n)); who.appendChild(el('span', 'sub', `${p.g}G ${p.a}A`)); row.appendChild(who); row.appendChild(rt(p.rt)); s.appendChild(row); }
+      return s; };
+    const mid = el('div', 'mid'), sc = el('div', 'score'); sc.appendChild(el('span', win === 0 ? '' : 'lose', String(m.score[0]))); sc.appendChild(el('i', '', '–')); sc.appendChild(el('span', win === 1 ? '' : 'lose', String(m.score[1]))); mid.appendChild(sc);
+    const tags = el('div', 'tags'); if (m.ot) tags.appendChild(el('span', 'tag ot', 'Overtime')); tags.appendChild(el('span', 'tag', '3v3')); if (m.arena) tags.appendChild(el('span', 'tag', m.arena)); mid.appendChild(tags);
+    box.appendChild(side(m.home, 'Home', false)); box.appendChild(mid); box.appendChild(side(m.away, 'Away', true)); main.appendChild(box);
+  },
+  posts(main) {
+    $('title').innerHTML = 'Post <b>magnets</b>'; $('why').textContent = `Most shots off the post per match · min. ${D.min} matches`;
+    document.documentElement.style.setProperty('--tint', 'rgba(142,160,255,.22)');
+    const box = el('div', 'rank'), max = Math.max(...D.posts.map((x) => x.per), 0.01);
+    D.posts.forEach((p, i) => { const r = el('div', 'row'); r.appendChild(el('span', posCls(i), String(i + 1))); r.appendChild(face(p)); r.appendChild(el('span', 'nm', p.n));
+      const bar = el('div', 'bar'), fill = el('i'); fill.style.width = Math.max(4, Math.round(p.per / max * 100)) + '%'; bar.appendChild(fill); r.appendChild(bar);
+      r.appendChild(el('span', 'val', p.per.toFixed(2))); r.appendChild(el('span', 'sub', `${p.ph} posts in ${p.gp} matches`)); box.appendChild(r); });
+    main.appendChild(box);
+  },
+};
+let official = null;
+window.show = async (kind) => {
+  if (!official) { official = fetch('/assets/ranks/index.json', { cache: 'no-store' }).then((r) => r.json()).then(setOfficial).catch(() => {}); }
+  await official;
+  const main = $('main'); main.textContent = ''; loads.length = 0; document.documentElement.style.removeProperty('--tint');
+  $('when').textContent = X.label;
+  DRAW[kind](main);
+  await Promise.all(loads); await document.fonts.ready;
+  await Promise.all(['800 60px "Sofia Sans"', '800 60px "Sofia Sans Condensed"', '600 20px "Sofia Sans"'].map((f) => document.fonts.load(f, 'AaĞğŞş0123').catch(() => {})));
+  // los nombres que no caben se encogen (hasta un 62 %; si aun así no caben, se cortan con puntos suspensivos)
+  for (const e of main.querySelectorAll('.nm')) { if (e.closest('.row')) continue; let s = parseFloat(getComputedStyle(e).fontSize); const min = s * 0.62; while (s > min && e.scrollWidth > e.clientWidth) { s -= 1; e.style.fontSize = s + 'px'; } }
+  return true;
+};
+</script>
+</body>
+</html>

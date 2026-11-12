@@ -115,7 +115,7 @@ jobs:
           case "$DISCORD_FORCE" in totw|month|news|daily|'') ;; *) DISCORD_FORCE='' ;; esac
           due=$(node crawler/discord.js plan)
           echo "Toca publicar: ${due:-nada}"
-          if echo "$due" | grep -qE '^(totw|month)$'; then
+          if echo "$due" | grep -qE '^(totw|month|daily)$'; then
             # la imagen es la misma que hace la web; si no se puede preparar, el mensaje sale sin ella
             export PW_DIR="$RUNNER_TEMP/pw"; mkdir -p "$PW_DIR"
             # para el vídeo vertical hace falta ffmpeg: el del sistema o, si no lo hay, el paquete ffmpeg-static

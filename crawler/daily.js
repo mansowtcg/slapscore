@@ -47,7 +47,7 @@ export function computeDaily(entries, { hidden = new Set(), min = MIN_DAY } = {}
   const ok = [...P.values()].filter((x) => x.gp >= min);
   const potd = ok.map((x) => ({ id: x.id, n: x.n, rk: x.rk, gp: x.gp, w: x.w, mvp: x.mvp, rt: r2(x.rs / x.gp), g: x.g, as: x.as }))
     .sort((a, b) => b.rt - a.rt || b.gp - a.gp || (a.id < b.id ? -1 : 1)).slice(0, 3);
-  const posts = ok.filter((x) => x.ph > 0).map((x) => ({ id: x.id, n: x.n, gp: x.gp, ph: x.ph, per: r2(x.ph / x.gp) }))
+  const posts = ok.filter((x) => x.ph > 0).map((x) => ({ id: x.id, n: x.n, rk: x.rk, gp: x.gp, ph: x.ph, per: r2(x.ph / x.gp) }))
     .sort((a, b) => b.per - a.per || b.ph - a.ph || (a.id < b.id ? -1 : 1)).slice(0, 5);
   // partido del día
   let best = null;
@@ -59,7 +59,7 @@ export function computeDaily(entries, { hidden = new Set(), min = MIN_DAY } = {}
   }
   let motd = null;
   if (best) {
-    const e = best.e, pl = (tm) => e.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map((p) => ({ id: String(p[0]), n: p[1], rt: p[3], g: p[4] || 0, a: p[5] || 0 }));
+    const e = best.e, pl = (tm) => e.p.filter((p) => p[2] === tm).sort((a, b) => b[3] - a[3]).map((p) => ({ id: String(p[0]), n: p[1], rk: p[6] || '', rt: p[3], g: p[4] || 0, a: p[5] || 0 }));
     const m = e.p[e.v];
     motd = { id: e.i, key: e.k, t: e.t, ot: !!e.o, score: [e.s[0], e.s[1]], arena: e.a || '', home: pl(0), away: pl(1),
       mvp: m ? { id: String(m[0]), n: m[1], rt: m[3], g: m[4] || 0, a: m[5] || 0, sv: m[9] || 0 } : null };

@@ -10,7 +10,7 @@ import { once } from 'node:events';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { withSite, weekLabel, monthLabel } from './discord.js';
+import { withSite, weekLabel, monthLabel } from './lib.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const VIDEO_MAX = 9 * 1024 * 1024;   // Discord admite 10 MB por archivo
