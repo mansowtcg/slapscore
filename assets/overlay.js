@@ -7,12 +7,14 @@
 //   /overlay/match/<AAAAMMDDHH>-<partido>   un partido concreto
 //   /overlay/vs?t1=<ids>&t2=<ids>     dos equipos frente a frente, con la nota media de cada jugador
 //   /overlay/s/<clave>                enlace fijo: enseña lo que haya guardado su dueño (cualquiera de los anteriores) Ligero a propósito: no carga la web
-// entera ni los diccionarios (sus textos van aquí, en los 6 idiomas).
-import { bucketOf, gameObj, parseRank } from './core.js';
+// entera ni los diccionarios (sus textos van aquí, en los 7 idiomas).
+import { bucketOf, gameObj, parseRank, pluralPL } from './core.js';
 import { setOfficial, officialSrc } from './emblems.js';
 
-export const OV_LANGS = ['en', 'es', 'fr', 'de', 'pt', 'tr'];
-const LOCS = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-BR', tr: 'tr-TR' };
+export const OV_LANGS = ['en', 'es', 'fr', 'de', 'pt', 'tr', 'pl'];
+// «Últimos {n} partidos» con su número (en polaco, además, con la forma que toca: 1 mecz, 3 mecze, 5 meczów)
+const cnt = (s, n) => pluralPL(s, +n).replace('{n}', n);
+const LOCS = { en: 'en-GB', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-BR', tr: 'tr-TR', pl: 'pl-PL' };
 const TX = {
   en: { home: 'Home', away: 'Away', fin: 'Final', tavg: 'Team average', nm: 'Match not found', gone: 'This link no longer exists', avg: 'Avg rating', last: 'Last {n} matches', sel: '{n} matches', wl: 'W-L', win: 'Win %', g: 'G/GP', a: 'A/GP', mvp: 'MVP', pub: 'Public', cus: 'Custom', all: 'All', none: 'No matches yet', nf: 'Player not found', noid: 'Missing player ID', W: 'W', L: 'L', D: 'D' },
   es: { home: 'Local', away: 'Visitante', fin: 'Final', tavg: 'Media del equipo', nm: 'Partido no encontrado', gone: 'Este enlace ya no existe', avg: 'Nota media', last: 'Últimos {n} partidos', sel: '{n} partidos', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Sin partidos todavía', nf: 'Jugador no encontrado', noid: 'Falta el ID del jugador', W: 'V', L: 'D', D: 'E' },
@@ -20,6 +22,7 @@ const TX = {
   de: { home: 'Heim', away: 'Gast', fin: 'Endstand', tavg: 'Teamschnitt', nm: 'Spiel nicht gefunden', gone: 'Diesen Link gibt es nicht mehr', avg: 'Ø Note', last: 'Letzte {n} Spiele', sel: '{n} Spiele', wl: 'S-N', win: '% S', g: 'T/SP', a: 'V/SP', mvp: 'MVP', pub: 'Öffentlich', cus: 'Custom', all: 'Alle', none: 'Noch keine Spiele', nf: 'Spieler nicht gefunden', noid: 'Spieler-ID fehlt', W: 'S', L: 'N', D: 'U' },
   pt: { home: 'Casa', away: 'Fora', fin: 'Final', tavg: 'Média da equipe', nm: 'Partida não encontrada', gone: 'Este link não existe mais', avg: 'Nota média', last: 'Últimas {n} partidas', sel: '{n} partidas', wl: 'V-D', win: '% V', g: 'G/PJ', a: 'A/PJ', mvp: 'MVP', pub: 'Públicas', cus: 'Custom', all: 'Todas', none: 'Ainda sem partidas', nf: 'Jogador não encontrado', noid: 'Falta o ID do jogador', W: 'V', L: 'D', D: 'E' },
   tr: { home: 'Ev sahibi', away: 'Deplasman', fin: 'Maç sonu', tavg: 'Takım ortalaması', nm: 'Maç bulunamadı', gone: 'Bu bağlantı artık yok', avg: 'Ort. not', last: 'Son {n} maç', sel: '{n} maç', wl: 'G-M', win: 'G %', g: 'G/OM', a: 'A/OM', mvp: 'MVP', pub: 'Açık', cus: 'Özel', all: 'Tümü', none: 'Henüz maç yok', nf: 'Oyuncu bulunamadı', noid: 'Oyuncu ID\'si eksik', W: 'G', L: 'M', D: 'B' },
+  pl: { home: 'Gospodarze', away: 'Goście', fin: 'Koniec', tavg: 'Średnia drużyny', nm: 'Nie znaleziono meczu', gone: 'Ten link już nie istnieje', avg: 'Śr. ocena', last: '[Ostatni|Ostatnie|Ostatnich] {n} [mecz|mecze|meczów]', sel: '{n} [mecz|mecze|meczów]', wl: 'Z-P', win: '% Z', g: 'G/M', a: 'A/M', mvp: 'MVP', pub: 'Publiczne', cus: 'Custom', all: 'Wszystkie', none: 'Brak meczów', nf: 'Nie znaleziono gracza', noid: 'Brak ID gracza', W: 'Z', L: 'P', D: 'R' },
 };
 
 // Opciones (todas van en la dirección, para que OBS las recuerde): n partidos, m tipo, v diseño, th fondo, l idioma,
@@ -131,7 +134,7 @@ export function renderOverlay(P, o, opts = {}) {
   const T = TX[o.l] || TX.en, loc = LOCS[o.l] || 'en-GB';
   const n1 = (x) => new Intl.NumberFormat(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.round(x * 10) / 10);
   const int = (x) => new Intl.NumberFormat(loc).format(Math.round(x));
-  const pct = (x) => { const v = Math.round(x * 100); return o.l === 'tr' ? '%' + v : o.l === 'en' || o.l === 'pt' ? v + '%' : v + ' %'; };
+  const pct = (x) => { const v = Math.round(x * 100); return o.l === 'tr' ? '%' + v : o.l === 'en' || o.l === 'pt' || o.l === 'pl' ? v + '%' : v + ' %'; };
   const cls = `ov ov-${o.v} ov-${o.th}${o.d ? ' ov-dates' : ''}`;
   const brand = `<span class="ov-brand"><i class="ov-puck"></i>SlapScore</span>`;
   if (!P) return `<div class="${cls} ov-msg">${brand}<span>${esc(opts.noid ? T.noid : T.nf)}</span></div>`;
@@ -145,7 +148,7 @@ export function renderOverlay(P, o, opts = {}) {
   const chips = s.L.slice(0, 10).map((g, i) => `<span class="ov-chip ${g.r === 'W' ? 'w' : g.r === 'L' ? 'l' : 'd'}${i === 0 && opts.fresh ? ' new' : ''}"><b class="rt ${rcls(g.rt)}">${n1(g.rt)}</b><i></i>${DF ? `<small class="ov-d">${esc(day(g.t))}</small>` : ''}</span>`).join('');
   const avg = s.avg != null ? `<span class="ov-big rt ${rcls(s.avg)}">${n1(s.avg)}</span>` : `<span class="ov-big rt none">–</span>`;
   const mode = o.m === 'pub' ? '' : `<span class="ov-tag">${esc(o.m === 'cus' ? T.cus : T.all)}</span>`;
-  const last = s.fixed ? T.sel.replace('{n}', s.k) : T.last.replace('{n}', o.n);
+  const last = s.fixed ? cnt(T.sel, s.k) : cnt(T.last, o.n);
   if (o.v === 'compact') {
     return `<div class="${cls}">${pic}<div class="ov-id"><b class="ov-name">${esc(P.n)}</b>${mmr || `<span class="ov-mmr">${esc(last)}</span>`}</div>
       <div class="ov-avg">${avg}<small>${esc(T.avg)}</small></div>
@@ -210,7 +213,7 @@ export function renderVs(A, B, o, names = {}) {
   const big = (v) => (v != null ? `<b class="rt ${rcls(v)}">${n1(v)}</b>` : `<b class="rt none">–</b>`);
   const mode = o.m === 'pub' ? '' : `<span class="ov-tag">${esc(o.m === 'cus' ? T.cus : T.all)}</span>`;
   return `<div class="${cls} ov-vs">
-    <div class="ov-top">${brandHTML}${mode}<span class="ov-last">${esc(T.avg)} · ${esc(T.last.replace('{n}', o.n))}</span></div>
+    <div class="ov-top">${brandHTML}${mode}<span class="ov-last">${esc(T.avg)} · ${esc(cnt(T.last, o.n))}</span></div>
     <div class="ov-sb"><b class="ov-tn">${esc(ovName(names.n1) || T.home)}</b><span class="ov-sc avg">${big(a.avg)}<i>VS</i>${big(b.avg)}</span><b class="ov-tn r">${esc(ovName(names.n2) || T.away)}</b></div>
     <div class="ov-teams"><div class="ov-tm">${side(a)}</div><div class="ov-tm r">${side(b)}</div></div></div>`;
 }

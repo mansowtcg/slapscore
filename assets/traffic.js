@@ -396,7 +396,7 @@ function devicesCard() {
 }
 function languagesCard() {
   // idioma en que ven la web (el elegido en el menú o el de la dirección)
-  const d = ST.data.dims, NM = { en: 'inglés', es: 'español', fr: 'francés', de: 'alemán', pt: 'portugués', tr: 'turco' };
+  const d = ST.data.dims, NM = { en: 'inglés', es: 'español', fr: 'francés', de: 'alemán', pt: 'portugués', tr: 'turco', pl: 'polaco' };
   const sl = (d.sl || []).filter(([k]) => NM[k]), t = sl.reduce((s, [, n]) => s + n, 0);
   const extra = t ? `<p class="tr-foot">Ven la web en ${sl.map(([k, n]) => `${NM[k]} el <b>${pctTxt(n / t)}</b>`).join(', ').replace(/, ([^,]*)$/, ' y $1')} de las visitas.</p>` : '';
   return listCard('Idioma del navegador', 'visitas', d.lang.map(([k, n]) => ({ label: X.esc(language(k)), n })), 'lang', extra);

@@ -221,13 +221,20 @@ export function linkPeriods(raws) {
 }
 // Cifras de cada jugador en cada periodo dentro del resumen del día (e.pd[].q): [nota, ...estas]
 export const PER_COLS = ['goals', 'assists', 'shots', 'saves', 'passes', 'score', 'takeaways', 'blocks', 'turnovers', 'possession_time_sec', 'faceoffs_won', 'faceoffs_lost', 'post_hits'];
+// El polaco tiene tres formas según el número: 1 mecz, 2-4 mecze, 5 meczów (y 12-14 meczów, 22 mecze...). En los
+// textos van entre corchetes, «{n} [mecz|mecze|meczów]», y aquí se elige la que toca; sin número, la última.
+export function pluralPL(s, n) {
+  const x = n == null ? NaN : typeof n === 'number' ? Math.abs(n) : parseInt(String(n).replace(/[^\d]/g, ''), 10);
+  const i = !Number.isInteger(x) ? 2 : x === 1 ? 0 : x % 10 >= 2 && x % 10 <= 4 && !(x % 100 >= 12 && x % 100 <= 14) ? 1 : 2;
+  return s.replace(/\[([^\]|]*)\|([^\]|]*)\|([^\]|]*)\]/g, (m, a, b, c) => [a, b, c][i]);
+}
 // Ordinal del periodo para mostrar: 1.er, 2.º, 3.er (en inglés 1st, 2nd…)
 export function periodOrd(n, lang) {
   if (lang === 'en') return n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
   if (lang === 'fr') return n + (n === 1 ? 're' : 'e');
   if (lang === 'de') return n + '.';
   if (lang === 'pt') return n + 'º';
-  if (lang === 'tr') return n + '.';
+  if (lang === 'tr' || lang === 'pl') return n + '.';
   return n + (n === 1 || n === 3 ? '.er' : '.º');
 }
 // Partida completa a partir de sus periodos (registros de slapshot.gg, en orden). Devuelve lo mismo que normalize()

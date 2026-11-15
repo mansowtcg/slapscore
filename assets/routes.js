@@ -1,26 +1,26 @@
-// Direcciones de la web: sin # y en el idioma de cada visitante (slapscore.app/jugadores, /players, /joueurs...).
+// Direcciones de la web: sin # y en el idioma de cada visitante (slapscore.app/jugadores, /players, /joueurs, /gracze...).
 // Por dentro, cada página sigue teniendo su clave de siempre (#jugadores, #j-123, #m-..., #d-2026-11-05, #cmp-1-2):
 // pathFor() pasa de la clave a la dirección y keyFor() al revés, aceptando cualquier idioma, las direcciones cortas
 // /j/<id> y /m/<id> y las antiguas, que la web cambia sola por la buena (sin recargar).
 // Lo usan la web (app.js) y el Worker de Cloudflare (que sirve la web en todas estas direcciones).
 
 export const PAGES = {
-  jugadores: { en: 'players', es: 'jugadores', fr: 'joueurs', de: 'spieler', pt: 'jogadores', tr: 'oyuncular' },
-  rankings: { en: 'rankings', es: 'rankings', fr: 'classements', de: 'ranglisten', pt: 'rankings', tr: 'siralamalar' },
-  records: { en: 'records', es: 'records', fr: 'records', de: 'rekorde', pt: 'recordes', tr: 'rekorlar' },
-  racha: { en: 'on-fire', es: 'en-racha', fr: 'en-forme', de: 'in-form', pt: 'em-alta', tr: 'formda' },
-  premios: { en: 'awards', es: 'premios', fr: 'recompenses', de: 'auszeichnungen', pt: 'premios', tr: 'oduller' },
-  eusl: { en: 'eusl', es: 'eusl', fr: 'eusl', de: 'eusl', pt: 'eusl', tr: 'eusl' },
-  notas: { en: 'how-we-rate', es: 'como-puntuamos', fr: 'notation', de: 'bewertung', pt: 'como-avaliamos', tr: 'notlandirma' },
-  novedades: { en: 'whats-new', es: 'novedades', fr: 'nouveautes', de: 'neuigkeiten', pt: 'novidades', tr: 'yenilikler' },
-  legal: { en: 'legal', es: 'aviso-legal', fr: 'mentions-legales', de: 'impressum', pt: 'aviso-legal', tr: 'yasal' },
+  jugadores: { en: 'players', es: 'jugadores', fr: 'joueurs', de: 'spieler', pt: 'jogadores', tr: 'oyuncular', pl: 'gracze' },
+  rankings: { en: 'rankings', es: 'rankings', fr: 'classements', de: 'ranglisten', pt: 'rankings', tr: 'siralamalar', pl: 'rankingi' },
+  records: { en: 'records', es: 'records', fr: 'records', de: 'rekorde', pt: 'recordes', tr: 'rekorlar', pl: 'rekordy' },
+  racha: { en: 'on-fire', es: 'en-racha', fr: 'en-forme', de: 'in-form', pt: 'em-alta', tr: 'formda', pl: 'na-fali' },
+  premios: { en: 'awards', es: 'premios', fr: 'recompenses', de: 'auszeichnungen', pt: 'premios', tr: 'oduller', pl: 'nagrody' },
+  eusl: { en: 'eusl', es: 'eusl', fr: 'eusl', de: 'eusl', pt: 'eusl', tr: 'eusl', pl: 'eusl' },
+  notas: { en: 'how-we-rate', es: 'como-puntuamos', fr: 'notation', de: 'bewertung', pt: 'como-avaliamos', tr: 'notlandirma', pl: 'jak-oceniamy' },
+  novedades: { en: 'whats-new', es: 'novedades', fr: 'nouveautes', de: 'neuigkeiten', pt: 'novidades', tr: 'yenilikler', pl: 'nowosci' },
+  legal: { en: 'legal', es: 'aviso-legal', fr: 'mentions-legales', de: 'impressum', pt: 'aviso-legal', tr: 'yasal', pl: 'nota-prawna' },
 };
 // páginas con un dato detrás: jugador, partido, día y comparación
 export const PARAM = {
-  j: { en: 'player', es: 'jugador', fr: 'joueur', de: 'spieler', pt: 'jogador', tr: 'oyuncu' },
-  m: { en: 'match', es: 'partido', fr: 'match', de: 'spiel', pt: 'partida', tr: 'mac' },
-  d: { en: 'matches', es: 'partidos', fr: 'matchs', de: 'spiele', pt: 'partidas', tr: 'maclar' },
-  cmp: { en: 'compare', es: 'comparar', fr: 'comparer', de: 'vergleich', pt: 'comparar', tr: 'karsilastir' },
+  j: { en: 'player', es: 'jugador', fr: 'joueur', de: 'spieler', pt: 'jogador', tr: 'oyuncu', pl: 'gracz' },
+  m: { en: 'match', es: 'partido', fr: 'match', de: 'spiel', pt: 'partida', tr: 'mac', pl: 'mecz' },
+  d: { en: 'matches', es: 'partidos', fr: 'matchs', de: 'spiele', pt: 'partidas', tr: 'maclar', pl: 'mecze' },
+  cmp: { en: 'compare', es: 'comparar', fr: 'comparer', de: 'vergleich', pt: 'comparar', tr: 'karsilastir', pl: 'porownaj' },
 };
 const VALID = { j: /^\d{1,12}$/, m: /^\d{10}-[0-9a-zA-Z-]{8,64}$/, d: /^\d{4}-\d{2}-\d{2}$/, cmp: /^\d{1,12}(-\d{1,12})?$/ };
 // sin traducir: el panel de administrador y su entrada (que no se enlaza en ningún sitio)

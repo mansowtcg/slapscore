@@ -116,7 +116,7 @@ export async function profileImage(P, X) {
   badge(c, avgR, 96, 478, 230, 134, X.fmtR);
   c.font = F(800, 44); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Nota media'), 364, 532);
   c.font = F(600, 30); c.fillStyle = COL.muted; c.fillText(X.t('{n} partidos analizados', { n: X.int(a.gp) }), 364, 580);
-  if (peak && meta.prk) { c.drawImage(peak, W - 60 - 150, 470, 150, 150); c.font = F(700, 22); c.textAlign = 'center'; c.fillStyle = COL.muted; c.fillText(X.t('Mejor rango').toLocaleUpperCase(X.loc), W - 60 - 75, 636); }
+  if (peak && meta.prk) { c.drawImage(peak, W - 60 - 150, 470, 150, 150); c.font = F(700, 22); c.textAlign = 'center'; c.fillStyle = COL.muted; c.fillText(X.t('Mejor rango').toLocaleUpperCase(X.loc), W - 60 - 75, 636, 138); }   // 138: que no se salga del recuadro (en polaco es largo)
   // estadísticas
   const pct = (x) => X.pct(x);
   const cells = [[X.int(a.gp), X.t('Partidos')], [pct(a.gp ? a.w / a.gp : 0), X.t('Victorias')], [X.int(a.mvp), 'MVP'], [X.int(a.g), X.t('Goles')], [X.int(a.as), X.t('Asistencias')], [X.int(a.sv), X.t('Paradas')]];

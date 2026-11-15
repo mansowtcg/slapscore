@@ -13,7 +13,7 @@ function steps(X) {
     { id: 'search', target: ['.hdr .search'], title: 'Busca a cualquier jugador', text: 'Por su nombre, su ID o el enlace de su perfil. En su perfil tienes su rango, su MMR, su forma y sus mejores partidos, y puedes compararlo con otro jugador.' },
     { id: 'fav', target: ['#fav-card'], icon: 'star', title: 'Favoritos y avisos', text: 'Marca jugadores con la estrella de su perfil para tener sus partidos a mano. Con la campana te avisamos en el móvil cuando terminen un partido o suban de rango.' },
     { id: 'nav', target: ['.bnav', '.hdr .nav'], title: 'Rankings, récords y premios', text: 'Los mejores en cada estadística, las mejores marcas, el equipo de la semana, el jugador del mes y la liga EUSL.' },
-    { id: 'tools', target: ['.hdr-actions'], title: 'Idioma, tema y sugerencias', text: 'Cambia el idioma (hay 6) o el tema claro u oscuro, y mándanos ideas o fallos con el buzón: lo leemos todo.' },
+    { id: 'tools', target: ['.hdr-actions'], title: 'Idioma, tema y sugerencias', text: 'Cambia el idioma (hay 7) o el tema claro u oscuro, y mándanos ideas o fallos con el buzón: lo leemos todo.' },
     { id: 'kofi', center: true, icon: 'coffee', kofi: true, title: 'Apoya SlapScore y ten prioridad', text: 'SlapScore es gratis y sin anuncios. Si lo apoyas en Ko-fi con cualquier cantidad, aunque sea simbólica, tus partidos se cargarán antes.' },
     { id: 'end', center: true, icon: 'check', title: '¡Listo!', text: 'Ya puedes usar SlapScore. Si quieres repasar este tutorial, lo tienes en Novedades.' },
   ];

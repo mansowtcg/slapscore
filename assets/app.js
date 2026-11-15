@@ -195,8 +195,8 @@ const NF0 = new Intl.NumberFormat(LOC), NF1 = nf(1), NF2 = nf(2);
 const fmtR = (r) => NF1.format(Math.round(r * 10) / 10);
 const dec = (x, d = 1) => (d === 2 ? NF2 : NF1).format(x || 0);
 const int = (x) => NF0.format(x || 0);
-const pct = (x) => { const n = Math.round((x || 0) * 100); return LANG === 'tr' ? '%' + n : n + (LANG === 'en' || LANG === 'pt' ? '%' : ' %'); };   // en turco, %95
-const pl = (n, one, many) => `${int(n)} ${t(n === 1 ? one : many)}`;
+const pct = (x) => { const n = Math.round((x || 0) * 100); return LANG === 'tr' ? '%' + n : n + (LANG === 'en' || LANG === 'pt' || LANG === 'pl' ? '%' : ' %'); };   // en turco, %95
+const pl = (n, one, many) => `${int(n)} ${t(n === 1 ? one : many, { n })}`;   // { n }: en polaco la forma depende del número
 const rcls = (r) => r >= 9 ? 'elite' : r >= 8 ? 'great' : r >= 7 ? 'good' : r >= 6.5 ? 'ok' : r >= 6 ? 'meh' : 'bad';
 const badge = (r, size) => `<span class="rt ${rcls(r)}${size ? ' ' + size : ''}">${fmtR(r)}</span>`;
 function hash32(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -678,7 +678,7 @@ const dayAdd = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 864e5).toIS
 const DF_WD1 = new Intl.DateTimeFormat(LOC, { weekday: 'short', timeZone: 'UTC' });
 const DF_MON = new Intl.DateTimeFormat(LOC, { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const wdShort = (d) => DF_WD1.format(dayDate(d)).replace('.', '').toLocaleUpperCase(LOC);
-const K_SUF = { en: 'k', es: ' mil', fr: ' k', de: ' Tsd.', pt: ' mil', tr: ' B' }[LANG];
+const K_SUF = { en: 'k', es: ' mil', fr: ' k', de: ' Tsd.', pt: ' mil', tr: ' B', pl: ' tys.' }[LANG];
 const countShort = (n) => n >= 10000 ? Math.round(n / 1000) + K_SUF : n >= 1000 ? NF1.format(Math.round(n / 100) / 10) + K_SUF : String(n);
 const dayN = (d) => { const x = S.dayMap.get(d); return x ? x.n : 0; };
 const dmShort = (d) => DF_DM.format(dayDate(d)).replace('.', '');
