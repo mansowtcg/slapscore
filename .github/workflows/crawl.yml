@@ -17,7 +17,7 @@ on:
         description: 'Pasada automática encadenada (1) o manual (0)'
         default: '0'
       discord:
-        description: 'Publicar ahora en Discord aunque no toque: totw, month, news o daily (vacío: lo normal)'
+        description: 'Publicar ahora en Discord aunque no toque: totw, month, news, daily o giveaway (el sorteo de los ajustes; vacío: lo normal)'
         default: ''
       social:
         description: 'Publicar ahora en las redes (X, Instagram, kit de TikTok) aunque no toque: totw, month o news (vacío: lo normal)'
@@ -112,7 +112,7 @@ jobs:
         run: |
           # Equipo de la semana (lunes), jugador del mes (día 1) y novedades de la web: crawler/discord.js
           [ -n "$DISCORD_WEBHOOK_TOTW$DISCORD_WEBHOOK_NEWS$DISCORD_WEBHOOK_DAILY" ] || { echo "Sin webhooks de Discord: no se publica nada."; exit 0; }
-          case "$DISCORD_FORCE" in totw|month|news|daily|'') ;; *) DISCORD_FORCE='' ;; esac
+          case "$DISCORD_FORCE" in totw|month|news|daily|giveaway|'') ;; *) DISCORD_FORCE='' ;; esac
           due=$(node crawler/discord.js plan)
           echo "Toca publicar: ${due:-nada}"
           if echo "$due" | grep -qE '^(totw|month|daily)$'; then

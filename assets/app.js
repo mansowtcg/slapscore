@@ -277,6 +277,7 @@ const ICON = {
   vs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>',
   bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M13 2.5 4.5 13.5H11L10 21.5l8.5-11H12Z"/></svg>',
+  gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>',
 };
 
 // ---------- interfaz base ----------
@@ -796,7 +797,7 @@ async function viewMatches(dayArg, tok) {
     <h1 class="sr-only">${esc(t('Partidos'))} · ${esc(dayLong(day))}</h1>
     <aside class="col col-left" id="m-left" aria-label="${esc(t('Filtros'))}">${skeletonList(4)}</aside>
     <section class="col" aria-label="${esc(t('Partidos'))}">
-      ${newsBanner()}<div class="card">
+      ${giveawayBanner() || newsBanner()}<div class="card">
         ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
         <div class="upd" id="m-upd" hidden></div>
@@ -1041,7 +1042,7 @@ let tourThisVisit = false, kofiNoteThisVisit = false;
 const kofiNoteSeen = () => { try { return !!localStorage.getItem(KOFI_NOTE_KEY) || localStorage.getItem('slapscore-tour') === 'done'; } catch { return true; } };
 function kofiNoteMark() { try { localStorage.setItem(KOFI_NOTE_KEY, String(Date.now())); } catch {} }
 function maybeKofiNote(tries = 0) {
-  if (!supportUrl() || kofiNoteSeen() || tourThisVisit || isBot()) return;
+  if (!supportUrl() || kofiNoteSeen() || tourThisVisit || gwThisVisit || isBot()) return;
   const v = route().view;
   if (v === 'admin') return;
   // con el tutorial a punto de salir, o algo abierto, se espera un poco
@@ -1062,7 +1063,7 @@ function discordNote() {
       <a class="btn discord" href="${esc(url)}" target="_blank" rel="noopener" data-dc data-close autofocus>${esc(t('Entrar al Discord'))}${ICON.right}</a><button type="button" class="btn dc-later" data-close>${esc(t('Ahora no'))}</button></div>`, 'dc-sheet');
 }
 function maybeDiscordNote(tries = 0) {
-  if (!discordUrl() || dcNoteSeen() || tourThisVisit || kofiNoteThisVisit || isBot()) return;
+  if (!discordUrl() || dcNoteSeen() || tourThisVisit || kofiNoteThisVisit || gwThisVisit || isBot()) return;
   if (supportUrl() && !kofiNoteSeen()) return;   // en esta visita toca el de Ko-fi
   const v = route().view;
   if (v === 'admin') return;
@@ -1070,6 +1071,50 @@ function maybeDiscordNote(tries = 0) {
   dcNoteMark(); hideTip(false); discordNote();
 }
 document.addEventListener('click', (e) => { if (e.target.closest('[data-kofi-how]')) { e.preventDefault(); kofiHow(); } });
+// ---------- sorteo ----------
+// config/settings.json -> "giveaway": { "id", "until", "winners", "channel", "video", "poster" }. Mientras no llegue la
+// fecha de «until», a cada navegador le sale una vez el aviso del sorteo nada más entrar (antes que el tutorial, Ko-fi o
+// Discord, que quedan para otra visita) y la portada lleva un recuadro para volver a verlo. Pasada la fecha, nada.
+const GW_KEY = 'slapscore-gw', GW_X_KEY = 'slapscore-gw-x';
+let gwThisVisit = false;
+function giveaway() {
+  const g = S.settings && S.settings.giveaway; if (!g || typeof g !== 'object' || !discordUrl()) return null;
+  const until = Date.parse(g.until), id = String(g.id || '');
+  if (!(until > Date.now()) || !/^[\w-]{1,24}$/.test(id)) return null;
+  const media = (u) => (/^assets\/promo\/[\w-]{1,40}\.(mp4|jpg|png|webp)$/.test(String(u || '')) ? '/' + u : '');   // con / delante: la web también se abre en /player/123
+  return { id, until, n: Math.max(1, Math.min(99, parseInt(g.winners, 10) || 1)), ch: '#' + (/^[\w-]{1,32}$/.test(String(g.channel || '')) ? g.channel : 'giveaway'), video: media(g.video), poster: media(g.poster) };
+}
+const gwDay = (g) => new Intl.DateTimeFormat(LOC, { day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' }).format(new Date(g.until));
+const gwSeen = (g) => { try { return localStorage.getItem(GW_KEY) === g.id; } catch { return true; } };
+const gwDue = () => { const g = giveaway(); return !!g && !gwSeen(g) && !isBot() && route().view !== 'admin'; };
+function giveawaySheet() {
+  const g = giveaway(), url = discordUrl(); if (!g) return;
+  const v = { n: g.n, c: g.ch, d: gwDay(g) };
+  const media = g.video ? `<video class="gw-video" src="${esc(g.video)}"${g.poster ? ` poster="${esc(g.poster)}"` : ''} muted loop playsinline preload="metadata"${REDUCED.matches ? ' controls' : ' autoplay'}></video>` : '';
+  const ovl = openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Sorteo: {n} accesos prioritarios', v))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="sheet-b dc-note gw-note">${media}
+      <p class="gw-lead">${esc(t('Sorteamos {n} accesos prioritarios: tus partidos se cargan antes y llevas la insignia ♥ Supporter, sin tener que donar.', v))}</p>
+      <ol class="gw-steps"><li>${esc(t('Entra en el Discord de SlapScore.'))}</li><li>${esc(t('Comparte la imagen de tu perfil o tu resumen del mes: en redes, en otro Discord o en el canal {c}.', v))}</li><li>${esc(t('Si la compartes fuera, deja el enlace o una captura en {c}.', v))}</li></ol>
+      <p class="muted gw-foot">${esc(t('La imagen sale de tu perfil, con el botón «Compartir imagen». Ganadores al azar; termina el {d}.', v))}</p>
+      <a class="btn discord" href="${esc(url)}" target="_blank" rel="noopener" data-gw data-close autofocus>${esc(t('Entrar al Discord'))}${ICON.right}</a><button type="button" class="btn dc-later" data-close>${esc(t('Ahora no'))}</button></div>`, 'dc-sheet gw-sheet');
+  const vid = $('.gw-video', ovl); if (vid && !REDUCED.matches) { vid.muted = true; const pr = vid.play(); if (pr && pr.catch) pr.catch(() => { vid.controls = true; }); }
+}
+function maybeGiveawayNote(tries = 0) {
+  if (!gwDue()) { gwThisVisit = false; return; }
+  if ($('#ovl') || $('#lang-menu') || document.querySelector('.tour')) { if (tries < 8) setTimeout(() => maybeGiveawayNote(tries + 1), 2000); else gwThisVisit = false; return; }
+  try { localStorage.setItem(GW_KEY, giveaway().id); } catch {}
+  dcNoteMark(); hideTip(false); giveawaySheet();   // el sorteo ya invita al Discord: su aviso no hace falta después
+}
+function giveawayBanner() {
+  const g = giveaway(); if (!g) return '';
+  try { if (localStorage.getItem(GW_X_KEY) === g.id) return ''; } catch {}
+  return `<div class="news-banner gw-banner in" id="gw-banner" role="status"><span class="nb-ic">${ICON.gift}</span><p><b>${esc(t('Sorteo'))}</b> ${esc(t('{n} accesos prioritarios sin donar. Hasta el {d}.', { n: g.n, d: gwDay(g) }))}</p><button type="button" class="btn sm primary" data-gw-open>${esc(t('Cómo participar'))}</button><button type="button" class="nb-x" data-gw-x aria-label="${esc(t('Cerrar'))}" title="${esc(t('Cerrar'))}">✕</button></div>`;
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-gw]')) trackEvent('giveaway');
+  else if (e.target.closest('[data-gw-open]')) { e.preventDefault(); giveawaySheet(); }
+  else if (e.target.closest('[data-gw-x]')) { e.preventDefault(); const g = giveaway(); try { if (g) localStorage.setItem(GW_X_KEY, g.id); } catch {} $$('#gw-banner').forEach((x) => x.remove()); }
+});
 // ---------- buzón de sugerencias ----------
 // La web y su API (Worker de Cloudflare) están en la misma dirección: el token del administrador nunca sale de ella
 function apiBase() { return ''; }
@@ -2432,7 +2477,7 @@ const tourDone = () => { try { return !!localStorage.getItem(TOUR_KEY); } catch 
 const isBot = () => navigator.webdriver || /bot|crawl|spider|slurp|preview|lighthouse|headless/i.test(navigator.userAgent);
 function maybeTour() {
   const force = /[?&]tutorial\b/.test(location.search);
-  if (tourPending || document.querySelector('.tour') || (!force && (tourDone() || isBot()))) return;
+  if (tourPending || document.querySelector('.tour') || (!force && (tourDone() || isBot() || gwThisVisit))) return;   // con el aviso del sorteo, el tutorial queda para otra visita
   tourPending = true;
   let n = 0;
   const tick = () => {
@@ -2658,8 +2703,10 @@ document.addEventListener('click', (e) => { if (e.target.closest && e.target.clo
     MAIN.innerHTML = `<div class="card empty"><strong>${esc(t('No se pudieron cargar los partidos.'))}</strong><p>${esc(e.status === 404 ? t('El robot aún no ha publicado datos.') : t('Comprueba tu conexión y vuelve a intentarlo.'))}</p><button class="btn" type="button" data-reload>${esc(t('Reintentar'))}</button></div>`;
     return;
   }
+  gwThisVisit = gwDue();
   renderChrome(); go({ instant: true }); S.booted = true;
   trackView(route());
+  if (gwThisVisit) setTimeout(maybeGiveawayNote, 900);
   setTimeout(maybeKofiNote, 3000);
   setTimeout(maybeDiscordNote, 3600);
 })();

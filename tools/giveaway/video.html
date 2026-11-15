@@ -1,0 +1,173 @@
+<!doctype html>
+<!-- Plantilla del vídeo del sorteo (1280×720, 14,5 s), el de assets/promo/giveaway.mp4. No es una página de la web.
+     Para rehacerlo: servir la web en local con esta carpeta dentro, poner al lado card.png y recap.png (las imágenes de
+     «Compartir imagen» y del resumen del mes de un perfil), abrirla con un navegador sin ventana, pedir cada fotograma
+     con renderAt(ms) a 30 por segundo y juntarlos con ffmpeg (como hace crawler/video.js). Los textos (premio, pasos,
+     fecha y enlace del Discord) están escritos aquí. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SlapScore · giveaway</title>
+<link rel="stylesheet" href="/assets/overlay.css">
+<style>
+  html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0F1320}
+  body{font-family:"Sofia Sans",system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  #bg{position:absolute;inset:0;background:linear-gradient(160deg,#1B2A7A 0%,#131A3A 38%,#0F1320 70%,#0B0E18 100%)}
+  .glow{position:absolute;border-radius:50%;filter:blur(80px)}
+  #g1{width:620px;height:620px;left:-200px;top:-240px;background:rgba(79,104,255,.45)}
+  #g2{width:560px;height:560px;right:-220px;top:330px;background:rgba(10,147,168,.28)}
+  .abs{position:absolute;will-change:transform,opacity;z-index:2}
+  .cond{font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;text-transform:uppercase;line-height:1}
+  #brand{left:56px;top:40px;display:flex;align-items:center;gap:12px;font-weight:800;font-size:30px}
+  #brand i{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:#374DF5}
+  #brand i::before{content:"";width:24px;height:13px;border-radius:50%;background:#fff}
+  #tag{right:56px;top:44px;padding:8px 18px;border-radius:999px;background:#F5B700;color:#1A1300;font-weight:800;font-size:20px;letter-spacing:.08em;text-transform:uppercase}
+  #site{right:56px;bottom:36px;font-weight:800;font-size:24px;color:#C9D0E6}
+  /* A: título */
+  #a-gift{left:590px;top:96px;width:100px;height:100px;border-radius:28px;background:#F5B700;display:grid;place-items:center;box-shadow:0 18px 50px rgba(245,183,0,.35)}
+  #a-gift svg{width:58px;height:58px;color:#1A1300}
+  #a-ttl{left:0;top:222px;width:1280px;text-align:center;font-size:214px;letter-spacing:-.01em;white-space:nowrap}
+  #a-ttl span{display:inline-block;will-change:transform,opacity}
+  #a-sub{left:0;top:438px;width:1280px;text-align:center;font-size:70px;color:#8EA0FF;letter-spacing:.02em}
+  #a-chip{left:0;top:546px;width:1280px;display:flex;justify-content:center}
+  #a-chip b{padding:13px 30px;border-radius:999px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.16);font-size:32px;font-weight:800}
+  /* B y C: texto a la izquierda, imágenes a la derecha */
+  .lbl{left:72px;top:132px;font-weight:800;font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:#F5B700}
+  .hd{left:72px;top:164px;font-size:92px;white-space:nowrap}
+  .row{left:72px;width:700px;display:flex;align-items:center;gap:22px}
+  .row .ic{flex:none;display:grid;place-items:center;width:76px;height:76px;border-radius:22px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.12)}
+  .row .ic svg{width:40px;height:40px}
+  .row .num{flex:none;display:grid;place-items:center;width:76px;height:76px;border-radius:50%;background:#374DF5;font-family:"Sofia Sans Condensed","Sofia Sans",sans-serif;font-weight:800;font-size:46px}
+  .row p{margin:0;display:flex;flex-direction:column;gap:5px}
+  .row b{font-size:37px;font-weight:800;line-height:1.08;white-space:nowrap}
+  .row small{font-size:23.5px;font-weight:600;color:#A9B1C9;line-height:1.25}
+  .row small em{font-style:normal;color:#fff;font-weight:800}
+  .shot{width:330px;height:412px;border-radius:22px;box-shadow:0 30px 70px rgba(0,0,0,.55),0 0 0 2px rgba(255,255,255,.12);object-fit:cover;transform-origin:50% 60%}
+  #s-card{left:846px;top:160px;z-index:4}#s-recap{left:846px;top:160px;z-index:3}
+  #pill{z-index:5;left:812px;top:540px;padding:11px 20px 11px 16px;border-radius:999px;background:#E5484D;color:#fff;font-weight:800;font-size:25px;display:flex;align-items:center;gap:9px;box-shadow:0 12px 30px rgba(229,72,77,.4)}
+  #pill svg{width:24px;height:24px}
+  /* D: cierre */
+  #d-ttl{left:0;top:112px;width:1280px;text-align:center;font-size:176px;white-space:nowrap}
+  #d-ttl i{font-style:normal;color:#F5B700}
+  #d-end{left:0;top:300px;width:1280px;text-align:center;font-size:50px;font-weight:800;color:#C9D0E6}
+  #d-end b{color:#fff}
+  #d-join{left:0;top:402px;width:1280px;display:flex;justify-content:center}
+  #d-join div{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 54px 24px;border-radius:30px;background:#5865F2;box-shadow:0 22px 60px rgba(88,101,242,.5)}
+  #d-join small{font-size:23px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#DDE1FF}
+  #d-join b{font-size:60px;font-weight:800;letter-spacing:.005em}
+  #d-how{left:0;top:586px;width:1280px;text-align:center;font-size:29px;font-weight:700;color:#A9B1C9}
+  #d-how b{color:#fff}
+  #conf{position:absolute;inset:0;pointer-events:none;z-index:1}
+  #conf i{position:absolute;left:0;top:0;width:14px;height:22px;border-radius:4px;will-change:transform,opacity}
+</style>
+</head>
+<body>
+<div id="bg"></div><div class="glow" id="g1"></div><div class="glow" id="g2"></div>
+<div id="conf"></div>
+<div class="abs" id="brand"><i></i>SlapScore</div>
+<div class="abs" id="tag">Giveaway</div>
+<div class="abs" id="site">slapscore.app</div>
+
+<div class="abs" id="a-gift"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.500-5a2.500 2.500 0 0 1 0 5"/></svg></div>
+<div class="abs cond" id="a-ttl"></div>
+<div class="abs cond" id="a-sub">3 priority accesses</div>
+<div class="abs" id="a-chip"><b>No donation needed</b></div>
+
+<div class="abs lbl" id="b-lbl">The prize</div>
+<div class="abs cond hd" id="b-hd">Priority access</div>
+<div class="abs row" id="b1" style="top:296px"><span class="ic"><svg viewBox="0 0 24 24" fill="#F5B700"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg></span><p><b>Your matches load first</b><small>Checked on every pass of the tracker</small></p></div>
+<div class="abs row" id="b2" style="top:406px"><span class="ic"><svg viewBox="0 0 24 24" fill="#FF5C7A"><path d="M12 21s-7.500-4.600-9.600-9.200C.900 8.400 2.900 4.500 6.600 4.500c2.100 0 3.800 1.200 5.400 3.200 1.600-2 3.300-3.200 5.400-3.200 3.700 0 5.700 3.900 4.200 7.300C19.500 16.400 12 21 12 21z"/></svg></span><p><b>Supporter badge</b><small>The ♥ on your profile</small></p></div>
+<div class="abs row" id="b3" style="top:516px"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#7CE0A0" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.500 4.500 4.500L19 7.500"/></svg></span><p><b>Free for 3 winners</b><small>Normally a perk for Ko-fi supporters</small></p></div>
+
+<div class="abs lbl" id="c-lbl">How to enter</div>
+<div class="abs cond hd" id="c-hd">Share your stats</div>
+<div class="abs row" id="c1" style="top:296px"><span class="num">1</span><p><b>Join the SlapScore Discord</b><small>discord.gg/RUUzZPQT2g</small></p></div>
+<div class="abs row" id="c2" style="top:406px"><span class="num">2</span><p><b>Share your SlapScore image</b><small>Profile card or monthly recap: on socials,<br>in another Discord or right in <em>#giveaway</em></small></p></div>
+<div class="abs row" id="c3" style="top:532px"><span class="num">3</span><p><b>Post it in #giveaway</b><small>Shared it elsewhere? Drop the link or a screenshot</small></p></div>
+
+<img class="abs shot" id="s-card" src="card.png" alt="">
+<img class="abs shot" id="s-recap" src="recap.png" alt="">
+<div class="abs" id="pill"><svg viewBox="0 0 24 24" fill="#fff"><path d="M12 21s-7.500-4.600-9.600-9.200C.900 8.400 2.900 4.500 6.600 4.500c2.100 0 3.800 1.200 5.400 3.200 1.600-2 3.300-3.200 5.400-3.200 3.700 0 5.700 3.900 4.200 7.300C19.500 16.400 12 21 12 21z"/></svg>Supporter</div>
+
+<div class="abs cond" id="d-ttl"><i>3</i> winners</div>
+<div class="abs" id="d-end">Ends <b>Sunday, November 29</b></div>
+<div class="abs" id="d-join"><div><small>Join to enter</small><b>discord.gg/RUUzZPQT2g</b></div></div>
+<div class="abs" id="d-how">Share your SlapScore image in <b>#giveaway</b> · winners drawn at random</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const cl = (x) => Math.max(0, Math.min(1, x));
+const seg = (t, a, b) => cl((t - a) / (b - a));
+const eo = (p) => 1 - Math.pow(1 - p, 3);
+const eio = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const back = (p) => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+const set = (el, o, tr) => { el.style.opacity = o.toFixed(3); el.style.transform = tr || 'none'; el.style.visibility = o <= 0.002 ? 'hidden' : 'visible'; };
+// entra subiendo en [a, a+d] y sale en [out-260, out]
+const inOut = (el, t, a, out, { d = 420, dy = 34, dx = 0 } = {}) => {
+  const p = eo(seg(t, a, a + d)), q = eio(seg(t, out - 260, out));
+  set(el, p * (1 - q), `translate(${(dx * (1 - p)).toFixed(2)}px,${(dy * (1 - p) - 26 * q).toFixed(2)}px)`);
+};
+window.DURATION = 14500;
+const A = [0, 3000], B = [3000, 6900], C = [6900, 10900], D = [10900, 14500];
+// título letra a letra
+const ttl = $('#a-ttl'); ttl.innerHTML = [...'GIVEAWAY'].map((c) => `<span>${c}</span>`).join(''); const letters = [...ttl.children];
+// confeti: siempre el mismo (sin azar de verdad, para que el vídeo salga igual cada vez)
+let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+const COLS = ['#F5B700', '#8EA0FF', '#FF5C7A', '#7CE0A0', '#fff', '#4F68FF'];
+const conf = $('#conf'); const bits = Array.from({ length: 70 }, (_, i) => {
+  const e = document.createElement('i'); e.style.background = COLS[i % COLS.length]; const w = 8 + rnd() * 9; e.style.width = w + 'px'; e.style.height = (w * (1.2 + rnd())) + 'px'; conf.appendChild(e);
+  return { e, x: rnd() * 1280, d: rnd() * 1400, v: 0.2 + rnd() * 0.17, sw: 20 + rnd() * 50, ph: rnd() * 6.28, rs: (rnd() - 0.5) * 0.5 };
+});
+function confetti(t, t0, t1) {
+  const on = t >= t0 && t <= t1;
+  for (const b of bits) {
+    if (!on) { b.e.style.visibility = 'hidden'; continue; }
+    const tt = t - t0 - b.d * 0.6; if (tt < 0) { b.e.style.visibility = 'hidden'; continue; }
+    const y = -40 + tt * b.v, x = b.x + Math.sin(tt / 420 + b.ph) * b.sw, fade = 1 - seg(t, t1 - 300, t1);
+    b.e.style.visibility = y > 760 ? 'hidden' : 'visible'; b.e.style.opacity = (0.9 * fade).toFixed(3);
+    b.e.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${(tt * b.rs).toFixed(1)}deg)`;
+  }
+}
+window.renderAt = (t) => {
+  // fondo: los brillos se mueven despacio
+  $('#g1').style.transform = `translate(${(Math.sin(t / 2600) * 40).toFixed(1)}px,${(Math.cos(t / 3100) * 26).toFixed(1)}px)`;
+  $('#g2').style.transform = `translate(${(Math.cos(t / 2900) * -46).toFixed(1)}px,${(Math.sin(t / 2400) * 30).toFixed(1)}px)`;
+  set($('#brand'), eo(seg(t, 0, 400)));
+  set($('#site'), eo(seg(t, 300, 800)) * (1 - seg(t, D[0] - 200, D[0])) + eo(seg(t, D[0] + 900, D[0] + 1300)));
+  set($('#tag'), eo(seg(t, A[1] - 100, A[1] + 300)) * (1 - seg(t, D[0] - 260, D[0])), `translateY(${((1 - eo(seg(t, A[1] - 100, A[1] + 300))) * -16).toFixed(1)}px)`);
+  // A
+  { const out = eio(seg(t, A[1] - 300, A[1]));
+    const p = back(seg(t, 100, 620)); set($('#a-gift'), cl(seg(t, 100, 300)) * (1 - out), `translateY(${(-26 * out).toFixed(1)}px) scale(${p.toFixed(3)}) rotate(${(Math.sin(t / 260) * 5 * (1 - seg(t, 600, 1600))).toFixed(2)}deg)`);
+    letters.forEach((l, i) => { const q = eo(seg(t, 260 + i * 55, 700 + i * 55)); l.style.opacity = (q * (1 - out)).toFixed(3); l.style.transform = `translateY(${((1 - q) * 90 - 30 * out).toFixed(1)}px)`; });
+    ttl.style.visibility = t < A[1] ? 'visible' : 'hidden';
+    inOut($('#a-sub'), t, 950, A[1], { dy: 30 }); inOut($('#a-chip'), t, 1400, A[1], { dy: 26 });
+  }
+  confetti(t, 300, A[1] + 200);
+  // B
+  inOut($('#b-lbl'), t, B[0] + 100, B[1], { dy: 20 }); inOut($('#b-hd'), t, B[0] + 180, B[1]);
+  inOut($('#b1'), t, B[0] + 520, B[1], { dx: -40, dy: 0 }); inOut($('#b2'), t, B[0] + 900, B[1], { dx: -40, dy: 0 }); inOut($('#b3'), t, B[0] + 1280, B[1], { dx: -40, dy: 0 });
+  // imágenes: la tarjeta entra en B; en C se abre en abanico con el resumen del mes
+  { const pin = eo(seg(t, B[0] + 350, B[0] + 950)), fan = eio(seg(t, C[0] + 150, C[0] + 850)), out = eio(seg(t, C[1] - 300, C[1]));
+    const fl = Math.sin(t / 900) * 5;
+    set($('#s-card'), pin * (1 - out), `translate(${((1 - pin) * 220 - fan * 92 + out * 60).toFixed(1)}px,${(fl + fan * 14).toFixed(1)}px) rotate(${(4 - fan * 11).toFixed(2)}deg) scale(${(1 - fan * 0.06).toFixed(3)})`);
+    set($('#s-recap'), cl(seg(t, C[0] + 150, C[0] + 330)) * (1 - out), `translate(${(fan * 88 + (1 - fan) * 40 + out * 60).toFixed(1)}px,${(-fl + 6 + (1 - fan) * 30).toFixed(1)}px) rotate(${(fan * 7).toFixed(2)}deg) scale(${(0.9 + fan * 0.08).toFixed(3)})`);
+    const pp = back(seg(t, B[0] + 1100, B[0] + 1550)), po = 1 - eio(seg(t, C[0] - 100, C[0] + 200));
+    set($('#pill'), cl(seg(t, B[0] + 1100, B[0] + 1300)) * po, `translateY(${fl.toFixed(1)}px) rotate(-4deg) scale(${pp.toFixed(3)})`);
+  }
+  // C
+  inOut($('#c-lbl'), t, C[0] + 100, C[1], { dy: 20 }); inOut($('#c-hd'), t, C[0] + 180, C[1]);
+  inOut($('#c1'), t, C[0] + 520, C[1], { dx: -40, dy: 0 }); inOut($('#c2'), t, C[0] + 1000, C[1], { dx: -40, dy: 0 }); inOut($('#c3'), t, C[0] + 1480, C[1], { dx: -40, dy: 0 });
+  // D
+  { const p = back(seg(t, D[0] + 80, D[0] + 640)); set($('#d-ttl'), cl(seg(t, D[0] + 80, D[0] + 300)), `scale(${(0.7 + 0.3 * p).toFixed(3)})`);
+    inOut($('#d-end'), t, D[0] + 480, 1e9, { dy: 26 });
+    const j = back(seg(t, D[0] + 850, D[0] + 1400)), pulse = 1 + Math.sin(Math.max(0, t - D[0] - 1400) / 330) * 0.018;
+    set($('#d-join'), cl(seg(t, D[0] + 850, D[0] + 1050)), `scale(${((0.8 + 0.2 * j) * pulse).toFixed(4)})`);
+    inOut($('#d-how'), t, D[0] + 1350, 1e9, { dy: 20 });
+  }
+  if (t >= D[0]) confetti(t, D[0] + 100, 1e9);
+  return String(t);
+};
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map((i) => i.decode().catch(() => {}))]).then(() => { window.renderAt(0); return true; });
+</script>
+</body>
+</html>

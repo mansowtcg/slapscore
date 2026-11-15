@@ -38,7 +38,7 @@ const rating = (x) => Number(x).toFixed(2);
 
 
 // Qué toca publicar. Devuelve { due: [...], state } con el estado ya puesto al día en lo que se da por visto sin publicar.
-export function plan({ awards, newsDate, state, now, hooks, force }) {
+export function plan({ awards, newsDate, state, now, hooks, force, giveaway }) {
   const st = { ...(state || {}) }, due = [], stamp = madridStamp(now);
   // resumen diario: el de ayer, desde las 12:00 (si un día no sale, al siguiente ya toca el nuevo)
   if (hooks.daily) {
@@ -64,6 +64,8 @@ export function plan({ awards, newsDate, state, now, hooks, force }) {
     else if (st.news == null) st.news = newsDate;   // la primera vez no se publica: solo lo que llegue a partir de ahora
     else if (String(newsDate) > String(st.news)) due.push('news');
   }
+  // el sorteo no sale nunca solo: solo cuando se pide a mano (discord=giveaway) y sigue abierto
+  if (force === 'giveaway' && hooks.news && giveaway) due.push('giveaway');
   return { due, state: st };
 }
 
@@ -136,6 +138,26 @@ export function buildMessage(kind, { awards, headline, roles = {}, hasImage }) {
 }
 export const FILES = { totw: 'team-of-the-week.png', month: 'player-of-the-month.png' };
 
+// Sorteo (config/settings.json -> giveaway): lo que hace falta para anunciarlo, o null si no hay o ya terminó
+export function giveawayOf(settings, now = Date.now()) {
+  const g = settings && settings.giveaway; if (!g || typeof g !== 'object') return null;
+  const until = Date.parse(g.until); if (!(until > now)) return null;
+  return { until, n: Math.max(1, Math.min(99, parseInt(g.winners, 10) || 1)), channel: /^[\w-]{1,32}$/.test(String(g.channel || '')) ? String(g.channel) : 'giveaway',
+    channelId: /^\d{5,25}$/.test(String(g.channelId || '')) ? String(g.channelId) : '', video: /^assets\/promo\/[\w-]{1,40}\.mp4$/.test(String(g.video || '')) ? String(g.video) : '' };
+}
+// El anuncio del sorteo en #announcements (con el vídeo adjunto, si lo hay). La fecha va como marca de tiempo de
+// Discord: cada uno la ve en su hora.
+export function giveawayMessage(g, roles = {}) {
+  const ch = g.channelId ? `<#${g.channelId}>` : `**#${g.channel}**`, ts = Math.floor(g.until / 1000);
+  const ping = roleOk(roles.news) ? { content: `<@&${roles.news}>`, allowed_mentions: { parse: [], roles: [roles.news] } } : { allowed_mentions: { parse: [] } };
+  return { username: 'SlapScore', avatar_url: `${SITE}/assets/icons/icon-512.png`, ...ping, embeds: [{ title: `🎁 Giveaway: ${g.n} priority accesses`, url: SITE, color: 0xF5B700,
+    description: [`We’re giving away **${g.n} priority accesses**: the perk Ko-fi supporters get, with no donation needed.`,
+      '⚡ Your matches are checked on every pass of the tracker, so they show up on SlapScore sooner.\n♥ Supporter badge on your profile.',
+      `**How to enter**\n1. Open your profile on [slapscore.app](${SITE}) and tap **Share image** (or your monthly recap).\n2. Share it: on social media, in another Discord server or right here.\n3. Post the image in ${ch}. If you shared it somewhere else, add the link or a screenshot.`,
+      `One entry per person. **${g.n} winners** drawn at random when it ends: <t:${ts}:F> (<t:${ts}:R>).`].join('\n\n'),
+    footer: { text: 'slapscore.app · Slapshot: Rebound ratings and stats' } }] };
+}
+
 // Envía un mensaje a un webhook; con imagen va como formulario. Devuelve true si Discord lo acepta.
 // file: un archivo { name, data } o varios (la imagen y el vídeo)
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.mp4': 'video/mp4' };
@@ -170,7 +192,7 @@ async function context() {
   for (const [k, v] of [['DISCORD_WEBHOOK_TOTW', hooks.totw], ['DISCORD_WEBHOOK_NEWS', hooks.news], ['DISCORD_WEBHOOK_DAILY', hookOk(process.env.DISCORD_WEBHOOK_DAILY)]]) if (process.env[k] && !v) console.error(`::warning::${k} no parece la dirección de un webhook de Discord: se ignora.`);
   const settings = await readJSON(path.join(ROOT, 'config', 'settings.json'), {});
   const roles = settings.discordRoles && typeof settings.discordRoles === 'object' ? settings.discordRoles : {};
-  const force = ['totw', 'month', 'news', 'daily'].includes(process.env.DISCORD_FORCE) ? process.env.DISCORD_FORCE : '';
+  const force = ['totw', 'month', 'news', 'daily', 'giveaway'].includes(process.env.DISCORD_FORCE) ? process.env.DISCORD_FORCE : '';
   // resumen diario: en su propio canal si hay webhook para él (DISCORD_WEBHOOK_DAILY); si no, en el de los premios.
   // Se apaga con "discordDaily": false en los ajustes.
   hooks.daily = settings.discordDaily === false ? '' : hookOk(process.env.DISCORD_WEBHOOK_DAILY) ? process.env.DISCORD_WEBHOOK_DAILY.trim() : hooks.totw;
@@ -179,7 +201,7 @@ async function context() {
   const [awards, state, news] = [await readJSON(path.join(DATA, 'awards.json'), null), await readJSON(STATE, {}), await newsInfo()];
   // el vídeo vertical se puede apagar en los ajustes: "social": { "video": false }
   const video = !(settings.social && settings.social.video === false);
-  return { hooks, roles, force, now, awards, state, news, video, hidden };
+  return { hooks, roles, force, now, awards, state, news, video, hidden, giveaway: giveawayOf(settings, now) };
 }
 
 // Imágenes: las mismas que hace la web con «Compartir imagen» en Premios, sacadas con un navegador sin ventana.
@@ -218,7 +240,7 @@ async function main() {
   const cmd = process.argv[2];
   const C = await context();
   if (!C.hooks.totw && !C.hooks.news && !C.hooks.daily) { if (cmd !== 'plan') console.log('Discord: sin webhooks configurados.'); return; }
-  const P = plan({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, hooks: C.hooks, force: C.force });
+  const P = plan({ awards: C.awards, newsDate: C.news.date, state: C.state, now: C.now, hooks: C.hooks, force: C.force, giveaway: C.giveaway });
   if (cmd === 'plan') { if (P.due.length) console.log(P.due.join('\n')); return; }
   if (cmd === 'render') {
     // resumen diario: sus tres imágenes
@@ -247,11 +269,15 @@ async function main() {
       msg = dailyMessage(day, D, C.roles, Object.fromEntries(pics.map((x) => [x.k, true])));
       if (msg && pics.length) file = pics.map(({ name, data }) => ({ name, data }));
       if (!msg) { console.log(`Discord: daily sin nada que contar (${day})`); if (C.force !== k) st.daily = day; continue; }
+    } else if (k === 'giveaway') {
+      msg = giveawayMessage(C.giveaway, C.roles);
+      if (C.giveaway.video) { try { const V = await import('./video.js'), data = await fs.readFile(path.join(ROOT, C.giveaway.video)); if (data.length <= V.VIDEO_MAX) video = { name: 'giveaway.mp4', data }; } catch {} }
     } else msg = buildMessage(k, { awards: C.awards, headline: C.news.headline, roles: C.roles, hasImage: !!file });
     if (process.env.DRY_RUN === '1') { console.log(`[prueba] ${k}${Array.isArray(file) ? ` (con ${file.length} imágenes)` : file ? ` (con imagen de ${Math.round(file.data.length / 1024)} KB)` : ''}${video ? ` (con vídeo de ${(video.data.length / 1048576).toFixed(1)} MB)` : ''}:\n${JSON.stringify(msg, null, 2)}`); continue; }
-    let ok = await send(k === 'news' ? C.hooks.news : k === 'daily' ? C.hooks.daily : C.hooks.totw, msg, [...(Array.isArray(file) ? file : [file]), video]);
+    const hook = k === 'news' || k === 'giveaway' ? C.hooks.news : k === 'daily' ? C.hooks.daily : C.hooks.totw;
+    let ok = await send(hook, msg, [...(Array.isArray(file) ? file : [file]), video]);
     // si Discord no acepta el mensaje con el vídeo, se manda sin él
-    if (!ok && video) { video = null; ok = await send(C.hooks.totw, msg, file); }
+    if (!ok && video) { video = null; ok = await send(hook, msg, file); }
     console.log(`Discord: ${k} ${ok ? 'publicado' : 'NO publicado'}${Array.isArray(file) ? ` (con ${file.length} imágenes)` : file ? ' (con imagen)' : ''}${ok && video ? ' (con vídeo)' : ''}`);
     if (!ok) { failed++; continue; }
     if (C.force === k) continue;   // forzado a mano: no cambia lo apuntado

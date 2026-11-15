@@ -1421,6 +1421,16 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .dc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
 .dc-list li svg{flex:none;width:18px;height:18px;margin-top:1px;color:#5865F2}
 .dc-note .btn{align-self:stretch;justify-content:center}
+/* aviso del sorteo */
+.gw-video{display:block;width:100%;aspect-ratio:16/9;border-radius:14px;background:#0F1320;object-fit:cover}
+.gw-sheet .sheet-h .nm span{white-space:normal;line-height:1.2}
+.gw-lead{margin:0;line-height:1.45;font-weight:600}
+.gw-steps{margin:0;padding:12px 14px 12px 34px;display:flex;flex-direction:column;gap:8px;border-radius:12px;background:var(--surface-2);font-size:14px;line-height:1.4}
+.gw-steps li::marker{font-weight:800;color:var(--primary)}
+.gw-foot{margin:0;font-size:13px;line-height:1.4}
+.gw-banner{background:color-mix(in srgb,#F5B700 14%,var(--surface));border-color:color-mix(in srgb,#F5B700 45%,transparent)}
+.gw-banner p b{color:inherit}
+.gw-banner .nb-ic{background:#F5B700;color:#1A1300}
 
 /* ---------- hojas: siempre se pueden desplazar y cerrar ---------- */
 /* La altura va con la de la pantalla visible (dvh) y no con un porcentaje, que en algunos móviles no limitaba la hoja:

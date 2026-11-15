@@ -289,7 +289,7 @@ export async function recapImage(o, X) {
   c.fillStyle = 'rgba(255,255,255,.06)'; rr(c, 60, 386, W - 120, 196, 28); c.fill();
   badge(c, s.avg, 96, 420, 220, 128, X.fmtR);
   c.font = F(800, 44); c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(X.t('Nota media'), 352, 474);
-  fit(c, `${X.t('{n} partidos', { n: X.int(s.k) })} · ${X.t('{n} días', { n: X.int(rec.days) })}`, 352, 522, 380, 600, 30, 'left', COL.muted);
+  fit(c, `${s.k === 1 ? X.t('1 partido') : X.t('{n} partidos', { n: X.int(s.k) })} · ${rec.days === 1 ? X.t('1 día') : X.t('{n} días', { n: X.int(rec.days) })}`, 352, 522, 380, 600, 30, 'left', COL.muted);
   const sign = (d) => `${d > 0 ? '+' : '−'}${X.int(Math.abs(d))}`;
   if (rec.dm) {
     c.textAlign = 'right'; c.fillStyle = rec.dm > 0 ? '#3DDC6E' : '#FF5A50'; c.font = F(800, 84, true); c.fillText(sign(rec.dm), W - 96, 502);
