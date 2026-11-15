@@ -22,6 +22,14 @@
     "tags": "#SlapshotRebound #SlapScore"
   },
   "hiddenPlayers": [],
+  "giveaway": {
+    "id": "2026-11",
+    "until": "2026-11-29T23:59:00+01:00",
+    "winners": 3,
+    "channel": "giveaway",
+    "video": "assets/promo/giveaway.mp4",
+    "poster": "assets/promo/giveaway.jpg"
+  },
   "supporters": [
     "1318285"
   ]
