@@ -54,7 +54,21 @@ export function bool(v) {
   return null;
 }
 const r1 = (x) => Math.round(x * 10) / 10;
-export const weightsFrom = (w) => Object.assign({}, DEFAULT_WEIGHTS, w || {});
+// Ajustes manuales por jugador (config/settings.json -> "adjust": { "<id>": -1 }): puntos que se suman a su nota en
+// cada partido, entre -2 y 2. Van dentro de los pesos (W.adj) para que la web y el robot calculen lo mismo y el robot
+// recalcule las notas cuando cambian, igual que con la fórmula. Se ven: en el desglose de la nota y en el perfil.
+export function adjustFrom(a) {
+  const o = {};
+  if (a && typeof a === 'object') for (const [k, v] of Object.entries(a)) { const n = Math.round(Number(v) * 10) / 10; if (/^\d{1,12}$/.test(k) && Number.isFinite(n) && n && Math.abs(n) <= 2) o[k] = n; }
+  return o;
+}
+export const weightsFrom = (w, adjust) => { const W = Object.assign({}, DEFAULT_WEIGHTS, w || {}); delete W.adj; const adj = adjustFrom(adjust); if (Object.keys(adj).length) W.adj = adj; return W; };
+// La nota de rate() con el ajuste manual de ese jugador, si lo tiene (queda como una línea más del desglose)
+function withAdj(r, pid, W) {
+  const a = pid && W.adj ? W.adj[pid] : 0; if (!a) return r;
+  const rating = Math.max(3, Math.min(10, r1(r.rating + a)));
+  return { rating, raw: r.raw + a, parts: rating === r.rating ? r.parts : [...r.parts, { label: 'Ajuste manual', n: '', c: rating - r.rating }] };
+}
 
 export function fmtPoss(s) {
   s = Math.round(s || 0);
@@ -129,7 +143,7 @@ export function normalize(raw, W) {
   for (const p of players) {
     p.res = !winner ? 'D' : (p.team === winner ? 'W' : 'L');
     p.ga = p.st.conceded_goals != null ? p.st.conceded_goals : (p.team === 'home' ? score.away : score.home);
-    const r = rate(p.st, p.res, p.ga, size[p.team], W);
+    const r = withAdj(rate(p.st, p.res, p.ga, size[p.team], W), p.pid, W);
     p.rating = r.rating; p.rawRating = r.raw; p.parts = r.parts;
   }
   const order = players.map((p, i) => i).sort((a, b) => players[b].rating - players[a].rating || players[b].rawRating - players[a].rawRating || (players[b].st.goals - players[a].st.goals));
@@ -298,7 +312,7 @@ export function mergePeriods(raws, W) {
       x.res = !winner ? 'D' : x.team === winner ? 'W' : 'L';
       x.ga = x.st.conceded_goals != null ? x.st.conceded_goals : (x.team === 'home' ? score.away : score.home);
       const st = x.k > 1 ? Object.fromEntries(Object.entries(x.st).map(([k, v]) => [k, v / x.k])) : x.st;
-      const r = rate(st, x.res, x.ga / x.k, size[x.team], W);
+      const r = withAdj(rate(st, x.res, x.ga / x.k, size[x.team], W), m.players[i].pid, W);
       x.rating = r.rating; x.rawRating = r.raw; x.parts = r.parts;
       sums[i].r += r.rating * x.k; sums[i].raw += r.raw * x.k; sums[i].n += x.k;
     });

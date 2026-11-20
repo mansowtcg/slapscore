@@ -856,4 +856,6 @@ export default {
   "Cómo participar": "So machst du mit",
   "1 partido": "1 Spiel",
   "1 día": "1 Tag",
+  "{n} de ajuste manual por partido": "{n} manuelle Anpassung pro Spiel",
+  "Ajuste manual": "Manuelle Anpassung",
 };

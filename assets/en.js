@@ -483,4 +483,6 @@ export default {
   "Cómo participar": "How to enter",
   "1 partido": "1 match",
   "1 día": "1 day",
+  "{n} de ajuste manual por partido": "{n} manual adjustment per match",
+  "Ajuste manual": "Manual adjustment",
 };

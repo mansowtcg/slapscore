@@ -20,7 +20,7 @@ const S = {
 };
 function applySettings(s) {
   S.settings = { seeds: [], hidden: [], weights: {}, ...(s || {}) };
-  S.W = C.weightsFrom(S.settings.weights);
+  S.W = C.weightsFrom(S.settings.weights, S.settings.adjust);
   // los ocultos se guardan como "día/hora|id" (o solo el id en ajustes antiguos)
   S.hidden = new Set((S.settings.hidden || []).map((h) => String(h).split('|').pop()));
   S.sup = new Set([...(Array.isArray(S.settings.supporters) ? S.settings.supporters : []), ...((S.index && Array.isArray(S.index.sup)) ? S.index.sup : [])].map(String));
@@ -1593,6 +1593,11 @@ function statsTable(m) {
   return `<table class="tbl"><thead><tr><th>${esc(t('Jugador'))}</th><th>${esc(t('Nota'))}</th>${keys.map((k) => `<th title="${esc(statName(k))}">${esc(statAbbr(k))}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>
     <p class="muted" style="font-size:12px;padding:10px 16px 0">${keys.map((k) => `<b>${esc(statAbbr(k))}</b> ${esc(statName(k))}`).join(' · ')}</p>`;
 }
+// Jugador con ajuste manual en la nota (ajustes -> adjust): «−1 de ajuste manual por partido», o '' si no tiene
+function adjLabel(pid) {
+  const a = S.W.adj && S.W.adj[String(pid)]; if (!a) return '';
+  return t('{n} de ajuste manual por partido', { n: (a < 0 ? '−' : '+') + (Number.isInteger(a) ? Math.abs(a) : dec(Math.abs(a))) });
+}
 function openPerf(m, p) {
   const keys = C.STAT_ORDER.filter((k) => p.st[k]);
   const maxAbs = Math.max(0.3, ...p.parts.map((x) => Math.abs(x.c)));
@@ -1603,7 +1608,7 @@ function openPerf(m, p) {
   const perBlock = m.per && m.isPeriod == null && p.perR ? `<div class="bd"><h3>${esc(t('Nota por periodo'))}</h3>
       ${m.per.map((x, j) => `<div class="bd-row"><span>${esc(perLabel(x))}</span><span></span>${p.perR[j] == null ? `<span class="muted">${esc(t('No jugó'))}</span>` : badge(p.perR[j])}</div>`).join('')}
       <div class="bd-row tot"><span>${esc(t('Nota del partido (media)'))}</span><span></span><b>${fmtR(p.rating)}</b></div>
-      <p class="muted" style="margin:10px 0 0;font-size:12.5px">${esc(t('La nota del partido es la media de las notas de cada periodo que jugó. Elige un periodo arriba para ver cómo sale cada una.'))}</p></div>` : '';
+      <p class="muted" style="margin:10px 0 0;font-size:12.5px">${esc(t('La nota del partido es la media de las notas de cada periodo que jugó. Elige un periodo arriba para ver cómo sale cada una.'))}</p>${adjLabel(p.pid) ? `<p class="muted" style="margin:6px 0 0;font-size:12.5px">${esc(adjLabel(p.pid))}</p>` : ''}</div>` : '';
   openSheet(`<div class="sheet-h">${avatar(p.name, p.pid, 'md')}<div style="min-width:0"><div class="nm" id="sheet-title"><span>${esc(p.name)}</span>${rank(p.rk, 22, { approx: p.rkApprox })}</div>
       <small>${crest(p.team, 16)}${esc(teamName(p.team))}${px ? ` · ${esc(perLabel(px))}` : ''} · <span class="res ${p.res}">${resLetter(p.res)}</span> ${esc(res)} ${m.score.home}-${m.score.away}${m.players[m.mvp] === p ? ' · <span class="mvp-tag">MVP</span>' : ''}</small></div>${badge(p.rating, 'xl')}</div>
     <div class="sgrid">${(keys.length ? keys : ['goals']).map((k) => `<div><b>${k === 'possession_time_sec' ? C.fmtPoss(p.st[k]) : int(p.st[k])}</b><span>${esc(statName(k))}</span></div>`).join('')}</div>
@@ -1903,7 +1908,7 @@ async function viewPlayer(pid, tok) {
       <div class="ph">${avatar(P.n, P.id, 'lg')}<div style="min-width:0"><h1>${esc(P.n)} ${rank(meta.rk, 30)}${S.sup && S.sup.has(String(P.id)) ? `<span class="pill sup-pill" title="${esc(t('Apoya SlapScore'))}">♥ Supporter</span>` : ''}${((aw) => aw ? `${aw.months.length ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Jugador del mes'))} · ${esc(awMonth(aw.months[0]))}</a>` : ''}${aw.weeks ? `<a class="pill aw-pill" href="#premios">${ICON.trophy}${esc(t('Equipo de la semana'))}${aw.weeks > 1 ? ' ×' + aw.weeks : ''}</a>` : ''}` : '')(awardsOf(String(P.id)))}${favBtn(P.id, P.n)}${pushOk() || isIOS() ? `<button type="button" class="fav-btn bell-btn" data-pbell="${esc(P.id)}" data-n="${esc(P.n)}" aria-pressed="${pushOn && isFav(P.id)}" aria-label="${esc(t('Avisarme de sus partidos'))}" title="${esc(t('Avisarme de sus partidos'))}">${ICON.bell}</button>` : ''}</h1>
         <div class="meta"><span>ID ${esc(P.id)}</span>${allGames[0] ? `<span>${esc(t('Último partido {x}', { x: ago(allGames[0].t) }))}</span>` : ''}<a href="https://slapshot.gg/players/${encodeURIComponent(P.id)}" target="_blank" rel="noopener">slapshot.gg ${ICON.ext}</a></div>
         <div class="ph-tags">${streakPill(cs)}${feat ? `<span class="pill">${ICON.bolt}${esc(t('Destacado'))}</span>` : ''}${bs >= 3 ? `<span class="pill">${esc(t('Mejor racha: {n} victorias', { n: bs }))}</span>` : ''}${onlyCus ? `<span class="pill cu-pill">${esc(t('Solo juega custom'))}</span>` : ''}</div></div>
-        <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small></span></div></div>
+        <div class="avg">${badge(avgR, 'xl')}<span class="avg-l">${esc(t('Nota media'))}<small class="avg-m${cus ? ' cu' : ''}">${esc(t(cus ? 'en custom' : 'en públicas'))}</small>${adjLabel(P.id) ? `<small class="avg-adj">${esc(adjLabel(P.id))}</small>` : ''}</span></div></div>
       <div class="ph-acts"><button class="btn sm me-tg" type="button" id="p-me" aria-pressed="${isMe(P.id)}" title="${esc(isMe(P.id) ? t('Pulsa si ya no es tu perfil') : t('Marca este perfil como el tuyo'))}">${ICON.user}${esc(isMe(P.id) ? t('Tu perfil') : t('Soy yo'))}</button><a class="btn sm" href="#cmp-${esc(P.id)}">${ICON.vs}${esc(t('Comparar'))}</a><button class="btn sm" type="button" id="p-shimg">${ICON.share}${esc(t('Compartir imagen'))}</button><button class="btn sm" type="button" data-share>${esc(t('Copiar enlace'))}</button>${floatOk() ? `<button class="btn sm" type="button" id="p-float">${ICON.float}${esc(t('Ventana flotante'))}</button>` : ''}<button class="btn sm" type="button" id="p-obs">${ICON.obs}${esc(t('Overlay para OBS'))}</button>${isAdmin() ? `<button class="btn sm" type="button" id="p-follow">${seed ? 'Dejar de seguir (admin)' : 'Seguir (admin)'}</button>` : ''}</div>
       ${supportUrl() && !(S.sup && S.sup.has(String(P.id))) ? `<button type="button" class="ph-prio" data-kofi-how><span class="sp-ic">${ICON.bolt}</span><span class="t"><b>${esc(t('¿Es tu perfil?'))}</b> ${esc(t('Apoya SlapScore en Ko-fi con lo que quieras y tus partidos se cargarán antes.'))}</span>${ICON.right}</button>` : ''}
       <div class="ranks">${curRank}${peakRank}</div>

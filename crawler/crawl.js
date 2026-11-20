@@ -46,7 +46,7 @@ const started = Date.now();
 
 // ---------- ajustes ----------
 const settings = await readJSON(SETTINGS, {});
-const W = C.weightsFrom(settings.weights);
+const W = C.weightsFrom(settings.weights, settings.adjust);
 const wHash = hash(JSON.stringify(W));
 const RETAIN = Math.max(35, Math.min(400, Number(settings.retainDays) || 60));
 // seguidos: los de la lista y los supporters (apoyan el proyecto): sus partidos se buscan en cada pasada mientras juegan.

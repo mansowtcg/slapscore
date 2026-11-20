@@ -855,4 +855,6 @@ export default {
   "Cómo participar": "Jak wziąć udział",
   "1 partido": "1 mecz",
   "1 día": "1 dzień",
+  "{n} de ajuste manual por partido": "{n} ręcznej korekty na mecz",
+  "Ajuste manual": "Korekta ręczna",
 };

@@ -856,4 +856,6 @@ export default {
   "Cómo participar": "Nasıl katılırım",
   "1 partido": "1 maç",
   "1 día": "1 gün",
+  "{n} de ajuste manual por partido": "Maç başına {n} manuel ayar",
+  "Ajuste manual": "Manuel ayar",
 };

@@ -856,4 +856,6 @@ export default {
   "Cómo participar": "Comment participer",
   "1 partido": "1 match",
   "1 día": "1 jour",
+  "{n} de ajuste manual por partido": "{n} d’ajustement manuel par match",
+  "Ajuste manual": "Ajustement manuel",
 };
