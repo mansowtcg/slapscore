@@ -69,3 +69,14 @@ export function langOfPath(path) {
   for (const v of [...Object.values(PAGES), ...Object.values(PARAM)]) for (const [l, w] of Object.entries(v)) if (w === s) langs.add(l);
   return langs.size === 1 ? [...langs][0] : null;
 }
+
+// ID de jugador escrito o pegado: el número, un enlace de SlapScore (en cualquier idioma: /player/123, /jugador/123,
+// /gracz/123, /j/123, o el antiguo #j-123) o un enlace de slapshot.gg. '' si no es nada de eso.
+export function pidOfLink(v) {
+  const s = String(v || '').trim();
+  let m = /^(\d{1,12})$/.exec(s) || /#j-(\d{1,12})\b/.exec(s) || /players\/(\d{1,12})/i.exec(s);
+  if (m) return m[1];
+  m = /slapscore\.app(\/[^\s?#]+)/i.exec(s) || /^(\/[^\s?#]+)/.exec(s);
+  const k = m && keyFor(m[1]), j = k && /^j-(\d{1,12})$/.exec(k);
+  return j ? j[1] : '';
+}

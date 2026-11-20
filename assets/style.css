@@ -1421,6 +1421,10 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .dc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
 .dc-list li svg{flex:none;width:18px;height:18px;margin-top:1px;color:#5865F2}
 .dc-note .btn{align-self:stretch;justify-content:center}
+/* Ko-fi: ¿llegan los avisos? */
+.kofi-last{margin:10px 0 0;font-size:13px;line-height:1.45}
+.kofi-last.warn,.kofi-last.err{padding:10px 12px;border-radius:10px;background:color-mix(in srgb,#F5B700 14%,var(--surface));color:var(--text)}
+.kofi-last.err{background:color-mix(in srgb,var(--loss,#E5484D) 12%,var(--surface))}
 /* aviso del sorteo */
 .gw-video{display:block;width:100%;aspect-ratio:16/9;border-radius:14px;background:#0F1320;object-fit:cover}
 .gw-sheet .sheet-h .nm span{white-space:normal;line-height:1.2}

@@ -1,6 +1,8 @@
 // Panel de administración de SlapScore.
 // Usa un token de GitHub (solo en este navegador) para lanzar el robot y cambiar config/settings.json.
 // El buzón de sugerencias vive en el Worker de Cloudflare: el mismo token sirve para leerlo (el Worker lo comprueba con GitHub).
+import { pidOfLink } from './routes.js';
+
 const API = 'https://api.github.com';
 const WF = 'crawl.yml';
 const RUN_KEY = 'slapscore-run';
@@ -240,6 +242,13 @@ async function loadSocial() {
 
 // ---------- Ko-fi ----------
 const KOFI_HOOK = 'https://slapscore.app/api/kofi';
+// ¿Están llegando los avisos de Ko-fi? Lo último que recibió el Worker (cloudflare/kofi.js): bien, o rechazado por la clave
+function kofiLast(last, esc, ago) {
+  const l = last || {}, test = `En Ko-fi, abre <a href="https://ko-fi.com/manage/webhooks" target="_blank" rel="noopener">Ajustes → API (webhooks)</a>, comprueba que la «Webhook URL» es <code class="kofi-url">${KOFI_HOOK}</code> y pulsa «Send Single Donation Test»: el apoyo de prueba tiene que salir aquí en unos segundos (luego lo borras con la ✕).`;
+  if (l.badAt && l.badAt > (l.okAt || 0)) return `<p class="kofi-last err"><b>Ko-fi mandó un aviso ${esc(ago(l.badAt))} y se rechazó: la clave de verificación no coincide.</b> Copia otra vez el «Verification Token» de Ko-fi (en esa misma página, en «Advanced») y guárdalo con «Cambiar la clave de Ko-fi».${l.okAt ? ` El último aviso bueno llegó ${esc(ago(l.okAt))}.` : ''}</p>`;
+  if (l.okAt) return `<p class="kofi-last muted">Último aviso de Ko-fi recibido ${esc(ago(l.okAt))}.</p>`;
+  return `<p class="kofi-last warn"><b>Todavía no ha llegado ningún aviso de Ko-fi.</b> Si ya has recibido apoyos, Ko-fi no los está mandando a la web. ${test}</p>`;
+}
 async function loadKofi() {
   const el = $('#kofi'); if (!el) return;
   const { esc, ago, int } = X;
@@ -247,8 +256,8 @@ async function loadKofi() {
   try { k = await workerApi('/api/kofi'); } catch (e) { el.innerHTML = `<div class="card-b err">${esc(e.message)}</div>`; return; }
   let P = {}; try { P = await X.loadPlayers(); } catch {}
   const pname = (id) => (P[id] ? P[id].n : 'Jugador ' + id);
-  const pidIn = (v) => { const m = /#j-(\d{1,12})\b/.exec(v) || /\/j\/(\d{1,12})\b/.exec(v) || /players\/(\d{1,12})/.exec(v) || /^(\d{1,12})$/.exec(v.trim()); return m ? m[1] : ''; };
-  const setup = `<div class="card-b kofi-setup"><p class="muted" style="margin-top:0">${k.configured ? '<b class="ok-t">Conectado.</b> Cada apoyo aparece aquí. Si el mensaje lleva el ID o el enlace del perfil de slapshot.gg, la insignia ♥ se pone sola; si no, asígnala tú.' : 'Para que la insignia ♥ se ponga sola cuando alguien apoya:'}</p>
+  const pidIn = pidOfLink;
+  const setup = `<div class="card-b kofi-setup"><p class="muted" style="margin-top:0">${k.configured ? '<b class="ok-t">Conectado.</b> Cada apoyo aparece aquí. Si el mensaje lleva el ID o el enlace del perfil de slapshot.gg, la insignia ♥ se pone sola; si no, asígnala tú.' : 'Para que la insignia ♥ se ponga sola cuando alguien apoya:'}</p>${k.configured ? kofiLast(k.last, esc, ago) : ''}
     ${k.configured ? '' : `<ol class="steps"><li>En Ko-fi, abre <a href="https://ko-fi.com/manage/webhooks" target="_blank" rel="noopener">Ajustes → API (webhooks)</a>.</li><li>En «Webhook URL» pega esta dirección y pulsa «Update»: <code class="kofi-url">${esc(KOFI_HOOK)}</code> <button class="btn sm" type="button" data-copy="${esc(KOFI_HOOK)}">Copiar</button></li><li>Abre «Advanced», copia el «Verification Token» y pégalo aquí abajo.</li><li>Prueba con «Send Single Donation Test»: el apoyo de prueba aparece en esta lista.</li></ol>`}
     <form id="kofi-tk" class="al-form"${k.configured ? ' hidden' : ''}><input class="input" id="kofi-tk-in" type="password" autocomplete="off" aria-label="Verification Token de Ko-fi" placeholder="Verification Token de Ko-fi"><button class="btn primary" type="submit">Guardar</button></form>
     ${k.configured ? '<button class="btn sm" type="button" id="kofi-tk-show">Cambiar la clave de Ko-fi</button>' : ''}</div>`;
@@ -262,7 +271,7 @@ async function loadKofi() {
   const sups = (k.supporters || []);
   const supl = sups.length ? `<div class="card-b" style="border-top:1px solid var(--line);padding-top:12px"><b style="font-size:13px">Supporters por Ko-fi (${int(sups.length)})</b>${sups.map((id) => `<div class="seedrow">${X.avatar(pname(id), id, 'sm')}<span class="nm">${esc(pname(id))} <span class="sup">♥</span><small>ID ${esc(id)}</small></span><button class="btn sm" type="button" data-kofi-rm="${esc(id)}">Quitar</button></div>`).join('')}</div>` : '';
   el.innerHTML = setup + list + supl;
-  const post = async (path, body, okMsg) => { try { await workerApi(path, { method: 'POST', body: JSON.stringify(body) }); X.toast(okMsg); loadKofi(); } catch (e) { X.toast(e.message); } };
+  const post = async (path, body, okMsg) => { try { const r = await workerApi(path, { method: 'POST', body: JSON.stringify(body) }); X.toast(r && r.known === false ? 'Insignia ♥ dada. Aún no tiene partidos en SlapScore: el robot los buscará en la próxima pasada.' : okMsg); loadKofi(); } catch (e) { X.toast(e.message); } };
   const tk = $('#kofi-tk', el);
   tk.addEventListener('submit', (e) => { e.preventDefault(); const v = $('#kofi-tk-in', el).value.trim(); if (v) post('/api/kofi/token', { token: v }, 'Clave de Ko-fi guardada'); });
   const show = $('#kofi-tk-show', el); if (show) show.addEventListener('click', () => { tk.hidden = false; show.hidden = true; $('#kofi-tk-in', el).focus(); });
@@ -485,9 +494,8 @@ async function drawSeeds(set) {
   }));
   $('#seed-add').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = $('#seed-in').value.trim(); const m = /players\/(\d+)/.exec(v) || /^(\d{4,10})$/.exec(v);
-    if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
-    const id = m[1];
+    const id = pidOfLink($('#seed-in').value);
+    if (!id) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
     if (seeds.includes(id)) { X.toast('Ese jugador ya está en la lista'); return; }
     const sb = $('#seed-add button'); if (sb.disabled) return; sb.disabled = true;
     try { const s = await writeSettings((x) => { x.seeds = [...new Set([...(x.seeds || []).map(String), id])]; return x; }, `Seguir jugador ${id}`); X.toast('Añadido: se revisará en la próxima pasada'); drawSeeds(s); }
@@ -513,10 +521,8 @@ async function drawSups(set) {
   }));
   $('#sup-add').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = $('#sup-in').value.trim();
-    const m = /#j-(\d{1,15})\b/.exec(v) || /players\/(\d{1,15})/.exec(v) || /^(\d{1,15})$/.exec(v);
-    if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
-    const id = m[1];
+    const id = pidOfLink($('#sup-in').value);
+    if (!id) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
     if (list.includes(id)) { X.toast('Ya es supporter'); return; }
     if ((set.hiddenPlayers || []).map(String).includes(id)) { X.toast('Ese jugador está oculto por privacidad'); return; }
     const sb = $('#sup-add button'); if (sb.disabled) return; sb.disabled = true;
@@ -543,10 +549,8 @@ function drawHidPlayers(set) {
   }));
   $('#hp-add').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const v = $('#hp-in').value.trim();
-    const m = /#j-(\d{1,15})\b/.exec(v) || /players\/(\d{1,15})/.exec(v) || /^(\d{1,15})$/.exec(v);
-    if (!m) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
-    const id = m[1];
+    const id = pidOfLink($('#hp-in').value);
+    if (!id) { X.toast('Escribe el número de jugador o pega el enlace de su perfil.'); return; }
     if (list.includes(id)) { X.toast('Ese jugador ya está oculto'); return; }
     const sb = $('#hp-add button'); if (sb.disabled) return;
     if (sb.dataset.sure !== '1') { sb.dataset.sure = '1'; sb.textContent = '¿Seguro? Ocultar'; return; }
