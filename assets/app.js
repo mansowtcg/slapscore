@@ -797,7 +797,7 @@ async function viewMatches(dayArg, tok) {
     <h1 class="sr-only">${esc(t('Partidos'))} · ${esc(dayLong(day))}</h1>
     <aside class="col col-left" id="m-left" aria-label="${esc(t('Filtros'))}">${skeletonList(4)}</aside>
     <section class="col" aria-label="${esc(t('Partidos'))}">
-      ${giveawayBanner() || newsBanner()}<div class="card">
+      ${giveawayBanner() || newsBanner()}<div id="daily-strip"></div><div class="card">
         ${dayBar(day)}
         <div class="filters" id="m-filters"></div>
         <div class="upd" id="m-upd" hidden></div>
@@ -1013,6 +1013,76 @@ function supportCard(cls = '') {
     <div class="sup-perk"><span class="sp-ic">${ICON.bolt}</span><p><b>${esc(t('Prioridad para quien apoye'))}</b> ${esc(t('Con cualquier donación, aunque sea simbólica, y tu ID de jugador en el mensaje, tus partidos se cargan antes y llevas la insignia ♥ Supporter.'))}</p></div>
     <div class="sup-acts"><a class="btn kofi" href="${esc(url)}" target="_blank" rel="noopener">${ICON.coffee}${esc(t('Invítame a un café'))}</a><button type="button" class="tbtn" data-kofi-how>${esc(t('¿Cómo funciona?'))}</button></div></div></div>`;
 }
+// ---------- supporters en la portada ----------
+// Quienes apoyan el proyecto (ajustes -> supporters y los de Ko-fi), a la vista y con las gracias. Sin cantidades: en el
+// orden en que llegaron. Los nombres salen del buscador (se rellena cuando carga).
+function supportersCard() {
+  const ids = [...(S.sup || [])].filter((id) => /^\d{1,12}$/.test(id)); if (!ids.length) return '';
+  return `<div class="card in sup-wall"><div class="card-h"><h3><span class="sup" aria-hidden="true">♥</span> ${esc(t('Supporters'))}</h3><small>${esc(t('Gracias por hacerlo posible'))}</small></div>
+    <div class="sup-list" id="sup-list">${ids.slice(0, 4).map(() => '<span class="sup-chip sk" style="width:120px;height:36px"></span>').join('')}</div>
+    <p class="sup-thx">${esc(t('SlapScore sigue en marcha gracias a quienes lo apoyan.'))}${supportUrl() ? ` <button type="button" class="tbtn" data-kofi-how>${esc(t('Quiero salir aquí'))}</button>` : ''}</p></div>`;
+}
+async function fillSupporters(tok) {
+  if (!$('#sup-list')) return;
+  let rows = []; try { rows = await loadSearch(); } catch {}
+  const el = $('#sup-list'); if (!el || !live(tok)) return;
+  const by = new Map(rows.map((r) => [String(r[0]), r])), ids = [...(S.sup || [])].filter((id) => by.has(id));   // sin ficha (o oculto), no sale
+  if (!ids.length) { const c = el.closest('.sup-wall'); if (c) c.remove(); return; }
+  const MAX = 18;
+  el.innerHTML = ids.slice(0, MAX).map((id) => { const r = by.get(id); return `<a class="sup-chip" href="#j-${esc(id)}">${avatar(r[1], id, 'sm')}<span class="t">${esc(r[1])}</span>${rank(r[2], 18)}</a>`; }).join('')
+    + (ids.length > MAX ? `<span class="sup-chip more">+${int(ids.length - MAX)}</span>` : '');
+}
+
+// ---------- resumen diario ----------
+// Cada día a las 12:00 (Madrid) sale en Discord el jugador del día, el partido del día y el ranking de palos de ayer;
+// el robot deja lo esencial en data/daily.json. La portada lo enseña y avisa una vez por resumen (una tira arriba),
+// siempre invitando a ver el top completo en el servidor.
+const DAILY_KEY = 'slapscore-daily';
+let dailyStripDay = '';   // resumen cuya tira se está enseñando en esta visita
+function loadDaily() {
+  if (!discordUrl() || S.settings.discordDaily === false) return Promise.resolve(null);
+  return remember('daily:' + S.ver, () => getJSON('data/daily.json')).then((d) => {
+    if (!d || !/^\d{4}-\d\d-\d\d$/.test(String(d.day))) return null;
+    if ((Date.now() - dayDate(d.day).getTime()) > 3 * 86400000) return null;   // si dejó de publicarse, no se anuncia uno viejo
+    const hp = new Set((S.settings.hiddenPlayers || []).map(String)), okP = (x) => x && /^\d{1,12}$/.test(String(x.id)) && !hp.has(String(x.id));
+    const potd = (d.potd || []).filter(okP), posts = (d.posts || []).filter(okP);
+    const motd = d.motd && /^\d{4}-\d\d-\d\d\/\d\d$/.test(String(d.motd.key)) && !S.hidden.has(d.motd.id) && Array.isArray(d.motd.score) ? d.motd : null;
+    return potd.length || motd || posts.length ? { day: d.day, potd, posts, motd } : null;
+  }).catch(() => null);
+}
+function dailyRows(d) {
+  const lbl = (s) => `<div class="dy-l">${esc(t(s))}</div>`;
+  let h = '';
+  const p = d.potd[0];
+  if (p) h += lbl('Jugador del día') + `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${ICON.star}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}${supMark(p.id)}</span>${rank(p.rk, 20)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span><span>${badge(p.rt)}</span></a>`;
+  const m = d.motd;
+  if (m) h += lbl('Partido del día') + `<a class="mini" href="${matchHref(m.key, m.id)}"><div class="side">${crest(0, 34)}${esc(HOME())}</div><div class="sc">${int(m.score[0])}<i>-</i>${int(m.score[1])}</div><div class="side">${crest(1, 34)}${esc(AWAY())}</div></a>`;
+  const x = d.posts[0];
+  if (x) h += lbl('Más palos por partido') + `<a class="lrow" href="#j-${esc(x.id)}"><span class="i">${ICON.target || ICON.flame}</span>${avatar(x.n, x.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(x.n)}${supMark(x.id)}</span>${rank(x.rk, 20)}</span><span class="sub">${esc(pl(x.ph, 'palo', 'palos'))} · ${esc(pl(x.gp, 'partido', 'partidos'))}</span></span><span class="dy-v">${dec(x.per, 2)}</span></a>`;
+  return h;
+}
+const dailyCta = (d) => `<div class="dy-cta"><p class="muted">${esc(t('El top completo de cada día, con sus imágenes, sale en nuestro Discord.'))}</p><a class="btn discord" href="${esc(discordUrl())}" target="_blank" rel="noopener" data-dc data-close>${esc(t('Ver el top completo en Discord'))}${ICON.right}</a></div>`;
+const dailyCard = (d) => `<div class="card in daily"><div class="card-h"><h3>${esc(t('Resumen del día'))}</h3><small>${esc(DF_LONGDAY.format(dayDate(d.day)))}</small></div>${dailyRows(d)}${dailyCta(d)}</div>`;
+function dailySheet(d) {
+  openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span>${esc(t('Resumen del día'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="sheet-b daily" style="padding:0 0 4px"><p class="muted" style="margin:0;padding:0 16px 4px;font-size:13px">${esc(DF_LONGDAY.format(dayDate(d.day)))}</p>${dailyRows(d)}${dailyCta(d)}</div>`, 'dc-sheet');
+}
+// La tira de aviso: una vez por resumen y navegador (sigue a la vista mientras dure esta visita)
+function dailyStrip(d) {
+  let seen = ''; try { seen = localStorage.getItem(DAILY_KEY) || ''; } catch { return ''; }
+  if (dailyStripDay !== d.day) { if (seen >= d.day) return ''; dailyStripDay = d.day; try { localStorage.setItem(DAILY_KEY, d.day); } catch {} }
+  const p = d.potd[0];
+  return `<div class="news-banner daily-strip in" id="daily-strip-b" role="status"><span class="nb-ic">${ICON.star}</span><p><b>${esc(t('Nuevo resumen del día'))}</b> ${esc(p ? t('Jugador del día: {n}', { n: p.n }) : t('Partido del día y ranking de palos'))}</p><button type="button" class="btn sm" data-daily-open>${esc(t('Ver'))}</button><button type="button" class="nb-x" data-daily-x aria-label="${esc(t('Cerrar'))}" title="${esc(t('Cerrar'))}">✕</button></div>`;
+}
+async function fillDaily(tok) {
+  const d = await loadDaily(); if (!live(tok)) return;
+  const slot = $('#daily-slot'); if (slot) slot.innerHTML = d ? dailyCard(d) : '';
+  const st = $('#daily-strip'); if (st) st.innerHTML = d ? dailyStrip(d) : '';
+}
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-daily-open]')) { e.preventDefault(); const d = await loadDaily(); if (d) dailySheet(d); }
+  else if (e.target.closest('[data-daily-x]')) { e.preventDefault(); dailyStripDay = 'x'; $$('#daily-strip-b').forEach((x) => x.remove()); }
+});
 // Invitación al servidor de Discord de la comunidad (portada)
 function discordCard(cls = '') {
   const url = discordUrl(); if (!url) return '';
@@ -1316,6 +1386,8 @@ function drawRight(st, top) {
     `<a class="lrow" href="${matchHref(p.k, p.i)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span style="display:flex;align-items:center;gap:6px;max-width:100%"><span style="overflow:hidden;text-overflow:ellipsis">${esc(p.n)}</span>${rank(p.rk, 20, { approx: p.ap })}</span><span class="sub">${p.g} ${t('G')} · ${p.as} ${t('A')} · ${p.s[0]}-${p.s[1]}</span></span>${badge(p.rt)}</a>`).join('')}</div></div>`;
   html += `<div id="tw-slot">${teamWeekCard(top)}</div>`;
   html += hotCard(top);
+  html += `<div id="daily-slot"></div>`;
+  html += supportersCard();
   html += supportCard();
   html += discordCard();
   html += feedbackCard();
@@ -1325,6 +1397,7 @@ function drawRight(st, top) {
     `<a class="lrow" href="#j-${esc(p.id)}"><span class="i">${i + 1}</span>${avatar(p.n, p.id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><span class="nr"><span class="t">${esc(p.n)}${supMark(p.id)}</span>${rank(p.rk, 20)}</span><span class="sub">${esc(pl(p.gp, 'partido', 'partidos'))}</span></span>${badge(p.avg)}</a>`).join('')}</div></div>`;
   html += `<div class="card in links"><a href="#records">${ICON.trophy}<span><b>${esc(t('Récords'))}</b><small>${esc(t('Las mejores marcas y rachas'))}</small></span>${ICON.right}</a><a href="#eusl">${ICON.league}<span><b>EUSL</b><small>${esc(t('Clasificación y resultados de la liga'))}</small></span>${ICON.right}</a></div>`;
   el.innerHTML = html;
+  fillSupporters(st.tok); fillDaily(st.tok);
 }
 
 // =====================================================================

@@ -236,6 +236,25 @@ export async function render(kinds, { dir = IMG, names = FILES, jpeg = false } =
   });
 }
 
+// Para la web: lo esencial del último resumen diario publicado en Discord (data/daily.json). La portada lo anuncia
+// («ya hay jugador y partido del día») e invita a verlo entero en el servidor. Solo se reescribe si cambia de día.
+export function dailyWeb(day, D) {
+  if (!D || (!D.potd.length && !D.motd && !D.posts.length)) return null;
+  const pl = (x) => ({ id: x.id, n: x.n, rk: x.rk || '', gp: x.gp });
+  return { day, games: D.games, players: D.players, min: D.min,
+    potd: D.potd.slice(0, 3).map((x) => ({ ...pl(x), rt: x.rt })),
+    posts: D.posts.slice(0, 3).map((x) => ({ ...pl(x), ph: x.ph, per: x.per })),
+    motd: D.motd ? { id: D.motd.id, key: D.motd.key, ot: D.motd.ot, score: D.motd.score, mvp: D.motd.mvp ? { id: D.motd.mvp.id, n: D.motd.mvp.n, rt: D.motd.mvp.rt } : null } : null };
+}
+export async function syncDailyWeb(day, hidden) {
+  const file = path.join(DATA, 'daily.json');
+  // ya está el de ese día (salvo que salga en él alguien que ha pedido no aparecer: entonces se rehace)
+  try { const j = JSON.parse(await fs.readFile(file, 'utf8')); if (j.day === day && ![...(j.potd || []), ...(j.posts || []), j.motd && j.motd.mvp].some((x) => x && hidden.has(String(x.id)))) return; } catch {}
+  let out = null; try { out = dailyWeb(day, computeDaily(await loadDay(DATA, day), { hidden })); } catch {}
+  if (!out) return;
+  await fs.writeFile(file, JSON.stringify(out)); console.log(`Resumen diario para la web: ${day}`);
+}
+
 async function main() {
   const cmd = process.argv[2];
   const C = await context();
@@ -284,6 +303,8 @@ async function main() {
     if (k === 'daily') st.daily = dailyDay(C.now); else if (k === 'totw') st.totw = C.awards.week.last.f; else if (k === 'month') st.month = C.awards.month.last.m; else st.news = C.news.date;
   }
   if (process.env.DRY_RUN !== '1' && JSON.stringify(st) !== JSON.stringify(C.state || {})) { await fs.mkdir(path.dirname(STATE), { recursive: true }); await fs.writeFile(STATE, JSON.stringify(st)); }
+  // la web anuncia el resumen que ya está en Discord
+  if (process.env.DRY_RUN !== '1' && C.hooks.daily && /^\d{4}-\d\d-\d\d$/.test(String(st.daily || ''))) { try { await syncDailyWeb(st.daily, C.hidden); } catch (e) { console.log(`::warning::No se pudo guardar el resumen diario para la web: ${e.message}`); } }
   if (failed) process.exitCode = 1;
 }
 

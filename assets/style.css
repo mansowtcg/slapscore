@@ -1421,6 +1421,26 @@ b.up,.up>b{color:var(--win)}b.down{color:var(--loss)}
 .dc-list li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
 .dc-list li svg{flex:none;width:18px;height:18px;margin-top:1px;color:#5865F2}
 .dc-note .btn{align-self:stretch;justify-content:center}
+/* portada: supporters */
+.sup-wall .card-h h3 .sup{margin-right:2px}
+.sup-list{display:flex;flex-wrap:wrap;gap:8px;padding:4px 16px 0}
+.sup-chip{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:5px 11px 5px 5px;border-radius:999px;background:var(--surface-2);color:var(--fg);font-weight:700;font-size:13.5px;text-decoration:none!important;transition:background .15s}
+a.sup-chip:hover{background:color-mix(in srgb,#FF5E5B 14%,var(--surface-2))}
+.sup-chip .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sup-chip.more{padding:5px 12px;color:var(--muted)}
+.sup-thx{margin:0;padding:12px 16px 14px;color:var(--muted);font-size:13px;line-height:1.45}
+.sup-thx .tbtn{margin-left:2px}
+/* portada: resumen del día */
+.daily .dy-l{padding:10px 16px 2px;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.daily .lrow .i svg{width:16px;height:16px;color:#F5B700;display:block}
+.daily .dy-v{font-weight:800;font-variant-numeric:tabular-nums}
+.daily .dy-cta{display:flex;flex-direction:column;gap:10px;padding:12px 16px 16px}
+.daily .dy-cta p{margin:0;font-size:13px;line-height:1.45}
+.daily .dy-cta .btn{align-self:stretch;justify-content:center}
+.daily-strip{background:color-mix(in srgb,#5865F2 11%,var(--surface));border-color:color-mix(in srgb,#5865F2 35%,transparent)}
+.daily-strip p b{color:inherit}
+.daily-strip .nb-ic{background:#5865F2}
+@media (max-width:600px){.daily-strip{flex-wrap:nowrap;gap:10px;padding:10px 8px 10px 12px}.daily-strip p{flex:1 1 0;min-width:0}.daily-strip p b{display:block}.daily-strip .btn{order:0;margin-left:0}}
 /* perfil: nota con ajuste manual */
 .avg-adj{display:block;margin-top:2px;font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
 /* Ko-fi: ¿llegan los avisos? */

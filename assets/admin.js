@@ -107,6 +107,7 @@ export async function mount(root, ctx) {
       <div class="card in"><div class="card-h"><h3>Ko-fi</h3><small>insignia ♥ automática al apoyar</small></div><div id="kofi"><div class="card-b"><div class="sk" style="height:80px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Supporters</h3><small>apoyan el proyecto: insignia ♥ y sus partidos al momento</small></div><div id="sups"><div class="card-b"><div class="sk" style="height:60px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Jugadores seguidos</h3><small>destacados: si juegan, se revisan en cada pasada</small></div><div id="seeds"><div class="card-b"><div class="sk" style="height:100px"></div></div></div></div>
+      <div class="card in"><div class="card-h"><h3>Ajustes manuales de nota</h3><small>puntos que se suman a la nota de un jugador</small></div><div id="adjust"><div class="card-b"><div class="sk" style="height:60px"></div></div></div></div>
       <div class="card in"><div class="card-h"><h3>Fórmula de la nota</h3></div><div class="card-b" id="weights"><div class="sk" style="height:160px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Logos de rango</h3><small>se ven en toda la web</small></div><div class="card-b" id="ranks"><div class="sk" style="height:120px"></div></div></div>
       <div class="card in"><div class="card-h"><h3>Web, archivo y apoyo</h3></div><div class="card-b" id="extra"><div class="sk" style="height:120px"></div></div></div>
@@ -137,7 +138,7 @@ export async function mount(root, ctx) {
   drawProgress(null);
   loadWorkflow(); loadRuns(); drawRanks(); loadInbox(); loadAlerts(); loadKofi(); loadSocial();
   $('#inbox-reload').addEventListener('click', () => loadInbox());
-  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawExtra(st.data); }
+  try { const st = await readSettings(); X.applySettings(st.data); drawSeeds(st.data); drawWeights(st.data); drawHidden(st.data); drawHidPlayers(st.data); drawSups(st.data); drawAdjust(st.data); drawExtra(st.data); }
   catch (e) { for (const id of ['seeds', 'hidden', 'hidplayers', 'sups', 'extra']) { const el = $('#' + id); if (el) el.innerHTML = `<div class="card-b err">${X.esc(e.message)}</div>`; } const w = $('#weights'); if (w) w.innerHTML = `<p class="err">${X.esc(e.message)}</p>`; if (e.status === 401) { setToken(null); X.renderChrome(); } }
   if (sessionStorage.getItem(RUN_KEY)) track();
 }
@@ -501,6 +502,34 @@ async function drawSeeds(set) {
     try { const s = await writeSettings((x) => { x.seeds = [...new Set([...(x.seeds || []).map(String), id])]; return x; }, `Seguir jugador ${id}`); X.toast('Añadido: se revisará en la próxima pasada'); drawSeeds(s); }
     catch (ex) { X.toast(ex.message); sb.disabled = false; }
   });
+}
+
+// ---------- ajustes manuales de nota ----------
+// Puntos que se suman a la nota de un jugador en cada partido (ajustes -> adjust; ver adjustFrom en core.js). Aquí se
+// encienden y se apagan: apagado, el ajuste se guarda en adjustOff (no cuenta) para poder volver a encenderlo.
+async function drawAdjust(set) {
+  const el = $('#adjust'); if (!el) return;
+  const { esc, dec } = X;
+  const on = X.C.adjustFrom(set.adjust), off = X.C.adjustFrom(set.adjustOff);
+  const ids = [...new Set([...Object.keys(on), ...Object.keys(off)])];
+  if (!ids.length) { el.innerHTML = '<div class="card-b muted">Ningún jugador tiene un ajuste manual.</div>'; return; }
+  let P = {}; try { P = await X.loadPlayers(); } catch {}
+  const pts = (n) => (n < 0 ? '−' : '+') + (Number.isInteger(n) ? Math.abs(n) : dec(Math.abs(n)));
+  el.innerHTML = ids.map((id) => { const act = id in on, n = act ? on[id] : off[id], p = P[id];
+    return `<div class="lrow">${X.avatar(p ? p.n : id, id, 'sm')}<span class="nm" style="flex-direction:column;align-items:flex-start;gap:0"><a href="#j-${esc(id)}">${esc(p ? p.n : 'ID ' + id)}</a><span class="sub">ID ${esc(id)} · ${esc(pts(n))} por partido · <b style="color:var(--${act ? 'win' : 'muted'})">${act ? 'Activo' : 'Desactivado'}</b></span></span><button class="btn sm${act ? '' : ' primary'}" type="button" data-adj="${esc(id)}" data-on="${act ? 1 : 0}">${act ? 'Desactivar' : 'Activar'}</button></div>`; }).join('')
+    + '<div class="card-b muted" style="font-size:13px;line-height:1.45">Activo, se suma a su nota en cada partido y su perfil lo indica junto a la nota media. Al cambiarlo, el robot recalcula sus partidos de los últimos 60 días en la siguiente pasada (unos minutos).</div>';
+  el.querySelectorAll('[data-adj]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.getAttribute('data-adj'), act = b.getAttribute('data-on') === '1'; if (b.disabled) return; b.disabled = true;
+    try {
+      const s = await writeSettings((x) => {
+        const A = Object.assign({}, x.adjust), O = Object.assign({}, x.adjustOff);
+        if (act) { if (id in A) { O[id] = A[id]; delete A[id]; } } else if (id in O) { A[id] = O[id]; delete O[id]; }
+        for (const [k, v] of [['adjust', A], ['adjustOff', O]]) { if (Object.keys(v).length) x[k] = v; else delete x[k]; }
+        return x;
+      }, `${act ? 'Desactivar' : 'Activar'} el ajuste de nota de ${id}`);
+      X.toast(act ? 'Ajuste desactivado: sus notas vuelven a ser las de la fórmula en la próxima pasada' : 'Ajuste activado: se aplica en la próxima pasada'); X.applySettings(s); drawAdjust(s);
+    } catch (ex) { X.toast(ex.message); b.disabled = false; }
+  }));
 }
 
 // ---------- supporters ----------
