@@ -1430,6 +1430,12 @@ a.sup-chip:hover{background:color-mix(in srgb,#FF5E5B 14%,var(--surface-2))}
 .sup-chip.more{padding:5px 12px;color:var(--muted)}
 .sup-thx{margin:0;padding:12px 16px 14px;color:var(--muted);font-size:13px;line-height:1.45}
 .sup-thx .tbtn{margin-left:2px}
+/* portada (móvil): accesos al resumen del día y a los supporters */
+.home-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.home-chips::-webkit-scrollbar{display:none}
+.home-chips .hc{flex:none;display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px 0 11px;border:0;border-radius:999px;background:var(--surface);color:var(--fg);font:inherit;font-weight:700;font-size:13.5px;box-shadow:var(--shadow-1)}
+.home-chips .hc svg{width:16px;height:16px;color:#F5B700}
+.home-chips .hc i{font-style:normal;color:var(--muted);font-weight:600}
 /* portada: resumen del día */
 .daily .dy-l{padding:10px 16px 2px;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .daily .lrow .i svg{width:16px;height:16px;color:#F5B700;display:block}

@@ -802,6 +802,7 @@ async function viewMatches(dayArg, tok) {
         <div class="filters" id="m-filters"></div>
         <div class="upd" id="m-upd" hidden></div>
       </div>
+      <div id="m-chips" class="only-mobile"></div>
       <div id="m-live" class="only-mobile"></div>
       <div id="m-me" class="only-mobile"></div>
       <div id="m-favs" class="only-mobile"></div>
@@ -1027,11 +1028,27 @@ async function fillSupporters(tok) {
   let rows = []; try { rows = await loadSearch(); } catch {}
   const el = $('#sup-list'); if (!el || !live(tok)) return;
   const by = new Map(rows.map((r) => [String(r[0]), r])), ids = [...(S.sup || [])].filter((id) => by.has(id));   // sin ficha (o oculto), no sale
-  if (!ids.length) { const c = el.closest('.sup-wall'); if (c) c.remove(); return; }
-  const MAX = 18;
-  el.innerHTML = ids.slice(0, MAX).map((id) => { const r = by.get(id); return `<a class="sup-chip" href="#j-${esc(id)}">${avatar(r[1], id, 'sm')}<span class="t">${esc(r[1])}</span>${rank(r[2], 18)}</a>`; }).join('')
-    + (ids.length > MAX ? `<span class="sup-chip more">+${int(ids.length - MAX)}</span>` : '');
+  if (!ids.length) { const c = el.closest('.sup-wall'); if (c) c.remove(); homeSups = []; drawHomeChips(); return; }
+  homeSups = ids.map((id) => by.get(id));
+  el.innerHTML = supChips(18); drawHomeChips();
 }
+let homeSups = [], homeDaily = null;
+const supChips = (max) => homeSups.slice(0, max).map((r) => `<a class="sup-chip" href="#j-${esc(r[0])}" data-close>${avatar(r[1], r[0], 'sm')}<span class="t">${esc(r[1])}</span>${rank(r[2], 18)}</a>`).join('')
+  + (homeSups.length > max ? `<span class="sup-chip more">+${int(homeSups.length - max)}</span>` : '');
+// En el móvil las tarjetas de la derecha quedan debajo de toda la lista de partidos: arriba van dos accesos directos
+function drawHomeChips() {
+  const el = $('#m-chips'); if (!el) return;
+  const a = homeDaily ? `<button type="button" class="hc" data-daily-open>${ICON.star}<span>${esc(t('Resumen del día'))}</span></button>` : '';
+  const b = homeSups.length ? `<button type="button" class="hc" data-sup-open><span class="sup" aria-hidden="true">♥</span><span>${esc(t('Supporters'))}</span><i>${int(homeSups.length)}</i></button>` : '';
+  el.innerHTML = a || b ? `<div class="home-chips">${a}${b}</div>` : '';
+}
+function supportersSheet() {
+  if (!homeSups.length) return;
+  openSheet(`<div class="sheet-h" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm" id="sheet-title"><span><span class="sup" aria-hidden="true">♥</span> ${esc(t('Supporters'))}</span></div><button class="ibtn" type="button" data-close aria-label="${esc(t('Cerrar'))}" style="color:var(--muted);font-size:22px">×</button></div>
+    <div class="sheet-b sup-wall" style="padding:0 0 6px"><p class="muted" style="margin:0;padding:0 16px 8px;font-size:13px">${esc(t('Gracias por hacerlo posible'))}</p><div class="sup-list">${supChips(60)}</div>
+    <p class="sup-thx">${esc(t('SlapScore sigue en marcha gracias a quienes lo apoyan.'))}${supportUrl() ? ` <button type="button" class="tbtn" data-kofi-how>${esc(t('Quiero salir aquí'))}</button>` : ''}</p></div>`, 'dc-sheet');
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-sup-open]')) { e.preventDefault(); supportersSheet(); } });
 
 // ---------- resumen diario ----------
 // Cada día a las 12:00 (Madrid) sale en Discord el jugador del día, el partido del día y el ranking de palos de ayer;
@@ -1076,6 +1093,7 @@ function dailyStrip(d) {
 }
 async function fillDaily(tok) {
   const d = await loadDaily(); if (!live(tok)) return;
+  homeDaily = d; drawHomeChips();
   const slot = $('#daily-slot'); if (slot) slot.innerHTML = d ? dailyCard(d) : '';
   const st = $('#daily-strip'); if (st) st.innerHTML = d ? dailyStrip(d) : '';
 }
